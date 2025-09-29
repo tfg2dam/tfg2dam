@@ -1,0 +1,104 @@
+/* Reset */
+body {
+  margin: 0;
+}
+
+/* Encabezado */
+header {
+  background-color: #000;
+  color: #fff;
+  padding: 15px 30px;
+  font-size: 24px;
+  font-weight: bold;
+  font-family: Arial, sans-serif;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Logo */
+.logo {
+  color: #fff;
+}
+
+/* Contenedor derecha */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* Buscador */
+.search-bar {
+  display: flex;
+}
+
+.search-bar input {
+  padding: 8px;
+  border: none;
+  border-radius: 4px 0 0 4px;
+  outline: none;
+}
+
+.search-bar button {
+  padding: 8px 12px;
+  border: none;
+  background-color: #fff;
+  color: #000;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+}
+
+.search-bar button:hover {
+  background-color: #ddd;
+}
+
+/* Menú usuario */
+.user-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.user-icon {
+  font-size: 28px;
+  cursor: pointer;
+  color: #fff;
+}
+
+.user-icon:hover {
+  color: #aaa;
+}
+
+/* Dropdown oculto por defecto */
+.dropdown {
+  display: none;
+  position: absolute;
+  right: 0;
+  background-color: #fff;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px rgba(0,0,0,0.2);
+  border-radius: 6px;
+  overflow: hidden;
+  z-index: 1;
+
+  font-size: 14px; /* 👈 tamaño más pequeño */
+}
+
+/* Enlaces dentro del dropdown */
+.dropdown a {
+  color: #000;
+  padding: 10px 14px; /* 👈 menos relleno para que se vea más compacto */
+  text-decoration: none;
+  display: block;
+}
+
+.dropdown a:hover {
+  background-color: #f1f1f1;
+}
+
+
+/* Mostrar el dropdown al pasar el ratón */
+.user-menu:hover .dropdown {
+  display: block;
+}
