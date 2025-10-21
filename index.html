@@ -1,132 +1,26 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
   <head>
-    <title>AvanzaUni</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="index.css" />
+    <meta charset="utf-8">
+    <title>BTC en tiempo real (€)</title>
   </head>
-  <body>
-    <header>
-      <div class="logo">AvanzaUni</div>
-      <div class="header-right">
-        <form class="search-bar">
-          <input type="text" placeholder="Buscar..." />
-          <button type="submit">🔍</button>
-        </form>
-
-        <div class="user-menu">
-          <span class="user-icon">👤</span>
-          <div class="dropdown">
-            <a href="login.html">Iniciar sesión</a>
-            <a href="registro.html">Registrarse</a>
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <!-- ======= CONTENIDO PRINCIPAL ======= -->
-    <main class="home">
-      <h1 class="home-title">
-        Elige los estudios que te interesan
-        <small>para consultar sus notas de corte</small>
-      </h1>
-
-      <section class="blocks">
-        <!-- Formación Profesional -->
-        <div class="panel panel-fp">
-          <h2 class="panel-title">Formación Profesional</h2>
-
-          <div class="cards">
-            <!-- Grado Medio -->
-            <article class="card">
-              <h3 class="card-title">Ciclos Formativos de<br /><span>Grado Medio</span></h3>
-
-              <label class="label" for="ccaa-gm">Selecciona comunidad autónoma</label>
-              <div class="select-wrap">
-                <select id="ccaa-gm" class="select">
-                  <option value="" selected>Selecciona comunidad autónoma</option>
-                  <option>Andalucía</option>
-                  <option>Aragón</option>
-                  <option>Asturias</option>
-                  <option>Illes Balears</option>
-                  <option>Canarias</option>
-                  <option>Cantabria</option>
-                  <option>Castilla-La Mancha</option>
-                  <option>Castilla y León</option>
-                  <option>Cataluña</option>
-                  <option>Comunidad de Madrid</option>
-                  <option>Comunidad Valenciana</option>
-                  <option>Extremadura</option>
-                  <option>Galicia</option>
-                  <option>La Rioja</option>
-                  <option>Murcia</option>
-                  <option>Navarra</option>
-                  <option>País Vasco</option>
-                  <option>Ceuta</option>
-                  <option>Melilla</option>
-                </select>
-              </div>
-
-              <button class="btn btn-outline">Ver notas de corte</button>
-            </article>
-
-            <!-- Grado Superior -->
-            <article class="card">
-              <h3 class="card-title">Ciclos Formativos de<br /><span>Grado Superior</span></h3>
-
-              <label class="label" for="ccaa-gs">Selecciona comunidad autónoma</label>
-              <div class="select-wrap">
-                <select id="ccaa-gs" class="select">
-                  <option value="" selected>Selecciona comunidad autónoma</option>
-                  <option>Andalucía</option>
-                  <option>Aragón</option>
-                  <option>Asturias</option>
-                  <option>Illes Balears</option>
-                  <option>Canarias</option>
-                  <option>Cantabria</option>
-                  <option>Castilla-La Mancha</option>
-                  <option>Castilla y León</option>
-                  <option>Cataluña</option>
-                  <option>Comunidad de Madrid</option>
-                  <option>Comunidad Valenciana</option>
-                  <option>Extremadura</option>
-                  <option>Galicia</option>
-                  <option>La Rioja</option>
-                  <option>Murcia</option>
-                  <option>Navarra</option>
-                  <option>País Vasco</option>
-                  <option>Ceuta</option>
-                  <option>Melilla</option>
-                </select>
-              </div>
-
-              <button class="btn btn-outline">Ver notas de corte</button>
-            </article>
-          </div>
-        </div>
-
-        <!-- Universidad -->
-        <div class="panel panel-uni">
-          <h2 class="panel-title">Universidad</h2>
-
-          <div class="cards single">
-            <article class="card">
-              <h3 class="card-title">Grados<br /><span>Universitarios</span></h3>
-              <button class="btn btn-solid">Notas de corte de grados</button>
-              <a href="calculadora_pau.html" class="btn btn-outline">Calcula tu nota de la Pau</a>
-            </article>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <footer class="footer">
-       <span id="year"></span> AvanzaUni
-    </footer>
+  <body style="font-family:sans-serif;text-align:center;margin-top:60px">
+    <h1>💶 Precio de Bitcoin</h1>
+    <h2 id="precio">Cargando...</h2>
 
     <script>
-      // Año en el footer
-      document.getElementById("year").textContent = new Date().getFullYear();
+      const p = document.getElementById("precio");
+      let prev = 0;
+
+      const ws = new WebSocket("wss://stream.binance.com:9443/ws/btceur@trade");
+      ws.onmessage = e => {
+        const { p: price } = JSON.parse(e.data);
+        const v = parseFloat(price);
+        p.textContent = v.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
+        p.style.color = v > prev ? "green" : v < prev ? "red" : "black";
+        prev = v;
+      };
+      ws.onerror = () => p.textContent = "Error de conexión";
     </script>
   </body>
 </html>
