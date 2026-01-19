@@ -85,6 +85,7 @@ dependencies {
     // Navigation Compose (opcional, para navegación más compleja)
     implementation("androidx.navigation:navigation-compose:2.7.5")
 
+
     // Para gráficos (opcional - MPAndroidChart o Vico)
     // implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
     // implementation("com.patrykandpatrick.vico:compose:1.13.1")

@@ -61,8 +61,7 @@ enum class TransactionType {
     BUY,
     SELL
 }
-
-@InternalSerializationApi // Datos del usuario
+@InternalSerializationApi
 @Serializable
 data class UserData(
     var username: String = "Usuario",
@@ -81,7 +80,7 @@ data class Rank(
     val description: String
 )
 
-@InternalSerializationApi // Entrada de la tabla de clasificación
+@InternalSerializationApi
 @Serializable
 data class LeaderboardEntry(
     val id: String,

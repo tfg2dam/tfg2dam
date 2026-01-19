@@ -8,6 +8,7 @@ package com.simutrade.repository
 import android.content.Context
 import android.content.SharedPreferences
 import com.simutrade.models.*
+import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
@@ -28,6 +29,8 @@ class UserRepository(context: Context) {
     }
 
     // Obtener datos del usuario
+
+    @OptIn(InternalSerializationApi::class)
     fun getUserData(): UserData {
         val jsonString = sharedPreferences.getString(KEY_USER_DATA, null)
         return if (jsonString != null) {
@@ -42,17 +45,20 @@ class UserRepository(context: Context) {
     }
 
     // Guardar datos del usuario
+    @OptIn(InternalSerializationApi::class)
     fun saveUserData(userData: UserData) {
         val jsonString = json.encodeToString(userData)
         sharedPreferences.edit().putString(KEY_USER_DATA, jsonString).apply()
     }
 
     // Resetear datos del usuario
+    @OptIn(InternalSerializationApi::class)
     fun resetUserData() {
         saveUserData(getDefaultUserData())
     }
 
     // Datos por defecto
+    @OptIn(InternalSerializationApi::class)
     private fun getDefaultUserData(): UserData {
         return UserData(
             username = "Usuario",
@@ -64,6 +70,7 @@ class UserRepository(context: Context) {
     }
 
     // Calcular valor de la cartera
+    @OptIn(InternalSerializationApi::class)
     fun calculatePortfolioValue(portfolio: List<PortfolioHolding>): Double {
         return portfolio.sumOf { it.quantity * it.currentPrice }
     }
@@ -84,6 +91,7 @@ class UserRepository(context: Context) {
     }
 
     // Comprar activo
+    @OptIn(InternalSerializationApi::class)
     fun buyAsset(
         userData: UserData,
         asset: Asset,
@@ -139,6 +147,7 @@ class UserRepository(context: Context) {
     }
 
     // Vender activo
+    @OptIn(InternalSerializationApi::class)
     fun sellAsset(
         userData: UserData,
         assetId: String,
@@ -183,6 +192,7 @@ class UserRepository(context: Context) {
     }
 
     // Actualizar precios de la cartera
+    @OptIn(InternalSerializationApi::class)
     fun updatePortfolioPrices(userData: UserData, priceMap: Map<String, Double>): UserData {
         userData.portfolio.forEach { holding ->
             priceMap[holding.assetId]?.let { newPrice ->
@@ -193,6 +203,7 @@ class UserRepository(context: Context) {
     }
 
     // Agregar dinero (para recompensas educativas)
+    @OptIn(InternalSerializationApi::class)
     fun addBalance(userData: UserData, amount: Double): UserData {
         userData.balance += amount
         saveUserData(userData)
