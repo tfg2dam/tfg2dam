@@ -1,8 +1,3 @@
-// ============================================
-// ACTIVIDAD PRINCIPAL - SimuTrade
-// Archivo: app/src/main/java/com/simutrade/MainActivity.kt
-// ============================================
-
 package com.simutrade
 
 import android.os.Bundle
@@ -19,7 +14,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.simutrade.ui.screens.*
 import com.simutrade.ui.theme.SimuTradeTheme
 import com.simutrade.viewmodel.MainViewModel
-import kotlinx.serialization.InternalSerializationApi
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,15 +26,13 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, InternalSerializationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SimuTradeApp() {
     val viewModel: MainViewModel = viewModel()
     val currentPage by viewModel.currentPage.collectAsState()
     val userData by viewModel.userData.collectAsState()
     val currentRank = viewModel.getCurrentRank()
-    val totalValue = viewModel.getTotalValue()
-    val profit = viewModel.getProfit()
 
     val navigationItems = listOf(
         NavigationItem("dashboard", "Panel", Icons.Default.Dashboard),
@@ -50,18 +42,6 @@ fun SimuTradeApp() {
     )
 
     Scaffold(
-        bottomBar = {
-            NavigationBar {
-                navigationItems.forEach { item ->
-                    NavigationBarItem(
-                        icon = { Icon(item.icon, contentDescription = item.label) },
-                        label = { Text(item.label) },
-                        selected = currentPage == item.route,
-                        onClick = { viewModel.navigateTo(item.route) }
-                    )
-                }
-            }
-        },
         topBar = {
             TopAppBar(
                 title = {
@@ -75,15 +55,20 @@ fun SimuTradeApp() {
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        // Mostrar diálogo de confirmación para resetear
-                    }) {
-                        Icon(Icons.Default.RestartAlt, contentDescription = "Reiniciar")
-                    }
                 }
             )
+        },
+        bottomBar = {
+            NavigationBar {
+                navigationItems.forEach { item ->
+                    NavigationBarItem(
+                        icon = { Icon(item.icon, contentDescription = item.label) },
+                        label = { Text(item.label) },
+                        selected = currentPage == item.route,
+                        onClick = { viewModel.navigateTo(item.route) }
+                    )
+                }
+            }
         }
     ) { paddingValues ->
         Surface(
@@ -95,8 +80,8 @@ fun SimuTradeApp() {
                 "dashboard" -> DashboardScreen(viewModel)
                 "market" -> MarketScreen(viewModel)
                 "trading" -> TradingScreen(viewModel)
-                // "rankings" -> RankingsScreen(viewModel)
-                // "educational" -> EducationalScreen(viewModel)
+                "rankings" -> RankingsScreen(viewModel)
+                "educational" -> EducationalScreen(viewModel)
             }
         }
     }

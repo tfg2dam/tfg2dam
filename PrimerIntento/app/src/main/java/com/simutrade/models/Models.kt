@@ -1,15 +1,5 @@
-// ============================================
-// MODELOS DE DATOS - SimuTrade
-// Archivo: app/src/main/java/com/simutrade/models/Models.kt
-// ============================================
-
 package com.simutrade.models
 
-import kotlinx.serialization.InternalSerializationApi
-import kotlinx.serialization.Serializable
-
-@InternalSerializationApi // Modelo de activo (acción o criptomoneda)
-@Serializable
 data class Asset(
     val id: String,
     val symbol: String,
@@ -25,15 +15,11 @@ enum class AssetType {
     CRYPTO
 }
 
-@InternalSerializationApi // Historial de precios para gráficos
-@Serializable
 data class PriceHistory(
     val time: String,
     val price: Double
 )
 
-@InternalSerializationApi // Posición en la cartera del usuario
-@Serializable
 data class PortfolioHolding(
     val assetId: String,
     val symbol: String,
@@ -44,11 +30,9 @@ data class PortfolioHolding(
     var currentPrice: Double
 )
 
-@InternalSerializationApi // Transacción (compra/venta)
-@Serializable
 data class Transaction(
     val id: String,
-    val date: Long, // timestamp
+    val date: Long,
     val type: TransactionType,
     val assetId: String,
     val symbol: String,
@@ -61,8 +45,7 @@ enum class TransactionType {
     BUY,
     SELL
 }
-@InternalSerializationApi
-@Serializable
+
 data class UserData(
     var username: String = "Usuario",
     var balance: Double = 100.0,
@@ -71,7 +54,6 @@ data class UserData(
     val transactions: MutableList<Transaction> = mutableListOf()
 )
 
-// Sistema de rangos
 data class Rank(
     val name: String,
     val minProfit: Double,
@@ -80,8 +62,6 @@ data class Rank(
     val description: String
 )
 
-@InternalSerializationApi
-@Serializable
 data class LeaderboardEntry(
     val id: String,
     val username: String,
@@ -90,8 +70,7 @@ data class LeaderboardEntry(
     val portfolioValue: Double
 )
 
-// Resultado de operación
 sealed class OperationResult {
-    data class Success @OptIn(InternalSerializationApi::class) constructor(val message: String, val userData: UserData) : OperationResult()
+    data class Success(val message: String, val userData: UserData) : OperationResult()
     data class Error(val message: String) : OperationResult()
 }
