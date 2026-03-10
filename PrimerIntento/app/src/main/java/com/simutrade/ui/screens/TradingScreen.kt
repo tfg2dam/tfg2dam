@@ -1,8 +1,3 @@
-// ============================================
-// PANTALLA TRADING - SimuTrade
-// Archivo: app/src/main/java/com/simutrade/ui/screens/TradingScreen.kt
-// ============================================
-
 package com.simutrade.ui.screens
 
 import androidx.compose.foundation.layout.*
@@ -20,9 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.simutrade.models.*
 import com.simutrade.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
-import kotlinx.serialization.InternalSerializationApi
 
-@OptIn(InternalSerializationApi::class)
 @Composable
 fun TradingScreen(viewModel: MainViewModel) {
     val selectedAsset by viewModel.selectedAsset.collectAsState()
@@ -53,7 +46,6 @@ fun TradingScreen(viewModel: MainViewModel) {
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -71,7 +63,6 @@ fun TradingScreen(viewModel: MainViewModel) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-
                     OutlinedButton(onClick = {
                         viewModel.clearSelectedAsset()
                         viewModel.navigateTo("market")
@@ -80,13 +71,8 @@ fun TradingScreen(viewModel: MainViewModel) {
                     }
                 }
 
-                // Asset Info Card
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -123,7 +109,6 @@ fun TradingScreen(viewModel: MainViewModel) {
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold
                             )
-
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -147,7 +132,6 @@ fun TradingScreen(viewModel: MainViewModel) {
                             }
                         }
 
-                        // Current holding info
                         if (currentHolding != null) {
                             Spacer(modifier = Modifier.height(16.dp))
                             Card(
@@ -155,9 +139,7 @@ fun TradingScreen(viewModel: MainViewModel) {
                                     containerColor = MaterialTheme.colorScheme.surfaceVariant
                                 )
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(12.dp)
-                                ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
                                     Text(
                                         text = "Posición actual",
                                         style = MaterialTheme.typography.bodySmall,
@@ -185,7 +167,6 @@ fun TradingScreen(viewModel: MainViewModel) {
                     }
                 }
 
-                // Trading Tabs
                 TabRow(selectedTabIndex = selectedTab) {
                     Tab(
                         selected = selectedTab == 0,
@@ -200,7 +181,6 @@ fun TradingScreen(viewModel: MainViewModel) {
                     )
                 }
 
-                // Trading Form
                 when (selectedTab) {
                     0 -> BuyForm(
                         asset = asset,
@@ -253,14 +233,9 @@ fun TradingScreen(viewModel: MainViewModel) {
 }
 
 @Composable
-fun NoAssetSelected(
-    modifier: Modifier = Modifier,
-    onNavigateToMarket: () -> Unit
-) {
+fun NoAssetSelected(modifier: Modifier = Modifier, onNavigateToMarket: () -> Unit) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(32.dp),
+        modifier = modifier.fillMaxSize().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -283,13 +258,10 @@ fun NoAssetSelected(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(24.dp))
-        Button(onClick = onNavigateToMarket) {
-            Text("Ir al Mercado")
-        }
+        Button(onClick = onNavigateToMarket) { Text("Ir al Mercado") }
     }
 }
 
-@OptIn(InternalSerializationApi::class)
 @Composable
 fun BuyForm(
     asset: Asset,
@@ -299,9 +271,7 @@ fun BuyForm(
     balance: Double,
     onBuy: () -> Unit
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         OutlinedTextField(
             value = quantity,
             onValueChange = onQuantityChange,
@@ -311,32 +281,21 @@ fun BuyForm(
             singleLine = true
         )
 
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Card(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Precio unitario", style = MaterialTheme.typography.bodyMedium)
                     Text("€${String.format("%.2f", asset.currentPrice)}", fontWeight = FontWeight.Medium)
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Cantidad", style = MaterialTheme.typography.bodyMedium)
                     Text(quantity.ifEmpty { "0" }, fontWeight = FontWeight.Medium)
                 }
                 Divider()
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Total", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text("€${String.format("%.2f", total)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
@@ -344,14 +303,10 @@ fun BuyForm(
         }
 
         Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            ),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
+            Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "Efectivo disponible",
                     style = MaterialTheme.typography.bodySmall,
@@ -395,7 +350,6 @@ fun BuyForm(
     }
 }
 
-@OptIn(InternalSerializationApi::class)
 @Composable
 fun SellForm(
     asset: Asset,
@@ -405,9 +359,7 @@ fun SellForm(
     currentHolding: PortfolioHolding?,
     onSell: () -> Unit
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         OutlinedTextField(
             value = quantity,
             onValueChange = onQuantityChange,
@@ -417,32 +369,21 @@ fun SellForm(
             singleLine = true
         )
 
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Card(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Precio unitario", style = MaterialTheme.typography.bodyMedium)
                     Text("€${String.format("%.2f", asset.currentPrice)}", fontWeight = FontWeight.Medium)
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Cantidad", style = MaterialTheme.typography.bodyMedium)
                     Text(quantity.ifEmpty { "0" }, fontWeight = FontWeight.Medium)
                 }
                 Divider()
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Total", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text("€${String.format("%.2f", total)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
@@ -451,14 +392,10 @@ fun SellForm(
 
         if (currentHolding != null) {
             Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                ),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "Disponible para vender",
                         style = MaterialTheme.typography.bodySmall,
@@ -497,9 +434,7 @@ fun SellForm(
             onClick = onSell,
             modifier = Modifier.fillMaxWidth(),
             enabled = currentHolding != null && quantity.toDoubleOrNull()?.let { it > 0 && it <= currentHolding.quantity } == true,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.secondary
-            )
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
         ) {
             Text("Vender ${asset.symbol}")
         }

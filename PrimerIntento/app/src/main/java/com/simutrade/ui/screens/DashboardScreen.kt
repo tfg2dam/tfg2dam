@@ -1,8 +1,3 @@
-// ============================================
-// PANTALLA DASHBOARD - SimuTrade
-// Archivo: app/src/main/java/com/simutrade/ui/screens/DashboardScreen.kt
-// ============================================
-
 package com.simutrade.ui.screens
 
 import androidx.compose.foundation.layout.*
@@ -17,13 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.simutrade.data.MockData
 import com.simutrade.models.*
 import com.simutrade.viewmodel.MainViewModel
-import kotlinx.serialization.InternalSerializationApi
 import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(InternalSerializationApi::class)
 @Composable
 fun DashboardScreen(viewModel: MainViewModel) {
     val userData by viewModel.userData.collectAsState()
@@ -39,7 +33,6 @@ fun DashboardScreen(viewModel: MainViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Título
         item {
             Text(
                 text = "Panel de Control",
@@ -48,7 +41,6 @@ fun DashboardScreen(viewModel: MainViewModel) {
             )
         }
 
-        // Tarjetas de resumen
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -61,7 +53,6 @@ fun DashboardScreen(viewModel: MainViewModel) {
                     icon = Icons.Default.AccountBalance,
                     modifier = Modifier.weight(1f)
                 )
-
                 SummaryCard(
                     title = "Efectivo",
                     value = "€${String.format("%.2f", userData.balance)}",
@@ -84,7 +75,6 @@ fun DashboardScreen(viewModel: MainViewModel) {
                     icon = Icons.Default.TrendingUp,
                     modifier = Modifier.weight(1f)
                 )
-
                 SummaryCard(
                     title = "Rango",
                     value = currentRank.icon,
@@ -95,21 +85,12 @@ fun DashboardScreen(viewModel: MainViewModel) {
             }
         }
 
-        // Progreso al siguiente rango
         item {
-            val ranks = listOf(
-                Rank("Bronce", Double.NEGATIVE_INFINITY, "#CD7F32", "🥉", "Novato"),
-                Rank("Plata", 50.0, "#C0C0C0", "🥈", "Básico"),
-                Rank("Oro", 150.0, "#FFD700", "🥇", "Experimentado"),
-                Rank("Platino", 300.0, "#E5E4E2", "💎", "Experto"),
-                Rank("Diamante", 500.0, "#B9F2FF", "👑", "Maestro")
-            )
-
+            val ranks = MockData.ranks
             val currentIndex = ranks.indexOfFirst { it.name == currentRank.name }
             if (currentIndex < ranks.size - 1) {
                 val nextRank = ranks[currentIndex + 1]
                 val progress = ((profit - currentRank.minProfit) / (nextRank.minProfit - currentRank.minProfit)).coerceIn(0.0, 1.0)
-
                 RankProgressCard(
                     nextRank = nextRank,
                     currentProfit = profit,
@@ -118,7 +99,6 @@ fun DashboardScreen(viewModel: MainViewModel) {
             }
         }
 
-        // Mi Cartera
         item {
             Text(
                 text = "Mi Cartera",
@@ -129,13 +109,9 @@ fun DashboardScreen(viewModel: MainViewModel) {
 
         if (userData.portfolio.isEmpty()) {
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Card(modifier = Modifier.fillMaxWidth()) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
+                        modifier = Modifier.fillMaxWidth().padding(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -152,7 +128,6 @@ fun DashboardScreen(viewModel: MainViewModel) {
             }
         }
 
-        // Transacciones recientes
         item {
             Text(
                 text = "Transacciones Recientes",
@@ -163,13 +138,9 @@ fun DashboardScreen(viewModel: MainViewModel) {
 
         if (userData.transactions.isEmpty()) {
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Card(modifier = Modifier.fillMaxWidth()) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
+                        modifier = Modifier.fillMaxWidth().padding(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -196,12 +167,8 @@ fun SummaryCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
+    Card(modifier = modifier) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -236,12 +203,8 @@ fun SummaryCard(
 
 @Composable
 fun RankProgressCard(nextRank: Rank, currentProfit: Double, progress: Float) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = "Progreso al Siguiente Rango",
                 style = MaterialTheme.typography.titleMedium,
@@ -278,7 +241,6 @@ fun RankProgressCard(nextRank: Rank, currentProfit: Double, progress: Float) {
     }
 }
 
-@OptIn(InternalSerializationApi::class)
 @Composable
 fun PortfolioHoldingCard(holding: PortfolioHolding) {
     val value = holding.quantity * holding.currentPrice
@@ -286,13 +248,9 @@ fun PortfolioHoldingCard(holding: PortfolioHolding) {
     val profit = value - cost
     val profitPercent = (profit / cost) * 100
 
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -312,7 +270,6 @@ fun PortfolioHoldingCard(holding: PortfolioHolding) {
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = "€${String.format("%.2f", value)}",
@@ -329,18 +286,13 @@ fun PortfolioHoldingCard(holding: PortfolioHolding) {
     }
 }
 
-@OptIn(InternalSerializationApi::class)
 @Composable
 fun TransactionCard(transaction: Transaction) {
     val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
 
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
@@ -375,7 +327,6 @@ fun TransactionCard(transaction: Transaction) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
             Text(
                 text = "${if (transaction.type == TransactionType.BUY) "-" else "+"}€${String.format("%.2f", transaction.total)}",
                 style = MaterialTheme.typography.titleMedium,
