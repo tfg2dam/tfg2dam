@@ -1,8 +1,3 @@
-// ============================================
-// TEMA DE LA APLICACIÓN - SimuTrade
-// Archivo: app/src/main/java/com/simutrade/ui/theme/Theme.kt
-// ============================================
-
 package com.simutrade.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -12,13 +7,11 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// Colores principales
 private val Blue600 = Color(0xFF2563EB)
 private val Purple600 = Color(0xFF9333EA)
 private val Green600 = Color(0xFF16A34A)
 private val Red600 = Color(0xFFDC2626)
 
-// Esquema de colores claro
 private val LightColorScheme = lightColorScheme(
     primary = Blue600,
     secondary = Purple600,
@@ -34,7 +27,6 @@ private val LightColorScheme = lightColorScheme(
     onSurface = Color(0xFF1C1B1F),
 )
 
-// Esquema de colores oscuro
 private val DarkColorScheme = darkColorScheme(
     primary = Blue600,
     secondary = Purple600,

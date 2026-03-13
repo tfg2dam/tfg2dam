@@ -1,8 +1,3 @@
-// ============================================
-// TIPOGRAFÍA - SimuTrade
-// Archivo: app/src/main/java/com/simutrade/ui/theme/Type.kt
-// ============================================
-
 package com.simutrade.ui.theme
 
 import androidx.compose.material3.Typography
