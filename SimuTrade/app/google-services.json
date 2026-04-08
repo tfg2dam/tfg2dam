@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "96487663187",
+    "project_id": "simutrade-dc155",
+    "storage_bucket": "simutrade-dc155.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:96487663187:android:fdba9b6f96f2f978c3c8a6",
+        "android_client_info": {
+          "package_name": "com.simutrade"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAihcx8YOTrVxU0vnOr1VX7YnTEgwR0soI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
