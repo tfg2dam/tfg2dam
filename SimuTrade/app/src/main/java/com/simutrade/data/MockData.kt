@@ -1,8 +1,12 @@
 package com.simutrade.data
 
-import com.simutrade.models.*
+import com.simutrade.data.model.Asset
+import com.simutrade.data.model.AssetType
+import com.simutrade.data.model.LeaderboardEntry
+import com.simutrade.data.model.PriceHistory
+import com.simutrade.data.model.Rank
+import java.util.Calendar
 import kotlin.math.max
-import java.util.*
 
 object MockData {
 
@@ -130,7 +134,13 @@ object MockData {
     }
 
     val ranks = listOf(
-        Rank("Bronce", Double.NEGATIVE_INFINITY, "#CD7F32", "🥉", "Novato en el mundo de las inversiones"),
+        Rank(
+            "Bronce",
+            Double.NEGATIVE_INFINITY,
+            "#CD7F32",
+            "🥉",
+            "Novato en el mundo de las inversiones"
+        ),
         Rank("Plata", 50.0, "#C0C0C0", "🥈", "Inversor con conocimientos básicos"),
         Rank("Oro", 150.0, "#FFD700", "🥇", "Trader experimentado"),
         Rank("Platino", 300.0, "#E5E4E2", "💎", "Experto en mercados financieros"),

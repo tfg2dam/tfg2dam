@@ -7,7 +7,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.simutrade.viewmodel.MainViewModel
+import com.simutrade.ui.viewmodel.MainViewModel
 
 @Composable
 fun RankingsScreen(viewModel: MainViewModel) {

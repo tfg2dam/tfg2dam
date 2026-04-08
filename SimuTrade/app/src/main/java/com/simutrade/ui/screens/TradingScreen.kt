@@ -12,8 +12,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.simutrade.models.*
-import com.simutrade.viewmodel.MainViewModel
+import com.simutrade.data.model.Asset
+import com.simutrade.data.model.AssetType
+import com.simutrade.data.model.OperationResult
+import com.simutrade.data.model.PortfolioHolding
+import com.simutrade.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 
 @Composable

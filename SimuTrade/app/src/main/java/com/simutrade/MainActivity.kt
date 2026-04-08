@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.simutrade.ui.screens.*
 import com.simutrade.ui.theme.SimuTradeTheme
-import com.simutrade.viewmodel.MainViewModel
+import com.simutrade.ui.viewmodel.MainViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

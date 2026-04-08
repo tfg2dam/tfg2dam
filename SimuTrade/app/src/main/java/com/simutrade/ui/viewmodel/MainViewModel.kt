@@ -1,11 +1,14 @@
-package com.simutrade.viewmodel
+package com.simutrade.ui.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.simutrade.data.MockData
-import com.simutrade.models.*
-import com.simutrade.repository.UserRepository
+import com.simutrade.data.model.Asset
+import com.simutrade.data.model.OperationResult
+import com.simutrade.data.model.Rank
+import com.simutrade.data.model.UserData
+import com.simutrade.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

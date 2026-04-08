@@ -1,4 +1,4 @@
-package com.simutrade.models
+package com.simutrade.data.model
 
 data class Asset(
     val id: String,
