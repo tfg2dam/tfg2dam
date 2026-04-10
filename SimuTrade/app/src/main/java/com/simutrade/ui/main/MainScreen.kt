@@ -22,6 +22,7 @@ fun MainScreen(
     val currentPage by mainViewModel.currentPage.collectAsState()
     val userData by mainViewModel.userData.collectAsState()
     val currentRank = mainViewModel.getCurrentRank()
+    var showProfileDialog by remember { mutableStateOf(false) }
 
     val navigationItems = listOf(
         NavigationItem("dashboard", "Panel", Icons.Default.Dashboard),
@@ -29,6 +30,18 @@ fun MainScreen(
         NavigationItem("rankings", "Rankings", Icons.Default.EmojiEvents),
         NavigationItem("educational", "Aprender", Icons.Default.School)
     )
+
+    if (showProfileDialog) {
+        ProfileDialog(
+            userData = userData,
+            onDismiss = { showProfileDialog = false },
+            onLogout = {
+                showProfileDialog = false
+                authViewModel.logout()
+                onLogout()
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -43,11 +56,8 @@ fun MainScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        authViewModel.logout()
-                        onLogout()
-                    }) {
-                        Icon(Icons.Default.Logout, contentDescription = "Cerrar sesión")
+                    IconButton(onClick = { showProfileDialog = true }) {
+                        Icon(Icons.Default.AccountCircle, contentDescription = "Perfil")
                     }
                 }
             )
