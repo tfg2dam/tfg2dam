@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.simutrade.ui.auth.AuthViewModel
 import com.simutrade.ui.screens.*
 import com.simutrade.ui.viewmodel.MainViewModel
 
@@ -15,11 +16,12 @@ import com.simutrade.ui.viewmodel.MainViewModel
 @Composable
 fun MainScreen(
     onLogout: () -> Unit,
-    viewModel: MainViewModel = viewModel()
+    mainViewModel: MainViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
 ) {
-    val currentPage by viewModel.currentPage.collectAsState()
-    val userData by viewModel.userData.collectAsState()
-    val currentRank = viewModel.getCurrentRank()
+    val currentPage by mainViewModel.currentPage.collectAsState()
+    val userData by mainViewModel.userData.collectAsState()
+    val currentRank = mainViewModel.getCurrentRank()
 
     val navigationItems = listOf(
         NavigationItem("dashboard", "Panel", Icons.Default.Dashboard),
@@ -41,7 +43,10 @@ fun MainScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onLogout) {
+                    IconButton(onClick = {
+                        authViewModel.logout()
+                        onLogout()
+                    }) {
                         Icon(Icons.Default.Logout, contentDescription = "Cerrar sesión")
                     }
                 }
@@ -54,7 +59,7 @@ fun MainScreen(
                         icon = { Icon(item.icon, contentDescription = item.label) },
                         label = { Text(item.label) },
                         selected = currentPage == item.route,
-                        onClick = { viewModel.navigateTo(item.route) }
+                        onClick = { mainViewModel.navigateTo(item.route) }
                     )
                 }
             }
@@ -62,11 +67,11 @@ fun MainScreen(
     ) { paddingValues ->
         Surface(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             when (currentPage) {
-                "dashboard"   -> DashboardScreen(viewModel)
-                "market"      -> MarketScreen(viewModel)
-                "trading"     -> TradingScreen(viewModel)
-                "rankings"    -> RankingsScreen(viewModel)
-                "educational" -> EducationalScreen(viewModel)
+                "dashboard"   -> DashboardScreen(mainViewModel)
+                "market"      -> MarketScreen(mainViewModel)
+                "trading"     -> TradingScreen(mainViewModel)
+                "rankings"    -> RankingsScreen(mainViewModel)
+                "educational" -> EducationalScreen(mainViewModel)
             }
         }
     }

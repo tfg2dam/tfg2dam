@@ -44,4 +44,8 @@ class AuthViewModel : ViewModel() {
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
+
+    fun logout() {
+        repository.logout()
+    }
 }
