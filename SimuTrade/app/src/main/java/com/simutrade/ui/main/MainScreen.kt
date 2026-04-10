@@ -35,7 +35,7 @@ fun MainScreen(
                     Column {
                         Text("SimuTrade", style = MaterialTheme.typography.titleLarge)
                         Text(
-                            "€${String.format("%.2f", userData.balance)} • ${currentRank.icon} ${currentRank.name}",
+                            "€${String.format("%.2f", userData.saldo)} • ${currentRank.icon} ${currentRank.name}",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }

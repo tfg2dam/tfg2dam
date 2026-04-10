@@ -24,6 +24,8 @@ import java.util.*
 @Composable
 fun DashboardScreen(viewModel: MainViewModel) {
     val userData by viewModel.userData.collectAsState()
+    val cartera by viewModel.cartera.collectAsState()
+    val transacciones by viewModel.transacciones.collectAsState()
     val portfolioValue = viewModel.getPortfolioValue()
     val totalValue = viewModel.getTotalValue()
     val profit = viewModel.getProfit()
@@ -58,8 +60,8 @@ fun DashboardScreen(viewModel: MainViewModel) {
                 )
                 SummaryCard(
                     title = "Efectivo",
-                    value = "€${String.format("%.2f", userData.balance)}",
-                    subtitle = "${String.format("%.1f", (userData.balance / totalValue) * 100)}% del total",
+                    value = "€${String.format("%.2f", userData.saldo)}",
+                    subtitle = "${String.format("%.1f", (userData.saldo / totalValue) * 100)}% del total",
                     icon = Icons.Default.AccountBalanceWallet,
                     modifier = Modifier.weight(1f)
                 )
@@ -74,7 +76,7 @@ fun DashboardScreen(viewModel: MainViewModel) {
                 SummaryCard(
                     title = "Cartera",
                     value = "€${String.format("%.2f", portfolioValue)}",
-                    subtitle = "${userData.portfolio.size} posiciones",
+                    subtitle = "${cartera.size} posiciones",
                     icon = Icons.Default.TrendingUp,
                     modifier = Modifier.weight(1f)
                 )
@@ -110,7 +112,7 @@ fun DashboardScreen(viewModel: MainViewModel) {
             )
         }
 
-        if (userData.portfolio.isEmpty()) {
+        if (cartera.isEmpty()) {
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Box(
@@ -126,7 +128,7 @@ fun DashboardScreen(viewModel: MainViewModel) {
                 }
             }
         } else {
-            items(userData.portfolio) { holding ->
+            items(cartera) { holding ->
                 PortfolioHoldingCard(holding)
             }
         }
@@ -139,7 +141,7 @@ fun DashboardScreen(viewModel: MainViewModel) {
             )
         }
 
-        if (userData.transactions.isEmpty()) {
+        if (transacciones.isEmpty()) {
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Box(
@@ -155,7 +157,7 @@ fun DashboardScreen(viewModel: MainViewModel) {
                 }
             }
         } else {
-            items(userData.transactions.take(10)) { transaction ->
+            items(transacciones.take(10)) { transaction ->
                 TransactionCard(transaction)
             }
         }

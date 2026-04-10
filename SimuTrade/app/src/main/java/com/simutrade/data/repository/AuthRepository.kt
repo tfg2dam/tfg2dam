@@ -19,7 +19,13 @@ class AuthRepository {
     suspend fun login(email: String, password: String): AuthResult {
         return try {
             val result = auth.signInWithEmailAndPassword(email, password).await()
-            AuthResult.Success(result.user!!)
+            val user = result.user!!
+
+            // Actualizar ultimo_login
+            firestore.collection("Usuarios").document(user.uid)
+                .update("ultimo_login", System.currentTimeMillis()).await()
+
+            AuthResult.Success(user)
         } catch (e: Exception) {
             AuthResult.Error(e.localizedMessage ?: "Error al iniciar sesión")
         }
@@ -30,16 +36,17 @@ class AuthRepository {
             val result = auth.createUserWithEmailAndPassword(email, password).await()
             val user = result.user!!
 
-            // Crear documento del usuario en Firestore
             val userData = hashMapOf(
-                "uid" to user.uid,
-                "username" to username,
+                "id_usuario" to user.uid,
+                "nombre_usuario" to username,
                 "email" to email,
-                "balance" to 100.0,
-                "initialBalance" to 100.0,
-                "createdAt" to System.currentTimeMillis()
+                "saldo" to 100.0,
+                "saldo_inicial" to 100.0,
+                "id_rango" to "bronce",       // rango inicial
+                "creado_en" to System.currentTimeMillis(),
+                "ultimo_login" to System.currentTimeMillis()
             )
-            firestore.collection("users").document(user.uid).set(userData).await()
+            firestore.collection("Usuarios").document(user.uid).set(userData).await()
 
             AuthResult.Success(user)
         } catch (e: Exception) {

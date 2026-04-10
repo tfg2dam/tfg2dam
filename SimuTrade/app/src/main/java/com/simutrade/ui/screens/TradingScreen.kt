@@ -38,7 +38,8 @@ fun TradingScreen(viewModel: MainViewModel) {
             )
         } else {
             val asset = selectedAsset!!
-            val currentHolding = userData.portfolio.find { it.assetId == asset.id }
+            val cartera by viewModel.cartera.collectAsState()
+            val currentHolding = cartera.find { it.assetId == asset.id }
             val quantityDouble = quantity.toDoubleOrNull() ?: 0.0
             val total = quantityDouble * asset.currentPrice
 
@@ -190,7 +191,7 @@ fun TradingScreen(viewModel: MainViewModel) {
                         quantity = quantity,
                         onQuantityChange = { quantity = it },
                         total = total,
-                        balance = userData.balance,
+                        balance = userData.saldo,
                         onBuy = {
                             viewModel.buyAsset(asset, quantityDouble) { result ->
                                 scope.launch {

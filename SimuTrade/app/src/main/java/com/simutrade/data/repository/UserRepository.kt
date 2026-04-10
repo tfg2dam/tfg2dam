@@ -1,169 +1,123 @@
 package com.simutrade.data.repository
 
-import android.content.Context
-import android.content.SharedPreferences
-import com.google.gson.Gson
-import com.simutrade.data.model.Asset
-import com.simutrade.data.model.OperationResult
-import com.simutrade.data.model.PortfolioHolding
-import com.simutrade.data.model.Transaction
-import com.simutrade.data.model.TransactionType
-import com.simutrade.data.model.UserData
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.simutrade.data.model.*
+import kotlinx.coroutines.tasks.await
 
-class UserRepository(context: Context) {
+class UserRepository {
 
-    private val sharedPreferences: SharedPreferences =
-        context.getSharedPreferences("simutrade_prefs", Context.MODE_PRIVATE)
+    private val auth = FirebaseAuth.getInstance()
+    private val firestore = FirebaseFirestore.getInstance()
 
-    private val gson = Gson()
+    private val uid get() = auth.currentUser?.uid ?: throw Exception("Usuario no autenticado")
 
-    companion object {
-        private const val KEY_USER_DATA = "user_data"
-        private const val INITIAL_BALANCE = 100.0
-    }
 
-    fun getUserData(): UserData {
-        val jsonString = sharedPreferences.getString(KEY_USER_DATA, null)
-        return if (jsonString != null) {
-            try {
-                gson.fromJson(jsonString, UserData::class.java)
-            } catch (e: Exception) {
-                getDefaultUserData()
-            }
-        } else {
-            getDefaultUserData()
-        }
-    }
-
-    fun saveUserData(userData: UserData) {
-        val jsonString = gson.toJson(userData)
-        sharedPreferences.edit().putString(KEY_USER_DATA, jsonString).apply()
-    }
-
-    fun resetUserData() {
-        saveUserData(getDefaultUserData())
-    }
-
-    private fun getDefaultUserData(): UserData {
+    suspend fun getUserData(): UserData {
+        val doc = firestore.collection("Usuarios").document(uid).get().await()
         return UserData(
-            username = "Usuario",
-            balance = INITIAL_BALANCE,
-            initialBalance = INITIAL_BALANCE,
-            portfolio = mutableListOf(),
-            transactions = mutableListOf()
+            idUsuario    = doc.getString("id_usuario") ?: "",
+            nombreUsuario = doc.getString("nombre_usuario") ?: "",
+            email        = doc.getString("email") ?: "",
+            saldo        = doc.getDouble("saldo") ?: 100.0,
+            saldoInicial = doc.getDouble("saldo_inicial") ?: 100.0,
+            idRango      = doc.getString("id_rango") ?: "bronce",
+            creadoEn     = doc.getLong("creado_en") ?: 0L,
+            ultimoLogin  = doc.getLong("ultimo_login") ?: 0L
         )
     }
 
-    fun calculatePortfolioValue(portfolio: List<PortfolioHolding>): Double {
-        return portfolio.sumOf { it.quantity * it.currentPrice }
+    suspend fun updateSaldo(nuevoSaldo: Double) {
+        firestore.collection("Usuarios").document(uid)
+            .update("saldo", nuevoSaldo).await()
     }
 
-    fun calculateTotalValue(balance: Double, portfolioValue: Double): Double {
-        return balance + portfolioValue
+    suspend fun updateRango(idRango: String) {
+        firestore.collection("Usuarios").document(uid)
+            .update("id_rango", idRango).await()
     }
 
-    fun calculateProfit(totalValue: Double, initialBalance: Double): Double {
-        return totalValue - initialBalance
-    }
 
-    fun calculateProfitPercent(totalValue: Double, initialBalance: Double): Double {
-        return ((totalValue - initialBalance) / initialBalance) * 100
-    }
-
-    fun buyAsset(userData: UserData, asset: Asset, quantity: Double): OperationResult {
-        val total = quantity * asset.currentPrice
-
-        if (total > userData.balance) {
-            return OperationResult.Error("Saldo insuficiente")
-        }
-
-        userData.balance -= total
-
-        val existingHolding = userData.portfolio.find { it.assetId == asset.id }
-
-        if (existingHolding != null) {
-            val totalQuantity = existingHolding.quantity + quantity
-            val totalCost = existingHolding.averagePrice * existingHolding.quantity + total
-            existingHolding.quantity = totalQuantity
-            existingHolding.averagePrice = totalCost / totalQuantity
-            existingHolding.currentPrice = asset.currentPrice
-        } else {
-            userData.portfolio.add(
-                PortfolioHolding(
-                    assetId = asset.id,
-                    symbol = asset.symbol,
-                    name = asset.name,
-                    type = asset.type,
-                    quantity = quantity,
-                    averagePrice = asset.currentPrice,
-                    currentPrice = asset.currentPrice
-                )
+    suspend fun getCartera(): List<PortfolioHolding> {
+        val snapshot = firestore.collection("Cartera")
+            .whereEqualTo("id_usuario", uid)
+            .get().await()
+        return snapshot.documents.map { doc ->
+            PortfolioHolding(
+                assetId      = doc.getString("id_activo") ?: "",
+                symbol       = doc.getString("simbolo") ?: "",
+                name         = doc.getString("nombre") ?: "",
+                type         = AssetType.valueOf(doc.getString("tipo") ?: "STOCK"),
+                quantity     = doc.getDouble("cantidad") ?: 0.0,
+                averagePrice = doc.getDouble("precio_promedio") ?: 0.0,
+                currentPrice = doc.getDouble("precio_actual") ?: 0.0
             )
         }
+    }
 
-        val transaction = Transaction(
-            id = System.currentTimeMillis().toString(),
-            date = System.currentTimeMillis(),
-            type = TransactionType.BUY,
-            assetId = asset.id,
-            symbol = asset.symbol,
-            quantity = quantity,
-            price = asset.currentPrice,
-            total = total
+    suspend fun upsertCartera(holding: PortfolioHolding) {
+        val docId = "${uid}_${holding.assetId}"
+        val data = hashMapOf(
+            "id_usuario"      to uid,
+            "id_activo"       to holding.assetId,
+            "simbolo"         to holding.symbol,
+            "nombre"          to holding.name,
+            "tipo"            to holding.type.name,
+            "cantidad"        to holding.quantity,
+            "precio_promedio" to holding.averagePrice,
+            "precio_actual"   to holding.currentPrice,
+            "actualizado_en"  to System.currentTimeMillis()
         )
-        userData.transactions.add(0, transaction)
-
-        saveUserData(userData)
-        return OperationResult.Success("Compra realizada con éxito", userData)
+        firestore.collection("Cartera").document(docId).set(data).await()
     }
 
-    fun sellAsset(userData: UserData, assetId: String, quantity: Double, currentPrice: Double): OperationResult {
-        val holding = userData.portfolio.find { it.assetId == assetId }
-            ?: return OperationResult.Error("No tienes este activo en tu cartera")
+    suspend fun deleteCartera(assetId: String) {
+        firestore.collection("Cartera").document("${uid}_${assetId}").delete().await()
+    }
 
-        if (quantity > holding.quantity) {
-            return OperationResult.Error("Cantidad insuficiente")
+
+    suspend fun getTransacciones(): List<Transaction> {
+        val snapshot = firestore.collection("Transacciones")
+            .whereEqualTo("id_usuario", uid)
+            .orderBy("ejecutado_en", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .get().await()
+        return snapshot.documents.map { doc ->
+            Transaction(
+                id       = doc.id,
+                date     = doc.getLong("ejecutado_en") ?: 0L,
+                type     = TransactionType.valueOf(doc.getString("tipo") ?: "BUY"),
+                assetId  = doc.getString("id_activo") ?: "",
+                symbol   = doc.getString("simbolo") ?: "",
+                quantity = doc.getDouble("cantidad") ?: 0.0,
+                price    = doc.getDouble("precio") ?: 0.0,
+                total    = doc.getDouble("total") ?: 0.0
+            )
         }
+    }
 
-        val total = quantity * currentPrice
-
-        userData.balance += total
-
-        if (quantity == holding.quantity) {
-            userData.portfolio.remove(holding)
-        } else {
-            holding.quantity -= quantity
-            holding.currentPrice = currentPrice
-        }
-
-        val transaction = Transaction(
-            id = System.currentTimeMillis().toString(),
-            date = System.currentTimeMillis(),
-            type = TransactionType.SELL,
-            assetId = assetId,
-            symbol = holding.symbol,
-            quantity = quantity,
-            price = currentPrice,
-            total = total
+    suspend fun addTransaccion(transaction: Transaction) {
+        val data = hashMapOf(
+            "id_usuario"   to uid,
+            "id_activo"    to transaction.assetId,
+            "simbolo"      to transaction.symbol,
+            "tipo"         to transaction.type.name,
+            "cantidad"     to transaction.quantity,
+            "precio"       to transaction.price,
+            "total"        to transaction.total,
+            "ejecutado_en" to transaction.date
         )
-        userData.transactions.add(0, transaction)
-
-        saveUserData(userData)
-        return OperationResult.Success("Venta realizada con éxito", userData)
+        firestore.collection("Transacciones").add(data).await()
     }
 
-    fun updatePortfolioPrices(userData: UserData, priceMap: Map<String, Double>): UserData {
-        userData.portfolio.forEach { holding ->
-            priceMap[holding.assetId]?.let { newPrice ->
-                holding.currentPrice = newPrice
-            }
-        }
-        return userData
-    }
+    fun calcularValorCartera(cartera: List<PortfolioHolding>): Double =
+        cartera.sumOf { it.quantity * it.currentPrice }
 
-    fun addBalance(userData: UserData, amount: Double): UserData {
-        userData.balance += amount
-        saveUserData(userData)
-        return userData
-    }
+    fun calcularValorTotal(saldo: Double, valorCartera: Double): Double =
+        saldo + valorCartera
+
+    fun calcularBeneficio(valorTotal: Double, saldoInicial: Double): Double =
+        valorTotal - saldoInicial
+
+    fun calcularBeneficioPct(valorTotal: Double, saldoInicial: Double): Double =
+        ((valorTotal - saldoInicial) / saldoInicial) * 100
 }

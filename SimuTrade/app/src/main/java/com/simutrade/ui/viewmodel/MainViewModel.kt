@@ -1,25 +1,27 @@
 package com.simutrade.ui.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.simutrade.data.MockData
-import com.simutrade.data.model.Asset
-import com.simutrade.data.model.OperationResult
-import com.simutrade.data.model.Rank
-import com.simutrade.data.model.UserData
+import com.simutrade.data.model.*
 import com.simutrade.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class MainViewModel(application: Application) : AndroidViewModel(application) {
+class MainViewModel : ViewModel() {
 
-    private val repository = UserRepository(application)
+    private val repository = UserRepository()
 
-    private val _userData = MutableStateFlow(repository.getUserData())
+    private val _userData = MutableStateFlow(UserData())
     val userData: StateFlow<UserData> = _userData.asStateFlow()
+
+    private val _cartera = MutableStateFlow<List<PortfolioHolding>>(emptyList())
+    val cartera: StateFlow<List<PortfolioHolding>> = _cartera.asStateFlow()
+
+    private val _transacciones = MutableStateFlow<List<Transaction>>(emptyList())
+    val transacciones: StateFlow<List<Transaction>> = _transacciones.asStateFlow()
 
     private val _assets = MutableStateFlow(MockData.mockAssets)
     val assets: StateFlow<List<Asset>> = _assets.asStateFlow()
@@ -30,80 +32,123 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentPage = MutableStateFlow("dashboard")
     val currentPage: StateFlow<String> = _currentPage.asStateFlow()
 
-    fun navigateTo(page: String) {
-        _currentPage.value = page
+    init {
+        cargarDatos()
     }
+
+    fun cargarDatos() {
+        viewModelScope.launch {
+            _userData.value = repository.getUserData()
+            _cartera.value = repository.getCartera()
+            _transacciones.value = repository.getTransacciones()
+        }
+    }
+
+    fun navigateTo(page: String) { _currentPage.value = page }
 
     fun selectAsset(asset: Asset) {
         _selectedAsset.value = asset
         navigateTo("trading")
     }
 
-    fun clearSelectedAsset() {
-        _selectedAsset.value = null
+    fun getCurrentRank() = MockData.getRankFromProfit(
+        repository.calcularBeneficio(
+            repository.calcularValorTotal(
+                _userData.value.saldo,
+                repository.calcularValorCartera(_cartera.value)
+            ),
+            _userData.value.saldoInicial
+        )
+    )
+
+    fun comprarActivo(asset: Asset, quantity: Double, onResult: (OperationResult) -> Unit) {
+        viewModelScope.launch {
+            val total = quantity * asset.currentPrice
+            val userData = _userData.value
+
+            if (total > userData.saldo) {
+                onResult(OperationResult.Error("Saldo insuficiente"))
+                return@launch
+            }
+
+            val nuevoSaldo = userData.saldo - total
+            repository.updateSaldo(nuevoSaldo)
+            _userData.value = userData.copy(saldo = nuevoSaldo)
+
+            val existente = _cartera.value.find { it.assetId == asset.id }
+            val holding = if (existente != null) {
+                val totalQty = existente.quantity + quantity
+                val totalCost = existente.averagePrice * existente.quantity + total
+                existente.copy(quantity = totalQty, averagePrice = totalCost / totalQty, currentPrice = asset.currentPrice)
+            } else {
+                PortfolioHolding(asset.id, asset.symbol, asset.name, asset.type, quantity, asset.currentPrice, asset.currentPrice)
+            }
+            repository.upsertCartera(holding)
+
+            val transaction = Transaction(
+                id = System.currentTimeMillis().toString(),
+                date = System.currentTimeMillis(),
+                type = TransactionType.BUY,
+                assetId = asset.id,
+                symbol = asset.symbol,
+                quantity = quantity,
+                price = asset.currentPrice,
+                total = total
+            )
+            repository.addTransaccion(transaction)
+            cargarDatos()
+            onResult(OperationResult.Success("Compra realizada con éxito", _userData.value))
+        }
     }
 
-    fun buyAsset(asset: Asset, quantity: Double, onResult: (OperationResult) -> Unit) {
+    fun venderActivo(assetId: String, quantity: Double, currentPrice: Double, onResult: (OperationResult) -> Unit) {
         viewModelScope.launch {
-            val result = repository.buyAsset(_userData.value, asset, quantity)
-            if (result is OperationResult.Success) {
-                _userData.value = result.userData
+            val holding = _cartera.value.find { it.assetId == assetId }
+                ?: run { onResult(OperationResult.Error("No tienes este activo")); return@launch }
+
+            if (quantity > holding.quantity) {
+                onResult(OperationResult.Error("Cantidad insuficiente"))
+                return@launch
             }
-            onResult(result)
+
+            val total = quantity * currentPrice
+            val nuevoSaldo = _userData.value.saldo + total
+            repository.updateSaldo(nuevoSaldo)
+            _userData.value = _userData.value.copy(saldo = nuevoSaldo)
+
+            if (quantity == holding.quantity) repository.deleteCartera(assetId)
+            else repository.upsertCartera(holding.copy(quantity = holding.quantity - quantity, currentPrice = currentPrice))
+
+            val transaction = Transaction(
+                id = System.currentTimeMillis().toString(),
+                date = System.currentTimeMillis(),
+                type = TransactionType.SELL,
+                assetId = assetId,
+                symbol = holding.symbol,
+                quantity = quantity,
+                price = currentPrice,
+                total = total
+            )
+            repository.addTransaccion(transaction)
+            cargarDatos()
+            onResult(OperationResult.Success("Venta realizada con éxito", _userData.value))
         }
+    }
+
+    fun getPortfolioValue() = repository.calcularValorCartera(_cartera.value)
+    fun getTotalValue() = repository.calcularValorTotal(_userData.value.saldo, getPortfolioValue())
+    fun getProfit() = repository.calcularBeneficio(getTotalValue(), _userData.value.saldoInicial)
+    fun getProfitPercent() = repository.calcularBeneficioPct(getTotalValue(), _userData.value.saldoInicial)
+
+    fun buyAsset(asset: Asset, quantity: Double, onResult: (OperationResult) -> Unit) {
+        comprarActivo(asset, quantity, onResult)
     }
 
     fun sellAsset(assetId: String, quantity: Double, currentPrice: Double, onResult: (OperationResult) -> Unit) {
-        viewModelScope.launch {
-            val result = repository.sellAsset(_userData.value, assetId, quantity, currentPrice)
-            if (result is OperationResult.Success) {
-                _userData.value = result.userData
-            }
-            onResult(result)
-        }
+        venderActivo(assetId, quantity, currentPrice, onResult)
     }
 
-    fun getPortfolioValue(): Double {
-        return repository.calculatePortfolioValue(_userData.value.portfolio)
-    }
-
-    fun getTotalValue(): Double {
-        return repository.calculateTotalValue(_userData.value.balance, getPortfolioValue())
-    }
-
-    fun getProfit(): Double {
-        return repository.calculateProfit(getTotalValue(), _userData.value.initialBalance)
-    }
-
-    fun getProfitPercent(): Double {
-        return repository.calculateProfitPercent(getTotalValue(), _userData.value.initialBalance)
-    }
-
-    fun getCurrentRank(): Rank {
-        return MockData.getRankFromProfit(getProfit())
-    }
-
-    fun addEducationalReward(amount: Double) {
-        viewModelScope.launch {
-            val updatedData = repository.addBalance(_userData.value, amount)
-            _userData.value = updatedData
-        }
-    }
-
-    fun resetAccount() {
-        viewModelScope.launch {
-            repository.resetUserData()
-            _userData.value = repository.getUserData()
-            navigateTo("dashboard")
-        }
-    }
-
-    fun updatePrices() {
-        viewModelScope.launch {
-            val priceMap = _assets.value.associate { it.id to it.currentPrice }
-            val updatedData = repository.updatePortfolioPrices(_userData.value, priceMap)
-            _userData.value = updatedData
-            repository.saveUserData(updatedData)
-        }
+    fun clearSelectedAsset() {
+        _selectedAsset.value = null
     }
 }

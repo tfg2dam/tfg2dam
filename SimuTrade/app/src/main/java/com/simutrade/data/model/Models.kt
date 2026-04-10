@@ -47,11 +47,14 @@ enum class TransactionType {
 }
 
 data class UserData(
-    var username: String = "Usuario",
-    var balance: Double = 100.0,
-    val initialBalance: Double = 100.0,
-    val portfolio: MutableList<PortfolioHolding> = mutableListOf(),
-    val transactions: MutableList<Transaction> = mutableListOf()
+    val idUsuario: String = "",
+    val nombreUsuario: String = "",
+    val email: String = "",
+    var saldo: Double = 100.0,
+    val saldoInicial: Double = 100.0,
+    val idRango: String = "bronce",
+    val creadoEn: Long = 0L,
+    var ultimoLogin: Long = 0L
 )
 
 data class Rank(
