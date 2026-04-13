@@ -18,7 +18,10 @@ data class MarketUiState(
     val isLoading: Boolean = false,
     val isSearching: Boolean = false,
     val error: String? = null,
-    val lastUpdated: Long = 0L
+    val lastUpdated: Long = 0L,
+    val priceHistory: List<Pair<Long, Double>> = emptyList(),
+    val isLoadingHistory: Boolean = false,
+    val selectedPeriod: String = "7d"  // ← añadido
 )
 
 class MarketViewModel : ViewModel() {
@@ -32,7 +35,7 @@ class MarketViewModel : ViewModel() {
     private var refreshJob: Job? = null
 
     companion object {
-        const val REFRESH_INTERVAL_MS = 30_000L // 30 segundos
+        const val REFRESH_INTERVAL_MS = 30_000L
     }
 
     init {
@@ -45,7 +48,6 @@ class MarketViewModel : ViewModel() {
         refreshJob = viewModelScope.launch {
             while (true) {
                 delay(REFRESH_INTERVAL_MS)
-                // Solo refresca si no hay búsqueda activa
                 if (_uiState.value.searchResults.isEmpty()) {
                     refreshPrices()
                 }
@@ -53,7 +55,6 @@ class MarketViewModel : ViewModel() {
         }
     }
 
-    // Carga inicial completa (muestra loading)
     fun loadMarketData() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
@@ -75,7 +76,6 @@ class MarketViewModel : ViewModel() {
         }
     }
 
-    // Refresco silencioso (sin mostrar loading)
     private fun refreshPrices() {
         viewModelScope.launch {
             try {
@@ -86,9 +86,7 @@ class MarketViewModel : ViewModel() {
                     stocks = stocks,
                     lastUpdated = System.currentTimeMillis()
                 )
-            } catch (e: Exception) {
-                // Silencioso, no mostramos error en refresco automático
-            }
+            } catch (e: Exception) { }
         }
     }
 
@@ -102,12 +100,27 @@ class MarketViewModel : ViewModel() {
             return
         }
         searchJob = viewModelScope.launch {
-            delay(500) // debounce
+            delay(500)
             _uiState.value = _uiState.value.copy(isSearching = true)
             val results = repository.searchAssets(query)
             _uiState.value = _uiState.value.copy(
                 searchResults = results,
                 isSearching = false
+            )
+        }
+    }
+
+    // ← Actualizado con parámetro period
+    fun loadPriceHistory(asset: Asset, period: String = "7d") {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isLoadingHistory = true,
+                selectedPeriod = period
+            )
+            val history = repository.getAssetHistory(asset, period)
+            _uiState.value = _uiState.value.copy(
+                priceHistory = history,
+                isLoadingHistory = false
             )
         }
     }

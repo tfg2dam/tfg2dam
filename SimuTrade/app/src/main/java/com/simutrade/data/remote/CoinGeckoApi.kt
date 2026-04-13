@@ -4,6 +4,7 @@ import com.google.gson.annotations.SerializedName
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 data class CoinGeckoItem(
@@ -13,6 +14,20 @@ data class CoinGeckoItem(
     @SerializedName("current_price") val currentPrice: Double,
     @SerializedName("price_change_24h") val priceChange24h: Double,
     @SerializedName("price_change_percentage_24h") val priceChangePercent24h: Double
+)
+
+data class CoinGeckoSearchResponse(
+    val coins: List<CoinGeckoSearchItem>
+)
+
+data class CoinGeckoSearchItem(
+    val id: String,
+    val symbol: String,
+    val name: String
+)
+
+data class CoinGeckoHistory(
+    val prices: List<List<Double>>
 )
 
 interface CoinGeckoApi {
@@ -29,17 +44,15 @@ interface CoinGeckoApi {
     suspend fun searchCoins(
         @Query("query") query: String
     ): CoinGeckoSearchResponse
+
+    @GET("coins/{id}/market_chart")
+    suspend fun getCoinHistory(
+        @Path("id") coinId: String,
+        @Query("vs_currency") currency: String = "eur",
+        @Query("days") days: Int = 7,
+        @Query("interval") interval: String = "daily"
+    ): CoinGeckoHistory
 }
-
-data class CoinGeckoSearchResponse(
-    val coins: List<CoinGeckoSearchItem>
-)
-
-data class CoinGeckoSearchItem(
-    val id: String,
-    val symbol: String,
-    val name: String
-)
 
 object CoinGeckoClient {
     val api: CoinGeckoApi by lazy {

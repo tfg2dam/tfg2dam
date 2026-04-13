@@ -21,6 +21,12 @@ data class FinnhubSearchItem(
     val description: String
 )
 
+data class FinnhubCandle(
+    @SerializedName("c") val close: List<Double>,
+    @SerializedName("t") val timestamps: List<Long>,
+    @SerializedName("s") val status: String
+)
+
 interface FinnhubApi {
     @GET("quote")
     suspend fun getQuote(
@@ -33,6 +39,15 @@ interface FinnhubApi {
         @Query("q") query: String,
         @Query("token") token: String = FinnhubClient.API_KEY
     ): FinnhubSearchResponse
+
+    @GET("stock/candle")
+    suspend fun getStockHistory(
+        @Query("symbol") symbol: String,
+        @Query("resolution") resolution: String = "D",
+        @Query("from") from: Long,
+        @Query("to") to: Long,
+        @Query("token") token: String = FinnhubClient.API_KEY
+    ): FinnhubCandle
 }
 
 object FinnhubClient {
