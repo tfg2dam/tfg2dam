@@ -12,18 +12,17 @@ class UserRepository {
 
     private val uid get() = auth.currentUser?.uid ?: throw Exception("Usuario no autenticado")
 
-
     suspend fun getUserData(): UserData {
         val doc = firestore.collection("Usuarios").document(uid).get().await()
         return UserData(
-            idUsuario    = doc.getString("id_usuario") ?: "",
+            idUsuario     = doc.getString("id_usuario") ?: "",
             nombreUsuario = doc.getString("nombre_usuario") ?: "",
-            email        = doc.getString("email") ?: "",
-            saldo        = doc.getDouble("saldo") ?: 100.0,
-            saldoInicial = doc.getDouble("saldo_inicial") ?: 100.0,
-            idRango      = doc.getString("id_rango") ?: "bronce",
-            creadoEn     = doc.getLong("creado_en") ?: 0L,
-            ultimoLogin  = doc.getLong("ultimo_login") ?: 0L
+            email         = doc.getString("email") ?: "",
+            saldo         = doc.getDouble("saldo") ?: 100.0,
+            saldoInicial  = doc.getDouble("saldo_inicial") ?: 100.0,
+            idRango       = doc.getString("id_rango") ?: "bronce",
+            creadoEn      = doc.getLong("creado_en") ?: 0L,
+            ultimoLogin   = doc.getLong("ultimo_login") ?: 0L
         )
     }
 
@@ -36,7 +35,6 @@ class UserRepository {
         firestore.collection("Usuarios").document(uid)
             .update("id_rango", idRango).await()
     }
-
 
     suspend fun getCartera(): List<PortfolioHolding> {
         val snapshot = firestore.collection("Cartera")
@@ -75,7 +73,6 @@ class UserRepository {
         firestore.collection("Cartera").document("${uid}_${assetId}").delete().await()
     }
 
-
     suspend fun getTransacciones(): List<Transaction> {
         val snapshot = firestore.collection("Transacciones")
             .whereEqualTo("id_usuario", uid)
@@ -107,6 +104,24 @@ class UserRepository {
             "ejecutado_en" to transaction.date
         )
         firestore.collection("Transacciones").add(data).await()
+    }
+
+    suspend fun getLeaderboard(): List<LeaderboardEntry> {
+        val snapshot = firestore.collection("Usuarios").get().await()
+        return snapshot.documents.mapNotNull { doc ->
+            val saldo = doc.getDouble("saldo") ?: return@mapNotNull null
+            val saldoInicial = doc.getDouble("saldo_inicial") ?: 100.0
+            val nombre = doc.getString("nombre_usuario") ?: return@mapNotNull null
+            val idRango = doc.getString("id_rango") ?: "bronce"
+            val beneficio = saldo - saldoInicial
+            LeaderboardEntry(
+                id = doc.id,
+                username = nombre,
+                profit = beneficio,
+                rank = idRango.replaceFirstChar { it.uppercaseChar() },
+                portfolioValue = saldo
+            )
+        }.sortedByDescending { it.profit }
     }
 
     fun calcularValorCartera(cartera: List<PortfolioHolding>): Double =

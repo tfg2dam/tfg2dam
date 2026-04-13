@@ -34,6 +34,12 @@ class MainViewModel : ViewModel() {
     private val _currentPage = MutableStateFlow("dashboard")
     val currentPage: StateFlow<String> = _currentPage.asStateFlow()
 
+    private val _leaderboard = MutableStateFlow<List<LeaderboardEntry>>(emptyList())
+    val leaderboard: StateFlow<List<LeaderboardEntry>> = _leaderboard.asStateFlow()
+
+    private val _isLoadingLeaderboard = MutableStateFlow(false)
+    val isLoadingLeaderboard: StateFlow<Boolean> = _isLoadingLeaderboard.asStateFlow()
+
     init {
         cargarDatos()
         cargarAssets()
@@ -55,6 +61,19 @@ class MainViewModel : ViewModel() {
                 _assets.value = cryptos + stocks
             } catch (e: Exception) {
                 // silencioso, los mockAssets siguen como fallback
+            }
+        }
+    }
+
+    fun cargarLeaderboard() {
+        viewModelScope.launch {
+            _isLoadingLeaderboard.value = true
+            try {
+                _leaderboard.value = repository.getLeaderboard()
+            } catch (e: Exception) {
+                // silencioso
+            } finally {
+                _isLoadingLeaderboard.value = false
             }
         }
     }
