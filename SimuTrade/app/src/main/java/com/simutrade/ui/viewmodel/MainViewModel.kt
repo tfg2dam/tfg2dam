@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.simutrade.data.MockData
 import com.simutrade.data.model.*
+import com.simutrade.data.repository.MarketRepository
 import com.simutrade.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,6 +14,7 @@ import kotlinx.coroutines.launch
 class MainViewModel : ViewModel() {
 
     private val repository = UserRepository()
+    private val marketRepository = MarketRepository()
 
     private val _userData = MutableStateFlow(UserData())
     val userData: StateFlow<UserData> = _userData.asStateFlow()
@@ -34,6 +36,7 @@ class MainViewModel : ViewModel() {
 
     init {
         cargarDatos()
+        cargarAssets()
     }
 
     fun cargarDatos() {
@@ -41,6 +44,18 @@ class MainViewModel : ViewModel() {
             _userData.value = repository.getUserData()
             _cartera.value = repository.getCartera()
             _transacciones.value = repository.getTransacciones()
+        }
+    }
+
+    fun cargarAssets() {
+        viewModelScope.launch {
+            try {
+                val cryptos = marketRepository.getTopCryptos()
+                val stocks = marketRepository.getTopStocks()
+                _assets.value = cryptos + stocks
+            } catch (e: Exception) {
+                // silencioso, los mockAssets siguen como fallback
+            }
         }
     }
 
@@ -79,9 +94,16 @@ class MainViewModel : ViewModel() {
             val holding = if (existente != null) {
                 val totalQty = existente.quantity + quantity
                 val totalCost = existente.averagePrice * existente.quantity + total
-                existente.copy(quantity = totalQty, averagePrice = totalCost / totalQty, currentPrice = asset.currentPrice)
+                existente.copy(
+                    quantity = totalQty,
+                    averagePrice = totalCost / totalQty,
+                    currentPrice = asset.currentPrice
+                )
             } else {
-                PortfolioHolding(asset.id, asset.symbol, asset.name, asset.type, quantity, asset.currentPrice, asset.currentPrice)
+                PortfolioHolding(
+                    asset.id, asset.symbol, asset.name, asset.type,
+                    quantity, asset.currentPrice, asset.currentPrice
+                )
             }
             repository.upsertCartera(holding)
 
@@ -117,7 +139,9 @@ class MainViewModel : ViewModel() {
             _userData.value = _userData.value.copy(saldo = nuevoSaldo)
 
             if (quantity == holding.quantity) repository.deleteCartera(assetId)
-            else repository.upsertCartera(holding.copy(quantity = holding.quantity - quantity, currentPrice = currentPrice))
+            else repository.upsertCartera(
+                holding.copy(quantity = holding.quantity - quantity, currentPrice = currentPrice)
+            )
 
             val transaction = Transaction(
                 id = System.currentTimeMillis().toString(),
@@ -132,6 +156,27 @@ class MainViewModel : ViewModel() {
             repository.addTransaccion(transaction)
             cargarDatos()
             onResult(OperationResult.Success("Venta realizada con éxito", _userData.value))
+        }
+    }
+
+    fun navigateToTradingFromCartera(holding: PortfolioHolding) {
+        val assetFromMarket = _assets.value.find {
+            it.id == holding.assetId || it.symbol == holding.symbol
+        }
+
+        if (assetFromMarket != null) {
+            selectAsset(assetFromMarket)
+        } else {
+            val tempAsset = Asset(
+                id = holding.assetId,
+                symbol = holding.symbol,
+                name = holding.name,
+                type = holding.type,
+                currentPrice = holding.currentPrice,
+                priceChange24h = 0.0,
+                priceChangePercent24h = 0.0
+            )
+            selectAsset(tempAsset)
         }
     }
 

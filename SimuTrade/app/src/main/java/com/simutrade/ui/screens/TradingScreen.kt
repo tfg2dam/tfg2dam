@@ -1,7 +1,9 @@
 package com.simutrade.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -23,6 +25,7 @@ import kotlinx.coroutines.launch
 fun TradingScreen(viewModel: MainViewModel) {
     val selectedAsset by viewModel.selectedAsset.collectAsState()
     val userData by viewModel.userData.collectAsState()
+    val cartera by viewModel.cartera.collectAsState()
     var selectedTab by remember { mutableStateOf(0) }
     var quantity by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -38,7 +41,6 @@ fun TradingScreen(viewModel: MainViewModel) {
             )
         } else {
             val asset = selectedAsset!!
-            val cartera by viewModel.cartera.collectAsState()
             val currentHolding = cartera.find { it.assetId == asset.id }
             val quantityDouble = quantity.toDoubleOrNull() ?: 0.0
             val total = quantityDouble * asset.currentPrice
@@ -47,9 +49,11 @@ fun TradingScreen(viewModel: MainViewModel) {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(16.dp),
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()), // ← scroll añadido
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Cabecera
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -71,10 +75,11 @@ fun TradingScreen(viewModel: MainViewModel) {
                         viewModel.clearSelectedAsset()
                         viewModel.navigateTo("market")
                     }) {
-                        Text("Volver al Mercado")
+                        Text("Volver")
                     }
                 }
 
+                // Info del activo
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -117,25 +122,28 @@ fun TradingScreen(viewModel: MainViewModel) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
+                                val isPositive = asset.priceChangePercent24h >= 0
+                                val color = if (isPositive) Color(0xFF16a34a) else Color(0xFFdc2626)
                                 Icon(
-                                    imageVector = if (asset.priceChangePercent24h >= 0) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+                                    imageVector = if (isPositive) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
                                     contentDescription = null,
-                                    tint = if (asset.priceChangePercent24h >= 0) Color(0xFF16a34a) else Color(0xFFdc2626),
+                                    tint = color,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Text(
                                     text = "${if (asset.priceChange24h >= 0) "+" else ""}€${String.format("%.2f", asset.priceChange24h)}",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = if (asset.priceChangePercent24h >= 0) Color(0xFF16a34a) else Color(0xFFdc2626)
+                                    color = color
                                 )
                                 Text(
-                                    text = "(${if (asset.priceChangePercent24h >= 0) "+" else ""}${String.format("%.2f", asset.priceChangePercent24h)}%)",
+                                    text = "(${if (isPositive) "+" else ""}${String.format("%.2f", asset.priceChangePercent24h)}%)",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (asset.priceChangePercent24h >= 0) Color(0xFF16a34a) else Color(0xFFdc2626)
+                                    color = color
                                 )
                             }
                         }
 
+                        // Posición actual si tiene
                         if (currentHolding != null) {
                             Spacer(modifier = Modifier.height(16.dp))
                             Card(
@@ -171,20 +179,22 @@ fun TradingScreen(viewModel: MainViewModel) {
                     }
                 }
 
+                // Tabs comprar/vender
                 TabRow(selectedTabIndex = selectedTab) {
                     Tab(
                         selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
+                        onClick = { selectedTab = 0; quantity = "" },
                         text = { Text("Comprar") }
                     )
                     Tab(
                         selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
+                        onClick = { selectedTab = 1; quantity = "" },
                         text = { Text("Vender") },
                         enabled = currentHolding != null
                     )
                 }
 
+                // Formulario
                 when (selectedTab) {
                     0 -> BuyForm(
                         asset = asset,
@@ -200,9 +210,8 @@ fun TradingScreen(viewModel: MainViewModel) {
                                             snackbarHostState.showSnackbar(result.message)
                                             quantity = ""
                                         }
-                                        is OperationResult.Error -> {
+                                        is OperationResult.Error ->
                                             snackbarHostState.showSnackbar(result.message)
-                                        }
                                     }
                                 }
                             }
@@ -222,9 +231,8 @@ fun TradingScreen(viewModel: MainViewModel) {
                                             snackbarHostState.showSnackbar(result.message)
                                             quantity = ""
                                         }
-                                        is OperationResult.Error -> {
+                                        is OperationResult.Error ->
                                             snackbarHostState.showSnackbar(result.message)
-                                        }
                                     }
                                 }
                             }
@@ -286,10 +294,7 @@ fun BuyForm(
         )
 
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Precio unitario", style = MaterialTheme.typography.bodyMedium)
                     Text("€${String.format("%.2f", asset.currentPrice)}", fontWeight = FontWeight.Medium)
@@ -298,7 +303,7 @@ fun BuyForm(
                     Text("Cantidad", style = MaterialTheme.typography.bodyMedium)
                     Text(quantity.ifEmpty { "0" }, fontWeight = FontWeight.Medium)
                 }
-                Divider()
+                HorizontalDivider()
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Total", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text("€${String.format("%.2f", total)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -311,34 +316,16 @@ fun BuyForm(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Efectivo disponible",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text("Efectivo disponible", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "€${String.format("%.2f", balance)}",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("€${String.format("%.2f", balance)}", style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold)
                 if (total > balance) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = null,
-                            tint = Color(0xFFdc2626),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "Saldo insuficiente",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFFdc2626)
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Warning, null, tint = Color(0xFFdc2626), modifier = Modifier.size(16.dp))
+                        Text("Saldo insuficiente", style = MaterialTheme.typography.bodySmall, color = Color(0xFFdc2626))
                     }
                 }
             }
@@ -346,10 +333,12 @@ fun BuyForm(
 
         Button(
             onClick = onBuy,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(52.dp),
             enabled = quantity.toDoubleOrNull()?.let { it > 0 && total <= balance } == true
         ) {
-            Text("Comprar ${asset.symbol}")
+            Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Comprar ${asset.symbol}", fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -367,17 +356,19 @@ fun SellForm(
         OutlinedTextField(
             value = quantity,
             onValueChange = onQuantityChange,
-            label = { Text("Cantidad") },
+            label = { Text("Cantidad a vender") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            supportingText = {
+                if (currentHolding != null) {
+                    Text("Máximo: ${currentHolding.quantity} unidades")
+                }
+            }
         )
 
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Precio unitario", style = MaterialTheme.typography.bodyMedium)
                     Text("€${String.format("%.2f", asset.currentPrice)}", fontWeight = FontWeight.Medium)
@@ -386,10 +377,11 @@ fun SellForm(
                     Text("Cantidad", style = MaterialTheme.typography.bodyMedium)
                     Text(quantity.ifEmpty { "0" }, fontWeight = FontWeight.Medium)
                 }
-                Divider()
+                HorizontalDivider()
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Total", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("€${String.format("%.2f", total)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("Recibirás", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("€${String.format("%.2f", total)}", style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold, color = Color(0xFF16a34a))
                 }
             }
         }
@@ -400,34 +392,16 @@ fun SellForm(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Disponible para vender",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text("Disponible para vender", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "${currentHolding.quantity} unidades",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("${currentHolding.quantity} unidades", style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold)
                     if (quantity.toDoubleOrNull()?.let { it > currentHolding.quantity } == true) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = Color(0xFFdc2626),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Cantidad insuficiente",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFFdc2626)
-                            )
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Warning, null, tint = Color(0xFFdc2626), modifier = Modifier.size(16.dp))
+                            Text("Cantidad insuficiente", style = MaterialTheme.typography.bodySmall, color = Color(0xFFdc2626))
                         }
                     }
                 }
@@ -436,11 +410,13 @@ fun SellForm(
 
         Button(
             onClick = onSell,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(52.dp),
             enabled = currentHolding != null && quantity.toDoubleOrNull()?.let { it > 0 && it <= currentHolding.quantity } == true,
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFdc2626))
         ) {
-            Text("Vender ${asset.symbol}")
+            Icon(Icons.Default.Sell, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Vender ${asset.symbol}", fontWeight = FontWeight.Bold)
         }
     }
 }

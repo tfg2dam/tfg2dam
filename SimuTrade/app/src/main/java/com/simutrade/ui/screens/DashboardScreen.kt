@@ -1,8 +1,15 @@
 package com.simutrade.ui.screens
 
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -129,7 +136,10 @@ fun DashboardScreen(viewModel: MainViewModel) {
             }
         } else {
             items(cartera) { holding ->
-                PortfolioHoldingCard(holding)
+                PortfolioHoldingCard(
+                    holding = holding,
+                    onClick = { viewModel.navigateToTradingFromCartera(holding) }
+                )
             }
         }
 
@@ -247,42 +257,61 @@ fun RankProgressCard(nextRank: Rank, currentProfit: Double, progress: Float) {
 }
 
 @Composable
-fun PortfolioHoldingCard(holding: PortfolioHolding) {
+fun PortfolioHoldingCard(holding: PortfolioHolding, onClick: () -> Unit) {
     val value = holding.quantity * holding.currentPrice
     val cost = holding.quantity * holding.averagePrice
     val profit = value - cost
-    val profitPercent = (profit / cost) * 100
+    val profitPercent = if (cost > 0) (profit / cost) * 100 else 0.0
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val isHovered by interactionSource.collectIsHoveredAsState()
+
+    val backgroundColor by animateColorAsState(
+        targetValue = when {
+            isPressed -> MaterialTheme.colorScheme.secondaryContainer
+            isHovered -> MaterialTheme.colorScheme.surfaceVariant
+            else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        },
+        label = "cardColor"
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current
+            ) { onClick() },
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor)
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = holding.symbol,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = holding.name,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(holding.symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.ChevronRight, null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp))
+                }
+                Text(holding.name, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "${holding.quantity} unidades × €${String.format("%.2f", holding.currentPrice)}",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Text("${holding.quantity} unidades × €${String.format("%.2f", holding.currentPrice)}",
+                    style = MaterialTheme.typography.bodySmall)
             }
             Column(horizontalAlignment = Alignment.End) {
+                Text("€${String.format("%.2f", value)}", style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold)
                 Text(
-                    text = "€${String.format("%.2f", value)}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "${if (profit >= 0) "+" else ""}€${String.format("%.2f", profit)} (${String.format("%.2f", profitPercent)}%)",
+                    "${if (profit >= 0) "+" else ""}€${String.format("%.2f", profit)} (${String.format("%.2f", profitPercent)}%)",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (profit >= 0) Color(0xFF16a34a) else Color(0xFFdc2626)
                 )
@@ -294,49 +323,63 @@ fun PortfolioHoldingCard(holding: PortfolioHolding) {
 @Composable
 fun TransactionCard(transaction: Transaction) {
     val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+    val isCompra = transaction.type == TransactionType.BUY
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = if (isCompra)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else
+                        Color(0xFFffe4e4),
+                    modifier = Modifier.size(40.dp)
                 ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (isCompra) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+                            contentDescription = null,
+                            tint = if (isCompra) MaterialTheme.colorScheme.primary else Color(0xFFdc2626),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Column {
                     Text(
                         text = transaction.symbol,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
-                    AssistChip(
-                        onClick = { },
-                        label = {
-                            Text(
-                                text = if (transaction.type == TransactionType.BUY) "Compra" else "Venta",
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
+                    Text(
+                        text = if (isCompra) "Compra" else "Venta",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isCompra) MaterialTheme.colorScheme.primary else Color(0xFFdc2626)
+                    )
+                    Text(
+                        text = dateFormat.format(Date(transaction.date)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "${transaction.quantity} × €${String.format("%.2f", transaction.price)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = dateFormat.format(Date(transaction.date)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "${transaction.quantity} × €${String.format("%.2f", transaction.price)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
             Text(
-                text = "${if (transaction.type == TransactionType.BUY) "-" else "+"}€${String.format("%.2f", transaction.total)}",
+                text = "${if (isCompra) "-" else "+"}€${String.format("%.2f", transaction.total)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = if (transaction.type == TransactionType.BUY) Color(0xFFdc2626) else Color(0xFF16a34a)
+                color = if (isCompra) Color(0xFFdc2626) else Color(0xFF16a34a)
             )
         }
     }
