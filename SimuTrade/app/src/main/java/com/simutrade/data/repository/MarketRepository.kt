@@ -102,4 +102,66 @@ class MarketRepository {
 
         return results
     }
+
+    suspend fun getAssetHistory(asset: Asset, period: String = "7d"): List<Pair<Long, Double>> {
+        return try {
+            if (asset.type == AssetType.CRYPTO) {
+                val (days, interval) = when (period) {
+                    "1h"  -> 1 to "minute"
+                    "1d"  -> 1 to "hourly"
+                    "7d"  -> 7 to "daily"
+                    "30d" -> 30 to "daily"
+                    "1A"  -> 365 to "daily"
+                    else  -> 7 to "daily"
+                }
+                val history = CoinGeckoClient.api.getCoinHistory(
+                    coinId = asset.id,
+                    days = days,
+                    interval = interval
+                )
+                // Para 1h cogemos solo las últimas 60 entradas
+                val prices = if (period == "1h") history.prices.takeLast(60) else history.prices
+                prices.map { it[0].toLong() to it[1] }
+            } else {
+                generateSimulatedHistory(asset.currentPrice, asset.priceChangePercent24h, period)
+            }
+        } catch (e: Exception) {
+            generateSimulatedHistory(asset.currentPrice, asset.priceChangePercent24h, period)
+        }
+    }
+
+    private fun generateSimulatedHistory(
+        currentPrice: Double,
+        changePercent24h: Double,
+        period: String = "7d"
+    ): List<Pair<Long, Double>> {
+        val now = System.currentTimeMillis()
+        val (points, intervalMs) = when (period) {
+            "1h"  -> 60 to (60 * 1000L)           // 60 puntos cada minuto
+            "1d"  -> 24 to (60 * 60 * 1000L)       // 24 puntos cada hora
+            "7d"  -> 8  to (24 * 60 * 60 * 1000L)  // 8 puntos cada día
+            "30d" -> 30 to (24 * 60 * 60 * 1000L)  // 30 puntos cada día
+            "1A"  -> 52 to (7 * 24 * 60 * 60 * 1000L) // 52 puntos cada semana
+            else  -> 8  to (24 * 60 * 60 * 1000L)
+        }
+
+        val multiplier = when (period) {
+            "1h"  -> 0.1
+            "1d"  -> 1.0
+            "7d"  -> 7.0
+            "30d" -> 30.0
+            "1A"  -> 365.0
+            else  -> 7.0
+        }
+
+        val priceStart = currentPrice / (1 + (changePercent24h / 100) * multiplier / 30)
+
+        return (0 until points).map { i ->
+            val timestamp = now - (points - 1 - i) * intervalMs
+            val progress = i.toDouble() / (points - 1)
+            val basePrice = priceStart + (currentPrice - priceStart) * progress
+            val variation = basePrice * 0.008 * (Math.random() - 0.5)
+            timestamp to (basePrice + variation)
+        }
+    }
 }

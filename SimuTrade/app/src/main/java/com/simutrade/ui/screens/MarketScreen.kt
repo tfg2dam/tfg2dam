@@ -26,18 +26,36 @@ fun MarketScreen(
     mainViewModel: MainViewModel,
     marketViewModel: MarketViewModel = viewModel()
 ) {
+    var chartAsset by remember { mutableStateOf<Asset?>(null) }
     val uiState by marketViewModel.uiState.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("Todos") }
     var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
+
     LaunchedEffect(Unit) {
         while (true) {
             delay(1000)
             currentTime = System.currentTimeMillis()
         }
     }
-    val filters = listOf("Todos", "Acciones", "Cripto")
 
+    chartAsset?.let { asset ->
+        LaunchedEffect(asset, uiState.selectedPeriod) {
+            marketViewModel.loadPriceHistory(asset, uiState.selectedPeriod)
+        }
+        PriceChartDialog(
+            asset = asset,
+            priceHistory = uiState.priceHistory,
+            isLoading = uiState.isLoadingHistory,
+            selectedPeriod = uiState.selectedPeriod,
+            onDismiss = { chartAsset = null },
+            onPeriodChange = { period ->
+                marketViewModel.loadPriceHistory(asset, period)
+            }
+        )
+    }
+
+    val filters = listOf("Todos", "Acciones", "Cripto")
     val isSearching = searchQuery.isNotEmpty()
 
     val displayedAssets = when {
@@ -105,7 +123,7 @@ fun MarketScreen(
             )
         }
 
-        // Filtros (solo si no hay búsqueda)
+        // Filtros
         if (!isSearching) {
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -130,10 +148,8 @@ fun MarketScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator()
                         Spacer(Modifier.height(8.dp))
-                        Text(
-                            "Cargando mercado...",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text("Cargando mercado...",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -187,7 +203,8 @@ fun MarketScreen(
             items(displayedAssets) { asset ->
                 AssetCard(
                     asset = asset,
-                    onClick = { mainViewModel.selectAsset(asset) }
+                    onClick = { mainViewModel.selectAsset(asset) },
+                    onChartClick = { chartAsset = asset }
                 )
             }
         }
@@ -195,7 +212,7 @@ fun MarketScreen(
 }
 
 @Composable
-fun AssetCard(asset: Asset, onClick: () -> Unit) {
+fun AssetCard(asset: Asset, onClick: () -> Unit, onChartClick: () -> Unit) {
     val isPositive = asset.priceChangePercent24h >= 0
     val changeColor = if (isPositive) Color(0xFF16a34a) else Color(0xFFdc2626)
 
@@ -211,6 +228,7 @@ fun AssetCard(asset: Asset, onClick: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Icono + nombre
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -245,6 +263,7 @@ fun AssetCard(asset: Asset, onClick: () -> Unit) {
                 }
             }
 
+            // Precio + cambio + botón gráfico
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = "€${String.format("%.2f", asset.currentPrice)}",
@@ -268,6 +287,16 @@ fun AssetCard(asset: Asset, onClick: () -> Unit) {
                         color = changeColor,
                         fontWeight = FontWeight.Medium
                     )
+                }
+                // Botón de gráfico
+                TextButton(
+                    onClick = onChartClick,
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                    modifier = Modifier.height(24.dp)
+                ) {
+                    Icon(Icons.Default.ShowChart, null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(2.dp))
+                    Text("Gráfico", style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
