@@ -56,6 +56,8 @@ class MainViewModel : ViewModel() {
             _userData.value = repository.getUserData()
             _cartera.value = repository.getCartera()
             _transacciones.value = repository.getTransacciones()
+
+            verificarRetosAutomaticos() // 🔥 AUTOMÁTICO
         }
     }
 
@@ -66,7 +68,7 @@ class MainViewModel : ViewModel() {
                 val stocks = marketRepository.getTopStocks()
                 _assets.value = cryptos + stocks
             } catch (e: Exception) {
-                // silencioso, los mockAssets siguen como fallback
+                // silencioso
             }
         }
     }
@@ -77,7 +79,6 @@ class MainViewModel : ViewModel() {
             try {
                 _leaderboard.value = repository.getLeaderboard()
             } catch (e: Exception) {
-                // silencioso
             } finally {
                 _isLoadingLeaderboard.value = false
             }
@@ -90,7 +91,6 @@ class MainViewModel : ViewModel() {
             try {
                 _retosData.value = repository.getRetosData()
             } catch (e: Exception) {
-                // silencioso
             } finally {
                 _isLoadingRetos.value = false
             }
@@ -133,6 +133,7 @@ class MainViewModel : ViewModel() {
                 nuevaRacha >= 7 -> 5.0
                 else -> 2.0
             }
+
             val totalRecompensa = recompensa + bonusRacha
             val nuevoSaldo = _userData.value.saldo + totalRecompensa
             repository.updateSaldo(nuevoSaldo)
@@ -149,7 +150,33 @@ class MainViewModel : ViewModel() {
         )
     }
 
-    fun navigateTo(page: String) { _currentPage.value = page }
+    // 🔥 NUEVA FUNCIÓN AUTOMÁTICA
+    fun verificarRetosAutomaticos() {
+        val retos = getRetosDelDia()
+        val completados = _retosData.value.retosCompletados
+
+        retos.forEach { reto ->
+            if (reto.id in completados) return@forEach
+
+            val completado = when (reto.titulo) {
+                "Primera operación" -> _transacciones.value.isNotEmpty()
+                "Diversifica" -> _cartera.value.size >= 2
+                "Inversor activo" -> {
+                    val tipos = _cartera.value.map { it.type }.toSet()
+                    tipos.contains(AssetType.STOCK) && tipos.contains(AssetType.CRYPTO)
+                }
+                else -> false
+            }
+
+            if (completado) {
+                completarReto(reto.id, reto.recompensa)
+            }
+        }
+    }
+
+    fun navigateTo(page: String) {
+        _currentPage.value = page
+    }
 
     fun selectAsset(asset: Asset) {
         _selectedAsset.value = asset
@@ -195,6 +222,7 @@ class MainViewModel : ViewModel() {
                     quantity, asset.currentPrice, asset.currentPrice
                 )
             }
+
             repository.upsertCartera(holding)
 
             val transaction = Transaction(
@@ -207,8 +235,11 @@ class MainViewModel : ViewModel() {
                 price = asset.currentPrice,
                 total = total
             )
+
             repository.addTransaccion(transaction)
             cargarDatos()
+            verificarRetosAutomaticos() // 🔥
+
             onResult(OperationResult.Success("Compra realizada con éxito", _userData.value))
         }
     }
@@ -216,7 +247,10 @@ class MainViewModel : ViewModel() {
     fun venderActivo(assetId: String, quantity: Double, currentPrice: Double, onResult: (OperationResult) -> Unit) {
         viewModelScope.launch {
             val holding = _cartera.value.find { it.assetId == assetId }
-                ?: run { onResult(OperationResult.Error("No tienes este activo")); return@launch }
+                ?: run {
+                    onResult(OperationResult.Error("No tienes este activo"))
+                    return@launch
+                }
 
             if (quantity > holding.quantity) {
                 onResult(OperationResult.Error("Cantidad insuficiente"))
@@ -228,10 +262,16 @@ class MainViewModel : ViewModel() {
             repository.updateSaldo(nuevoSaldo)
             _userData.value = _userData.value.copy(saldo = nuevoSaldo)
 
-            if (quantity == holding.quantity) repository.deleteCartera(assetId)
-            else repository.upsertCartera(
-                holding.copy(quantity = holding.quantity - quantity, currentPrice = currentPrice)
-            )
+            if (quantity == holding.quantity) {
+                repository.deleteCartera(assetId)
+            } else {
+                repository.upsertCartera(
+                    holding.copy(
+                        quantity = holding.quantity - quantity,
+                        currentPrice = currentPrice
+                    )
+                )
+            }
 
             val transaction = Transaction(
                 id = System.currentTimeMillis().toString(),
@@ -243,8 +283,11 @@ class MainViewModel : ViewModel() {
                 price = currentPrice,
                 total = total
             )
+
             repository.addTransaccion(transaction)
             cargarDatos()
+            verificarRetosAutomaticos() // 🔥
+
             onResult(OperationResult.Success("Venta realizada con éxito", _userData.value))
         }
     }
