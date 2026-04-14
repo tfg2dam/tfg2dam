@@ -77,3 +77,18 @@ sealed class OperationResult {
     data class Success(val message: String, val userData: UserData) : OperationResult()
     data class Error(val message: String) : OperationResult()
 }
+
+data class RetosData(
+    val rachaActual: Int = 0,
+    val rachaMaxima: Int = 0,
+    val ultimaVez: Long = 0L,
+    val retosCompletados: List<String> = emptyList()
+)
+
+data class Reto(
+    val id: String,
+    val titulo: String,
+    val descripcion: String,
+    val emoji: String,
+    val recompensa: Double
+)

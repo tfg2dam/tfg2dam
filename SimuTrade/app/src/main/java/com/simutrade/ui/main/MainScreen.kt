@@ -28,7 +28,7 @@ fun MainScreen(
         NavigationItem("dashboard", "Panel", Icons.Default.Dashboard),
         NavigationItem("market", "Mercado", Icons.Default.TrendingUp),
         NavigationItem("rankings", "Rankings", Icons.Default.EmojiEvents),
-        NavigationItem("educational", "Aprender", Icons.Default.School)
+        NavigationItem("educational", "Retos", Icons.Default.Star)
     )
 
     if (showProfileDialog) {

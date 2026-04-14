@@ -40,6 +40,12 @@ class MainViewModel : ViewModel() {
     private val _isLoadingLeaderboard = MutableStateFlow(false)
     val isLoadingLeaderboard: StateFlow<Boolean> = _isLoadingLeaderboard.asStateFlow()
 
+    private val _retosData = MutableStateFlow(RetosData())
+    val retosData: StateFlow<RetosData> = _retosData.asStateFlow()
+
+    private val _isLoadingRetos = MutableStateFlow(false)
+    val isLoadingRetos: StateFlow<Boolean> = _isLoadingRetos.asStateFlow()
+
     init {
         cargarDatos()
         cargarAssets()
@@ -76,6 +82,71 @@ class MainViewModel : ViewModel() {
                 _isLoadingLeaderboard.value = false
             }
         }
+    }
+
+    fun cargarRetos() {
+        viewModelScope.launch {
+            _isLoadingRetos.value = true
+            try {
+                _retosData.value = repository.getRetosData()
+            } catch (e: Exception) {
+                // silencioso
+            } finally {
+                _isLoadingRetos.value = false
+            }
+        }
+    }
+
+    fun completarReto(retoId: String, recompensa: Double) {
+        viewModelScope.launch {
+            val retosData = _retosData.value
+            if (retoId in retosData.retosCompletados) return@launch
+
+            val hoy = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }.timeInMillis
+
+            val ayer = hoy - 24 * 60 * 60 * 1000
+
+            val nuevaRacha = when {
+                retosData.ultimaVez >= hoy -> retosData.rachaActual
+                retosData.ultimaVez >= ayer -> retosData.rachaActual + 1
+                else -> 1
+            }
+
+            val nuevosRetosCompletados = retosData.retosCompletados + retoId
+            val nuevaRetosData = retosData.copy(
+                rachaActual = nuevaRacha,
+                rachaMaxima = maxOf(nuevaRacha, retosData.rachaMaxima),
+                ultimaVez = System.currentTimeMillis(),
+                retosCompletados = nuevosRetosCompletados
+            )
+
+            repository.saveRetosData(nuevaRetosData)
+            _retosData.value = nuevaRetosData
+
+            val bonusRacha = when {
+                nuevaRacha >= 30 -> 15.0
+                nuevaRacha >= 7 -> 5.0
+                else -> 2.0
+            }
+            val totalRecompensa = recompensa + bonusRacha
+            val nuevoSaldo = _userData.value.saldo + totalRecompensa
+            repository.updateSaldo(nuevoSaldo)
+            _userData.value = _userData.value.copy(saldo = nuevoSaldo)
+        }
+    }
+
+    fun getRetosDelDia(): List<Reto> {
+        val dia = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR)
+        return listOf(
+            Reto("reto_${dia}_1", "Primera operación", "Realiza una compra o venta hoy", "📈", 2.0),
+            Reto("reto_${dia}_2", "Diversifica", "Ten al menos 2 activos en cartera", "🎯", 3.0),
+            Reto("reto_${dia}_3", "Inversor activo", "Opera con un activo de cada tipo", "⚡", 5.0)
+        )
     }
 
     fun navigateTo(page: String) { _currentPage.value = page }

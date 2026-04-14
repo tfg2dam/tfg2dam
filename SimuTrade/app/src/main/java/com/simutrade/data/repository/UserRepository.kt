@@ -124,6 +124,30 @@ class UserRepository {
         }.sortedByDescending { it.profit }
     }
 
+    suspend fun getRetosData(): RetosData {
+        return try {
+            val doc = firestore.collection("Retos").document(uid).get().await()
+            RetosData(
+                rachaActual = doc.getLong("racha_actual")?.toInt() ?: 0,
+                rachaMaxima = doc.getLong("racha_maxima")?.toInt() ?: 0,
+                ultimaVez = doc.getLong("ultima_vez") ?: 0L,
+                retosCompletados = (doc.get("retos_completados") as? List<String>) ?: emptyList()
+            )
+        } catch (e: Exception) {
+            RetosData()
+        }
+    }
+
+    suspend fun saveRetosData(retosData: RetosData) {
+        val data = hashMapOf(
+            "racha_actual" to retosData.rachaActual,
+            "racha_maxima" to retosData.rachaMaxima,
+            "ultima_vez" to retosData.ultimaVez,
+            "retos_completados" to retosData.retosCompletados
+        )
+        firestore.collection("Retos").document(uid).set(data).await()
+    }
+
     fun calcularValorCartera(cartera: List<PortfolioHolding>): Double =
         cartera.sumOf { it.quantity * it.currentPrice }
 
