@@ -153,19 +153,59 @@ class MainViewModel : ViewModel() {
     }
 
     fun verificarRetosAutomaticos() {
+
+        // 🔥 1. RESET DIARIO
+        val hoy = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR)
+
+        if (_retosData.value.diaActual != hoy) {
+
+            val nuevosDatos = _retosData.value.copy(
+                retosCompletados = emptyList(),
+                diaActual = hoy
+            )
+
+            viewModelScope.launch {
+                repository.saveRetosData(nuevosDatos)
+            }
+
+            _retosData.value = nuevosDatos
+        }
+
+        // 🔥 2. TRANSACCIONES DE HOY (CLAVE 🔥)
+        val inicioDia = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val transaccionesHoy = _transacciones.value.filter {
+            it.date >= inicioDia
+        }
+
+        // 🔥 3. VERIFICAR RETOS
         val retos = getRetosDelDia()
         val completados = _retosData.value.retosCompletados
 
         retos.forEach { reto ->
             if (reto.id in completados) return@forEach
 
-            val completado = when (reto.titulo) {
-                "Primera operación" -> _transacciones.value.isNotEmpty()
-                "Diversifica" -> _cartera.value.size >= 2
-                "Inversor activo" -> {
+            val completado = when {
+
+                // 📈 Reto 1 → operación HOY
+                reto.id.endsWith("_1") ->
+                    transaccionesHoy.isNotEmpty()
+
+                // 🎯 Reto 2 → 2 activos distintos
+                reto.id.endsWith("_2") ->
+                    _cartera.value.map { it.assetId }.distinct().size >= 2
+
+                // ⚡ Reto 3 → stock + crypto
+                reto.id.endsWith("_3") -> {
                     val tipos = _cartera.value.map { it.type }.toSet()
                     tipos.contains(AssetType.STOCK) && tipos.contains(AssetType.CRYPTO)
                 }
+
                 else -> false
             }
 

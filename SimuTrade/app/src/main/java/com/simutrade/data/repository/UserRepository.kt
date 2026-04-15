@@ -157,7 +157,8 @@ class UserRepository {
                 rachaActual = doc.getLong("racha_actual")?.toInt() ?: 0,
                 rachaMaxima = doc.getLong("racha_maxima")?.toInt() ?: 0,
                 ultimaVez = doc.getLong("ultima_vez") ?: 0L,
-                retosCompletados = (doc.get("retos_completados") as? List<String>) ?: emptyList()
+                retosCompletados = (doc.get("retos_completados") as? List<String>) ?: emptyList(),
+                diaActual = doc.getLong("dia_actual")?.toInt() ?: 0 // 🔥 NUEVO
             )
         } catch (e: Exception) {
             RetosData()
@@ -169,7 +170,8 @@ class UserRepository {
             "racha_actual" to retosData.rachaActual,
             "racha_maxima" to retosData.rachaMaxima,
             "ultima_vez" to retosData.ultimaVez,
-            "retos_completados" to retosData.retosCompletados
+            "retos_completados" to retosData.retosCompletados,
+            "dia_actual" to retosData.diaActual // 🔥 NUEVO
         )
 
         firestore.collection("Retos").document(uid).set(data).await()

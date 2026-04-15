@@ -82,7 +82,8 @@ data class RetosData(
     val rachaActual: Int = 0,
     val rachaMaxima: Int = 0,
     val ultimaVez: Long = 0L,
-    val retosCompletados: List<String> = emptyList()
+    val retosCompletados: List<String> = emptyList(),
+    val diaActual: Int = 0 // 🔥 NUEVO
 )
 
 data class Reto(
