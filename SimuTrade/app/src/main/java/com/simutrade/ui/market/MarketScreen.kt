@@ -1,4 +1,4 @@
-package com.simutrade.ui.screens
+package com.simutrade.ui.market
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,7 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.simutrade.data.model.Asset
 import com.simutrade.data.model.AssetType
-import com.simutrade.ui.market.MarketViewModel
 import com.simutrade.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
 

@@ -1,4 +1,4 @@
-package com.simutrade.ui.screens
+package com.simutrade.ui.dashboard
 
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
@@ -17,9 +17,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.simutrade.data.MockData
+import com.simutrade.data.repository.MockData
 import com.simutrade.data.model.PortfolioHolding
 import com.simutrade.data.model.Rank
 import com.simutrade.data.model.Transaction
@@ -179,7 +180,7 @@ fun SummaryCard(
     title: String,
     value: String,
     subtitle: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     modifier: Modifier = Modifier
 ) {
     Card(modifier = modifier) {

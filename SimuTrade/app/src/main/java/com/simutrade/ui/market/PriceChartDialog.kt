@@ -1,4 +1,4 @@
-package com.simutrade.ui.screens
+package com.simutrade.ui.market
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons

@@ -9,7 +9,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.simutrade.ui.auth.AuthViewModel
-import com.simutrade.ui.screens.*
+import com.simutrade.ui.challenges.EducationalScreen
+import com.simutrade.ui.dashboard.DashboardScreen
+import com.simutrade.ui.market.MarketScreen
+import com.simutrade.ui.rankings.RankingsScreen
+import com.simutrade.ui.trading.TradingScreen
 import com.simutrade.ui.viewmodel.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)

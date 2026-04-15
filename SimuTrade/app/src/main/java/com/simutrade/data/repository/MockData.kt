@@ -1,4 +1,4 @@
-package com.simutrade.data
+package com.simutrade.data.repository
 
 import com.simutrade.data.model.Asset
 import com.simutrade.data.model.AssetType
