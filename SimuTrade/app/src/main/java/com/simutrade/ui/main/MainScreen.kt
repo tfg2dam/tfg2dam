@@ -9,7 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.simutrade.ui.auth.AuthViewModel
-import com.simutrade.ui.challenges.EducationalScreen
+import com.simutrade.ui.challenges.ChallengesScreen
 import com.simutrade.ui.dashboard.DashboardScreen
 import com.simutrade.ui.market.MarketScreen
 import com.simutrade.ui.rankings.RankingsScreen
@@ -32,7 +32,7 @@ fun MainScreen(
         NavigationItem("dashboard", "Panel", Icons.Default.Dashboard),
         NavigationItem("market", "Mercado", Icons.Default.TrendingUp),
         NavigationItem("rankings", "Rankings", Icons.Default.EmojiEvents),
-        NavigationItem("educational", "Retos", Icons.Default.Star)
+        NavigationItem("challenges", "Retos", Icons.Default.Star)
     )
 
     if (showProfileDialog) {
@@ -85,7 +85,7 @@ fun MainScreen(
                 "market"      -> MarketScreen(mainViewModel)
                 "trading"     -> TradingScreen(mainViewModel)
                 "rankings"    -> RankingsScreen(mainViewModel)
-                "educational" -> EducationalScreen(mainViewModel)
+                "challenges" -> ChallengesScreen(mainViewModel)
             }
         }
     }

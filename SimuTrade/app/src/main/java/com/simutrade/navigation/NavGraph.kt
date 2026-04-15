@@ -16,7 +16,7 @@ object Routes {
     const val MARKET = "market"
     const val TRADING = "trading/{assetId}"
     const val RANKINGS = "rankings"
-    const val EDUCATIONAL = "educational"
+    const val CHALLENGES = "challenges"
 }
 
 @Composable

@@ -14,7 +14,7 @@ import com.simutrade.data.model.Reto
 import com.simutrade.ui.viewmodel.MainViewModel
 
 @Composable
-fun EducationalScreen(viewModel: MainViewModel) {
+fun ChallengesScreen(viewModel: MainViewModel) {
     val retosData by viewModel.retosData.collectAsState()
     val isLoading by viewModel.isLoadingRetos.collectAsState()
     val retosDelDia = viewModel.getRetosDelDia()
