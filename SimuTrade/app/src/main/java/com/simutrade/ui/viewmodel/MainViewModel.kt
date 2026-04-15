@@ -57,7 +57,7 @@ class MainViewModel : ViewModel() {
             _cartera.value = repository.getCartera()
             _transacciones.value = repository.getTransacciones()
 
-            verificarRetosAutomaticos()
+            verificarRetosAutomaticos() // ✅ SOLO AQUÍ
         }
     }
 
@@ -118,6 +118,7 @@ class MainViewModel : ViewModel() {
             }
 
             val nuevosRetosCompletados = retosData.retosCompletados + retoId
+
             val nuevaRetosData = retosData.copy(
                 rachaActual = nuevaRacha,
                 rachaMaxima = maxOf(nuevaRacha, retosData.rachaMaxima),
@@ -136,6 +137,7 @@ class MainViewModel : ViewModel() {
 
             val totalRecompensa = recompensa + bonusRacha
             val nuevoSaldo = _userData.value.saldo + totalRecompensa
+
             repository.updateSaldo(nuevoSaldo)
             _userData.value = _userData.value.copy(saldo = nuevoSaldo)
         }
@@ -243,8 +245,6 @@ class MainViewModel : ViewModel() {
             val profit = getProfit()
             repository.updateUserStats(totalValue, profit)
 
-            verificarRetosAutomaticos()
-
             onResult(OperationResult.Success("Compra realizada con éxito", _userData.value))
         }
     }
@@ -264,6 +264,7 @@ class MainViewModel : ViewModel() {
 
             val total = quantity * currentPrice
             val nuevoSaldo = _userData.value.saldo + total
+
             repository.updateSaldo(nuevoSaldo)
             _userData.value = _userData.value.copy(saldo = nuevoSaldo)
 
@@ -296,8 +297,6 @@ class MainViewModel : ViewModel() {
             val totalValue = getTotalValue()
             val profit = getProfit()
             repository.updateUserStats(totalValue, profit)
-
-            verificarRetosAutomaticos()
 
             onResult(OperationResult.Success("Venta realizada con éxito", _userData.value))
         }
