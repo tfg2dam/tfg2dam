@@ -2,8 +2,10 @@ package com.simutrade.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.simutrade.data.model.*
 import kotlinx.coroutines.tasks.await
+import kotlin.math.round
 
 class UserRepository {
 
@@ -11,6 +13,11 @@ class UserRepository {
     private val firestore = FirebaseFirestore.getInstance()
 
     private val uid get() = auth.currentUser?.uid ?: throw Exception("Usuario no autenticado")
+
+    // 🔹 REDONDEO A 2 DECIMALES
+    private fun redondear(valor: Double): Double {
+        return round(valor * 100) / 100
+    }
 
     suspend fun getUserData(): UserData {
         val doc = firestore.collection("Usuarios").document(uid).get().await()
@@ -28,7 +35,7 @@ class UserRepository {
 
     suspend fun updateSaldo(nuevoSaldo: Double) {
         firestore.collection("Usuarios").document(uid)
-            .update("saldo", nuevoSaldo).await()
+            .update("saldo", redondear(nuevoSaldo)).await()
     }
 
     suspend fun updateRango(idRango: String) {
@@ -36,10 +43,22 @@ class UserRepository {
             .update("id_rango", idRango).await()
     }
 
+    suspend fun updateUserStats(totalValue: Double, profit: Double) {
+        firestore.collection("Usuarios")
+            .document(uid)
+            .update(
+                mapOf(
+                    "portfolio_value" to redondear(totalValue),
+                    "profit" to redondear(profit)
+                )
+            ).await()
+    }
+
     suspend fun getCartera(): List<PortfolioHolding> {
         val snapshot = firestore.collection("Cartera")
             .whereEqualTo("id_usuario", uid)
             .get().await()
+
         return snapshot.documents.map { doc ->
             PortfolioHolding(
                 assetId      = doc.getString("id_activo") ?: "",
@@ -55,6 +74,7 @@ class UserRepository {
 
     suspend fun upsertCartera(holding: PortfolioHolding) {
         val docId = "${uid}_${holding.assetId}"
+
         val data = hashMapOf(
             "id_usuario"      to uid,
             "id_activo"       to holding.assetId,
@@ -66,18 +86,22 @@ class UserRepository {
             "precio_actual"   to holding.currentPrice,
             "actualizado_en"  to System.currentTimeMillis()
         )
+
         firestore.collection("Cartera").document(docId).set(data).await()
     }
 
     suspend fun deleteCartera(assetId: String) {
-        firestore.collection("Cartera").document("${uid}_${assetId}").delete().await()
+        firestore.collection("Cartera")
+            .document("${uid}_${assetId}")
+            .delete().await()
     }
 
     suspend fun getTransacciones(): List<Transaction> {
         val snapshot = firestore.collection("Transacciones")
             .whereEqualTo("id_usuario", uid)
-            .orderBy("ejecutado_en", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .orderBy("ejecutado_en", Query.Direction.DESCENDING)
             .get().await()
+
         return snapshot.documents.map { doc ->
             Transaction(
                 id       = doc.id,
@@ -103,25 +127,27 @@ class UserRepository {
             "total"        to transaction.total,
             "ejecutado_en" to transaction.date
         )
+
         firestore.collection("Transacciones").add(data).await()
     }
 
     suspend fun getLeaderboard(): List<LeaderboardEntry> {
-        val snapshot = firestore.collection("Usuarios").get().await()
+        val snapshot = firestore.collection("Usuarios")
+            .orderBy("profit", Query.Direction.DESCENDING)
+            .get().await()
+
         return snapshot.documents.mapNotNull { doc ->
-            val saldo = doc.getDouble("saldo") ?: return@mapNotNull null
-            val saldoInicial = doc.getDouble("saldo_inicial") ?: 100.0
             val nombre = doc.getString("nombre_usuario") ?: return@mapNotNull null
             val idRango = doc.getString("id_rango") ?: "bronce"
-            val beneficio = saldo - saldoInicial
+
             LeaderboardEntry(
                 id = doc.id,
                 username = nombre,
-                profit = beneficio,
+                profit = doc.getDouble("profit") ?: 0.0,
                 rank = idRango.replaceFirstChar { it.uppercaseChar() },
-                portfolioValue = saldo
+                portfolioValue = doc.getDouble("portfolio_value") ?: 0.0
             )
-        }.sortedByDescending { it.profit }
+        }
     }
 
     suspend fun getRetosData(): RetosData {
@@ -145,6 +171,7 @@ class UserRepository {
             "ultima_vez" to retosData.ultimaVez,
             "retos_completados" to retosData.retosCompletados
         )
+
         firestore.collection("Retos").document(uid).set(data).await()
     }
 

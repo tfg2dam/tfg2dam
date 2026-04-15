@@ -42,10 +42,14 @@ class AuthRepository {
                 "email" to email,
                 "saldo" to 100.0,
                 "saldo_inicial" to 100.0,
-                "id_rango" to "bronce",       // rango inicial
+                "id_rango" to "bronce",
                 "creado_en" to System.currentTimeMillis(),
-                "ultimo_login" to System.currentTimeMillis()
+                "ultimo_login" to System.currentTimeMillis(),
+
+                "portfolio_value" to 100.0,
+                "profit" to 0.0
             )
+
             firestore.collection("Usuarios").document(user.uid).set(userData).await()
 
             AuthResult.Success(user)

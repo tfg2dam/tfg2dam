@@ -57,7 +57,7 @@ class MainViewModel : ViewModel() {
             _cartera.value = repository.getCartera()
             _transacciones.value = repository.getTransacciones()
 
-            verificarRetosAutomaticos() // 🔥 AUTOMÁTICO
+            verificarRetosAutomaticos()
         }
     }
 
@@ -150,7 +150,6 @@ class MainViewModel : ViewModel() {
         )
     }
 
-    // 🔥 NUEVA FUNCIÓN AUTOMÁTICA
     fun verificarRetosAutomaticos() {
         val retos = getRetosDelDia()
         val completados = _retosData.value.retosCompletados
@@ -237,8 +236,14 @@ class MainViewModel : ViewModel() {
             )
 
             repository.addTransaccion(transaction)
+
             cargarDatos()
-            verificarRetosAutomaticos() // 🔥
+
+            val totalValue = getTotalValue()
+            val profit = getProfit()
+            repository.updateUserStats(totalValue, profit)
+
+            verificarRetosAutomaticos()
 
             onResult(OperationResult.Success("Compra realizada con éxito", _userData.value))
         }
@@ -285,8 +290,14 @@ class MainViewModel : ViewModel() {
             )
 
             repository.addTransaccion(transaction)
+
             cargarDatos()
-            verificarRetosAutomaticos() // 🔥
+
+            val totalValue = getTotalValue()
+            val profit = getProfit()
+            repository.updateUserStats(totalValue, profit)
+
+            verificarRetosAutomaticos()
 
             onResult(OperationResult.Success("Venta realizada con éxito", _userData.value))
         }

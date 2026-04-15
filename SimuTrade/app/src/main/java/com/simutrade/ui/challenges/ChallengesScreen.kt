@@ -150,7 +150,6 @@ fun ChallengesScreen(viewModel: MainViewModel) {
             }
         }
 
-        // 🔥 INSIGNIAS (LO QUE TE FALTABA)
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
