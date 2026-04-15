@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,20 +32,17 @@ fun RankingsScreen(viewModel: MainViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+
+        // 🔹 TÍTULO
         item {
             Text(
-                text = "Rankings",
+                text = "Ranking",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Compite con otros inversores",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
 
+        // 🔥 TU POSICIÓN (MEJORADA)
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -62,23 +59,26 @@ fun RankingsScreen(viewModel: MainViewModel) {
                 ) {
                     Column {
                         Text(
-                            text = "Tu posición",
+                            text = "Tu ranking",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+
                         Text(
                             text = userData.nombreUsuario,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
+
                         Text(
-                            text = "${if (profit >= 0) "+" else ""}€${String.format("%.2f", profit)} de beneficio",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            text = "${if (profit >= 0) "+" else ""}€${String.format("%.2f", profit)}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (profit >= 0) Color(0xFF16a34a) else Color(0xFFdc2626)
                         )
                     }
+
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = currentRank.icon,
@@ -87,14 +87,14 @@ fun RankingsScreen(viewModel: MainViewModel) {
                         Text(
                             text = currentRank.name,
                             style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
         }
 
+        // HEADER
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -102,48 +102,61 @@ fun RankingsScreen(viewModel: MainViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Tabla de clasificación",
+                    text = "Top inversores",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
+
                 IconButton(onClick = { viewModel.cargarLeaderboard() }) {
                     Icon(Icons.Default.Refresh, contentDescription = "Actualizar")
                 }
             }
         }
 
+        // LOADING
         if (isLoading) {
             item {
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
                 }
             }
-        } else if (leaderboard.isEmpty()) {
+        }
+
+        // EMPTY
+        else if (leaderboard.isEmpty()) {
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Box(
-                        modifier = Modifier.fillMaxWidth().padding(32.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "No hay usuarios en el ranking todavía",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = "No hay datos aún",
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
-        } else {
+        }
+
+        // LISTA
+        else {
             itemsIndexed(leaderboard) { index, entry ->
+
                 val isCurrentUser = entry.username == userData.nombreUsuario
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isCurrentUser)
-                            MaterialTheme.colorScheme.primaryContainer
+                            Color(0xFFE0F2FE) // 🔥 highlight usuario
                         else
                             MaterialTheme.colorScheme.surface
                     )
@@ -155,20 +168,24 @@ fun RankingsScreen(viewModel: MainViewModel) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+
+                        // IZQUIERDA
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+
                             Text(
                                 text = when (index) {
                                     0 -> "🥇"
                                     1 -> "🥈"
                                     2 -> "🥉"
-                                    else -> "#${index + 1}"
+                                    else -> "${index + 1}"
                                 },
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
+
                             Column {
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -176,9 +193,9 @@ fun RankingsScreen(viewModel: MainViewModel) {
                                 ) {
                                     Text(
                                         text = entry.username,
-                                        style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold
                                     )
+
                                     if (isCurrentUser) {
                                         Surface(
                                             shape = MaterialTheme.shapes.small,
@@ -193,22 +210,21 @@ fun RankingsScreen(viewModel: MainViewModel) {
                                         }
                                     }
                                 }
-                                Text(
-                                    text = entry.rank,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
                             }
                         }
+
+                        // DERECHA (LO IMPORTANTE)
                         Column(horizontalAlignment = Alignment.End) {
+
                             Text(
                                 text = "${if (entry.profit >= 0) "+" else ""}€${String.format("%.2f", entry.profit)}",
-                                style = MaterialTheme.typography.titleSmall,
+                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = if (entry.profit >= 0) Color(0xFF16a34a) else Color(0xFFdc2626)
                             )
+
                             Text(
-                                text = "€${String.format("%.2f", entry.portfolioValue)} saldo",
+                                text = "€${String.format("%.2f", entry.portfolioValue)}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
