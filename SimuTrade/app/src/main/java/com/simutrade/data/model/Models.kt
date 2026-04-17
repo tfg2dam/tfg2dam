@@ -1,11 +1,13 @@
 package com.simutrade.data.model
 
+// ================= ASSETS =================
+
 data class Asset(
     val id: String,
     val symbol: String,
     val name: String,
     val type: AssetType,
-    var currentPrice: Double,
+    val currentPrice: Double,
     val priceChange24h: Double,
     val priceChangePercent24h: Double
 )
@@ -20,15 +22,19 @@ data class PriceHistory(
     val price: Double
 )
 
+// ================= PORTFOLIO =================
+
 data class PortfolioHolding(
     val assetId: String,
     val symbol: String,
     val name: String,
     val type: AssetType,
-    var quantity: Double,
-    var averagePrice: Double,
-    var currentPrice: Double
+    val quantity: Double,
+    val averagePrice: Double,
+    val currentPrice: Double
 )
+
+// ================= TRANSACTIONS =================
 
 data class Transaction(
     val id: String,
@@ -46,16 +52,20 @@ enum class TransactionType {
     SELL
 }
 
+// ================= USER =================
+
 data class UserData(
     val idUsuario: String = "",
     val nombreUsuario: String = "",
     val email: String = "",
-    var saldo: Double = 100.0,
+    val saldo: Double = 100.0,
     val saldoInicial: Double = 100.0,
     val idRango: String = "bronce",
     val creadoEn: Long = 0L,
-    var ultimoLogin: Long = 0L
+    val ultimoLogin: Long = 0L
 )
+
+// ================= RANKING =================
 
 data class Rank(
     val name: String,
@@ -73,17 +83,14 @@ data class LeaderboardEntry(
     val portfolioValue: Double
 )
 
-sealed class OperationResult {
-    data class Success(val message: String, val userData: UserData) : OperationResult()
-    data class Error(val message: String) : OperationResult()
-}
+// ================= RETOS =================
 
 data class RetosData(
     val rachaActual: Int = 0,
     val rachaMaxima: Int = 0,
     val ultimaVez: Long = 0L,
     val retosCompletados: List<String> = emptyList(),
-    val diaActual: Int = 0 // 🔥 NUEVO
+    val diaActual: Int = 0
 )
 
 data class Reto(
@@ -93,3 +100,10 @@ data class Reto(
     val emoji: String,
     val recompensa: Double
 )
+
+// ================= COMMON =================
+
+sealed class OperationResult {
+    data class Success(val message: String, val userData: UserData) : OperationResult()
+    data class Error(val message: String) : OperationResult()
+}
