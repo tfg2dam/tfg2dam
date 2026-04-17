@@ -21,7 +21,7 @@ data class MarketUiState(
     val lastUpdated: Long = 0L,
     val priceHistory: List<Pair<Long, Double>> = emptyList(),
     val isLoadingHistory: Boolean = false,
-    val selectedPeriod: String = "7d"  // ← añadido
+    val selectedPeriod: String = "7d"
 )
 
 class MarketViewModel : ViewModel() {
@@ -48,6 +48,8 @@ class MarketViewModel : ViewModel() {
         refreshJob = viewModelScope.launch {
             while (true) {
                 delay(REFRESH_INTERVAL_MS)
+
+                // 🔥 no refrescar mientras buscas
                 if (_uiState.value.searchResults.isEmpty()) {
                     refreshPrices()
                 }
@@ -57,16 +59,22 @@ class MarketViewModel : ViewModel() {
 
     fun loadMarketData() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                error = null
+            )
+
             try {
                 val cryptos = repository.getTopCryptos()
                 val stocks = repository.getTopStocks()
+
                 _uiState.value = _uiState.value.copy(
                     cryptos = cryptos,
                     stocks = stocks,
                     isLoading = false,
                     lastUpdated = System.currentTimeMillis()
                 )
+
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -81,17 +89,22 @@ class MarketViewModel : ViewModel() {
             try {
                 val cryptos = repository.getTopCryptos()
                 val stocks = repository.getTopStocks()
+
                 _uiState.value = _uiState.value.copy(
                     cryptos = cryptos,
                     stocks = stocks,
                     lastUpdated = System.currentTimeMillis()
                 )
-            } catch (e: Exception) { }
+
+            } catch (_: Exception) {
+                // 🔥 evitamos crasheos silenciosos
+            }
         }
     }
 
     fun search(query: String) {
         searchJob?.cancel()
+
         if (query.isBlank()) {
             _uiState.value = _uiState.value.copy(
                 searchResults = emptyList(),
@@ -99,29 +112,51 @@ class MarketViewModel : ViewModel() {
             )
             return
         }
+
         searchJob = viewModelScope.launch {
-            delay(500)
+            delay(500) // debounce
+
             _uiState.value = _uiState.value.copy(isSearching = true)
-            val results = repository.searchAssets(query)
-            _uiState.value = _uiState.value.copy(
-                searchResults = results,
-                isSearching = false
-            )
+
+            try {
+                val results = repository.searchAssets(query)
+
+                _uiState.value = _uiState.value.copy(
+                    searchResults = results,
+                    isSearching = false
+                )
+
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isSearching = false,
+                    error = "Error en la búsqueda"
+                )
+            }
         }
     }
 
-    // ← Actualizado con parámetro period
     fun loadPriceHistory(asset: Asset, period: String = "7d") {
         viewModelScope.launch {
+
             _uiState.value = _uiState.value.copy(
                 isLoadingHistory = true,
                 selectedPeriod = period
             )
-            val history = repository.getAssetHistory(asset, period)
-            _uiState.value = _uiState.value.copy(
-                priceHistory = history,
-                isLoadingHistory = false
-            )
+
+            try {
+                val history = repository.getAssetHistory(asset, period)
+
+                _uiState.value = _uiState.value.copy(
+                    priceHistory = history,
+                    isLoadingHistory = false
+                )
+
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoadingHistory = false,
+                    error = "Error cargando gráfico"
+                )
+            }
         }
     }
 

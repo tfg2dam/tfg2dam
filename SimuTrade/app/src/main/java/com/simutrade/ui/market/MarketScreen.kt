@@ -11,12 +11,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.simutrade.data.model.Asset
 import com.simutrade.data.model.AssetType
+import com.simutrade.ui.theme.positive
 import com.simutrade.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
 
@@ -31,6 +31,7 @@ fun MarketScreen(
     var selectedFilter by remember { mutableStateOf("Todos") }
     var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
 
+    // 🔥 reloj en vivo
     LaunchedEffect(Unit) {
         while (true) {
             delay(1000)
@@ -38,10 +39,12 @@ fun MarketScreen(
         }
     }
 
+    // 🔥 dialog gráfico
     chartAsset?.let { asset ->
         LaunchedEffect(asset, uiState.selectedPeriod) {
             marketViewModel.loadPriceHistory(asset, uiState.selectedPeriod)
         }
+
         PriceChartDialog(
             asset = asset,
             priceHistory = uiState.priceHistory,
@@ -65,9 +68,13 @@ fun MarketScreen(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+
+        // 🔹 HEADER
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -79,15 +86,17 @@ fun MarketScreen(
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (uiState.lastUpdated > 0) {
                         Text(
-                            "Actualizado hace ${((currentTime - uiState.lastUpdated) / 1000).toInt()}s",
+                            "Hace ${((currentTime - uiState.lastUpdated) / 1000).toInt()}s",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(Modifier.width(4.dp))
                     }
+
                     IconButton(onClick = { marketViewModel.loadMarketData() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Actualizar")
                     }
@@ -95,7 +104,7 @@ fun MarketScreen(
             }
         }
 
-        // Buscador
+        // 🔍 BUSCADOR
         item {
             OutlinedTextField(
                 value = searchQuery,
@@ -106,14 +115,20 @@ fun MarketScreen(
                 placeholder = { Text("Buscar acciones o criptos...") },
                 leadingIcon = { Icon(Icons.Default.Search, null) },
                 trailingIcon = {
-                    if (uiState.isSearching) {
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = {
-                            searchQuery = ""
-                            marketViewModel.search("")
-                        }) {
-                            Icon(Icons.Default.Clear, null)
+                    when {
+                        uiState.isSearching -> {
+                            CircularProgressIndicator(
+                                Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                        }
+                        searchQuery.isNotEmpty() -> {
+                            IconButton(onClick = {
+                                searchQuery = ""
+                                marketViewModel.search("")
+                            }) {
+                                Icon(Icons.Default.Clear, null)
+                            }
                         }
                     }
                 },
@@ -122,7 +137,7 @@ fun MarketScreen(
             )
         }
 
-        // Filtros
+        // 🧠 FILTROS
         if (!isSearching) {
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -137,24 +152,28 @@ fun MarketScreen(
             }
         }
 
-        // Estado de carga
+        // ⏳ LOADING
         if (uiState.isLoading) {
             item {
                 Box(
-                    Modifier.fillMaxWidth().padding(32.dp),
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator()
                         Spacer(Modifier.height(8.dp))
-                        Text("Cargando mercado...",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "Cargando mercado...",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
         }
 
-        // Error
+        // ❌ ERROR
         uiState.error?.let { error ->
             item {
                 Card(
@@ -173,7 +192,7 @@ fun MarketScreen(
             }
         }
 
-        // Contador
+        // 📊 CONTADOR
         if (!uiState.isLoading) {
             item {
                 Text(
@@ -184,11 +203,13 @@ fun MarketScreen(
             }
         }
 
-        // Lista vacía
-        if (displayedAssets.isEmpty() && !uiState.isLoading && !uiState.isSearching) {
+        // 📭 VACÍO
+        if (displayedAssets.isEmpty() && !uiState.isLoading) {
             item {
                 Box(
-                    Modifier.fillMaxWidth().padding(32.dp),
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -198,7 +219,10 @@ fun MarketScreen(
                     )
                 }
             }
-        } else {
+        }
+
+        // 📈 LISTA
+        else {
             items(displayedAssets) { asset ->
                 AssetCard(
                     asset = asset,
@@ -211,9 +235,15 @@ fun MarketScreen(
 }
 
 @Composable
-fun AssetCard(asset: Asset, onClick: () -> Unit, onChartClick: () -> Unit) {
+fun AssetCard(
+    asset: Asset,
+    onClick: () -> Unit,
+    onChartClick: () -> Unit
+) {
     val isPositive = asset.priceChangePercent24h >= 0
-    val changeColor = if (isPositive) Color(0xFF16a34a) else Color(0xFFdc2626)
+    val changeColor =
+        if (isPositive) MaterialTheme.colorScheme.positive
+        else MaterialTheme.colorScheme.error
 
     Card(
         modifier = Modifier
@@ -227,12 +257,14 @@ fun AssetCard(asset: Asset, onClick: () -> Unit, onChartClick: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icono + nombre
+
+            // IZQUIERDA
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
+
                 Surface(
                     shape = MaterialTheme.shapes.small,
                     color = if (asset.type == AssetType.STOCK)
@@ -243,54 +275,59 @@ fun AssetCard(asset: Asset, onClick: () -> Unit, onChartClick: () -> Unit) {
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
-                            text = if (asset.type == AssetType.STOCK) "📈" else "₿",
-                            style = MaterialTheme.typography.bodyLarge
+                            text = if (asset.type == AssetType.STOCK) "📈" else "₿"
                         )
                     }
                 }
+
                 Column {
                     Text(
-                        text = asset.symbol,
+                        asset.symbol,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = asset.name,
+                        asset.name,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            // Precio + cambio + botón gráfico
+            // DERECHA
             Column(horizontalAlignment = Alignment.End) {
+
                 Text(
-                    text = "€${String.format("%.2f", asset.currentPrice)}",
+                    "€${String.format("%.2f", asset.currentPrice)}",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
+
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = if (isPositive) Icons.Default.TrendingUp
-                        else Icons.Default.TrendingDown,
+                        imageVector = if (isPositive)
+                            Icons.Default.TrendingUp
+                        else
+                            Icons.Default.TrendingDown,
                         contentDescription = null,
                         tint = changeColor,
                         modifier = Modifier.size(14.dp)
                     )
+
                     Text(
-                        text = "${if (isPositive) "+" else ""}${String.format("%.2f", asset.priceChangePercent24h)}%",
+                        "${if (isPositive) "+" else ""}${String.format("%.2f", asset.priceChangePercent24h)}%",
                         style = MaterialTheme.typography.bodySmall,
                         color = changeColor,
                         fontWeight = FontWeight.Medium
                     )
                 }
-                // Botón de gráfico
+
                 TextButton(
                     onClick = onChartClick,
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp),
                     modifier = Modifier.height(24.dp)
                 ) {
                     Icon(Icons.Default.ShowChart, null, modifier = Modifier.size(14.dp))

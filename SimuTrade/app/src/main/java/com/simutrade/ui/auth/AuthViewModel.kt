@@ -16,33 +16,75 @@ data class AuthUiState(
 )
 
 class AuthViewModel : ViewModel() {
+
     private val repository = AuthRepository()
 
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
+    // 🔹 Helper para actualizar estado
+    private fun updateState(
+        isLoading: Boolean? = null,
+        error: String? = null,
+        success: Boolean? = null
+    ) {
+        _uiState.value = _uiState.value.copy(
+            isLoading = isLoading ?: _uiState.value.isLoading,
+            error = error,
+            success = success ?: _uiState.value.success
+        )
+    }
+
     fun login(email: String, password: String) {
+
+        if (email.isBlank() || password.isBlank()) {
+            updateState(error = "Completa todos los campos")
+            return
+        }
+
         viewModelScope.launch {
-            _uiState.value = AuthUiState(isLoading = true)
+            updateState(isLoading = true, error = null, success = false)
+
             when (val result = repository.login(email, password)) {
-                is AuthResult.Success -> _uiState.value = AuthUiState(success = true)
-                is AuthResult.Error -> _uiState.value = AuthUiState(error = result.message)
+                is AuthResult.Success -> {
+                    updateState(isLoading = false, success = true)
+                }
+
+                is AuthResult.Error -> {
+                    updateState(isLoading = false, error = result.message)
+                }
             }
         }
     }
 
     fun register(email: String, password: String, username: String) {
+
+        if (email.isBlank() || password.isBlank() || username.isBlank()) {
+            updateState(error = "Completa todos los campos")
+            return
+        }
+
         viewModelScope.launch {
-            _uiState.value = AuthUiState(isLoading = true)
+            updateState(isLoading = true, error = null, success = false)
+
             when (val result = repository.register(email, password, username)) {
-                is AuthResult.Success -> _uiState.value = AuthUiState(success = true)
-                is AuthResult.Error -> _uiState.value = AuthUiState(error = result.message)
+                is AuthResult.Success -> {
+                    updateState(isLoading = false, success = true)
+                }
+
+                is AuthResult.Error -> {
+                    updateState(isLoading = false, error = result.message)
+                }
             }
         }
     }
 
     fun clearError() {
-        _uiState.value = _uiState.value.copy(error = null)
+        updateState(error = null)
+    }
+
+    fun clearSuccess() {
+        updateState(success = false)
     }
 
     fun logout() {

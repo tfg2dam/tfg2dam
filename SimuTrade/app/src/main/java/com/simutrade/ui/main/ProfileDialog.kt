@@ -5,11 +5,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.simutrade.data.model.UserData
 
 @Composable
@@ -18,6 +19,17 @@ fun ProfileDialog(
     onDismiss: () -> Unit,
     onLogout: () -> Unit
 ) {
+    val initial = userData.nombreUsuario
+        .trim()
+        .firstOrNull()
+        ?.uppercaseChar()
+        ?.toString() ?: "?"
+
+    val rango = userData.idRango
+        .takeIf { it.isNotBlank() }
+        ?.replaceFirstChar { it.uppercaseChar() }
+        ?: "Bronce"
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -32,16 +44,17 @@ fun ProfileDialog(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
-                            text = userData.nombreUsuario.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                            text = initial,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 }
+
                 Column {
                     Text(
-                        text = userData.nombreUsuario,
+                        text = userData.nombreUsuario.ifBlank { "Usuario" },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -55,22 +68,25 @@ fun ProfileDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
                 HorizontalDivider()
 
                 ProfileRow(
                     icon = Icons.Default.AccountBalanceWallet,
                     label = "Saldo disponible",
-                    value = "€${String.format("%.2f", userData.saldo)}"
+                    value = "€${"%.2f".format(userData.saldo)}"
                 )
+
                 ProfileRow(
                     icon = Icons.Default.Savings,
                     label = "Saldo inicial",
-                    value = "€${String.format("%.2f", userData.saldoInicial)}"
+                    value = "€${"%.2f".format(userData.saldoInicial)}"
                 )
+
                 ProfileRow(
                     icon = Icons.Default.EmojiEvents,
                     label = "Rango actual",
-                    value = userData.idRango.replaceFirstChar { it.uppercaseChar() }
+                    value = rango
                 )
 
                 HorizontalDivider()
@@ -102,7 +118,7 @@ fun ProfileDialog(
 
 @Composable
 fun ProfileRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     label: String,
     value: String
 ) {
@@ -111,6 +127,7 @@ fun ProfileRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
+
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -121,12 +138,14 @@ fun ProfileRow(
                 modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,

@@ -7,7 +7,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.patrykandpatrick.vico.compose.axis.horizontal.rememberBottomAxis
@@ -17,6 +16,7 @@ import com.patrykandpatrick.vico.compose.chart.line.lineChart
 import com.patrykandpatrick.vico.core.entry.FloatEntry
 import com.patrykandpatrick.vico.core.entry.entryModelOf
 import com.simutrade.data.model.Asset
+import com.simutrade.ui.theme.positive
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -29,24 +29,24 @@ fun PriceChartDialog(
     onDismiss: () -> Unit,
     onPeriodChange: (String) -> Unit
 ) {
+
     val isPositive = asset.priceChangePercent24h >= 0
-    val lineColor = if (isPositive) Color(0xFF16a34a) else Color(0xFFdc2626)
+    val lineColor =
+        if (isPositive) MaterialTheme.colorScheme.positive
+        else MaterialTheme.colorScheme.error
+
     val periods = listOf("1h", "1d", "7d", "30d", "1A")
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                Modifier.fillMaxWidth(),
+                Arrangement.SpaceBetween,
+                Alignment.CenterVertically
             ) {
                 Column {
-                    Text(
-                        asset.symbol,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text(asset.symbol, fontWeight = FontWeight.Bold)
                     Text(
                         asset.name,
                         style = MaterialTheme.typography.bodySmall,
@@ -61,20 +61,20 @@ fun PriceChartDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
 
-                // Precio actual + cambio
+                // 💰 PRECIO
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom
+                    Modifier.fillMaxWidth(),
+                    Arrangement.SpaceBetween,
+                    Alignment.Bottom
                 ) {
                     Text(
-                        "€${String.format("%.2f", asset.currentPrice)}",
+                        "€${"%.2f".format(asset.currentPrice)}",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
+
                     Text(
-                        "${if (isPositive) "+" else ""}${String.format("%.2f", asset.priceChangePercent24h)}% (24h)",
-                        style = MaterialTheme.typography.bodyMedium,
+                        "${if (isPositive) "+" else ""}${"%.2f".format(asset.priceChangePercent24h)}% (24h)",
                         color = lineColor,
                         fontWeight = FontWeight.Medium
                     )
@@ -82,72 +82,66 @@ fun PriceChartDialog(
 
                 HorizontalDivider()
 
-                // Selector de periodo
+                // ⏱ FILTROS
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     periods.forEach { period ->
                         FilterChip(
                             selected = selectedPeriod == period,
                             onClick = { onPeriodChange(period) },
-                            label = {
-                                Text(
-                                    period,
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                            },
+                            label = { Text(period) },
                             modifier = Modifier.weight(1f)
                         )
                     }
                 }
 
-                // Gráfico
+                // 📊 GRÁFICO
                 if (isLoading) {
                     Box(
-                        modifier = Modifier.fillMaxWidth().height(180.dp),
+                        Modifier.fillMaxWidth().height(180.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator()
                             Spacer(Modifier.height(8.dp))
-                            Text(
-                                "Cargando historial...",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Text("Cargando historial...")
                         }
                     }
-                } else if (priceHistory.isEmpty()) {
+                }
+
+                else if (priceHistory.isEmpty()) {
                     Box(
-                        modifier = Modifier.fillMaxWidth().height(180.dp),
+                        Modifier.fillMaxWidth().height(180.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            "No hay datos disponibles",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text("No hay datos disponibles")
                     }
-                } else {
-                    val entries = priceHistory.mapIndexed { index, (_, price) ->
-                        FloatEntry(index.toFloat(), price.toFloat())
+                }
+
+                else {
+                    val entries = priceHistory.mapIndexed { i, (_, price) ->
+                        FloatEntry(i.toFloat(), price.toFloat())
                     }
+
                     val model = entryModelOf(entries)
 
                     val dateFormat = when (selectedPeriod) {
-                        "1h"  -> SimpleDateFormat("HH:mm", Locale.getDefault())
-                        "1d"  -> SimpleDateFormat("HH:mm", Locale.getDefault())
-                        "1A"  -> SimpleDateFormat("MMM", Locale.getDefault())
-                        else  -> SimpleDateFormat("dd/MM", Locale.getDefault())
+                        "1h", "1d" -> SimpleDateFormat("HH:mm", Locale.getDefault())
+                        "1A" -> SimpleDateFormat("MMM", Locale.getDefault())
+                        else -> SimpleDateFormat("dd/MM", Locale.getDefault())
                     }
-                    val labels = priceHistory.map { (ts, _) -> dateFormat.format(Date(ts)) }
 
-                    // Mostrar solo algunos labels para no saturar
+                    val labels = priceHistory.map { (ts, _) ->
+                        dateFormat.format(Date(ts))
+                    }
+
                     val step = when (selectedPeriod) {
-                        "1h"  -> 10
-                        "1d"  -> 4
-                        "1A"  -> 8
-                        else  -> 1
+                        "1h" -> 10
+                        "1d" -> 4
+                        "1A" -> 8
+                        else -> 1
                     }
 
                     Chart(
@@ -156,43 +150,38 @@ fun PriceChartDialog(
                         startAxis = rememberStartAxis(),
                         bottomAxis = rememberBottomAxis(
                             valueFormatter = { value, _ ->
-                                val idx = value.toInt()
-                                if (idx % step == 0) labels.getOrElse(idx) { "" } else ""
+                                val i = value.toInt()
+                                if (i % step == 0) labels.getOrElse(i) { "" } else ""
                             }
                         ),
-                        modifier = Modifier.fillMaxWidth().height(180.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
                     )
 
-                    // Min / Max
-                    val minPrice = priceHistory.minOf { it.second }
-                    val maxPrice = priceHistory.maxOf { it.second }
+                    // 📉 MIN / MAX
+                    val min = priceHistory.minOf { it.second }
+                    val max = priceHistory.maxOf { it.second }
+
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        Modifier.fillMaxWidth(),
+                        Arrangement.SpaceBetween
                     ) {
-                        Column(horizontalAlignment = Alignment.Start) {
+
+                        Column {
+                            Text("Mínimo", style = MaterialTheme.typography.bodySmall)
                             Text(
-                                "Mínimo",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                "€${String.format("%.2f", minPrice)}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFFdc2626),
+                                "€${"%.2f".format(min)}",
+                                color = MaterialTheme.colorScheme.error,
                                 fontWeight = FontWeight.Medium
                             )
                         }
+
                         Column(horizontalAlignment = Alignment.End) {
+                            Text("Máximo", style = MaterialTheme.typography.bodySmall)
                             Text(
-                                "Máximo",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                "€${String.format("%.2f", maxPrice)}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF16a34a),
+                                "€${"%.2f".format(max)}",
+                                color = MaterialTheme.colorScheme.tertiary,
                                 fontWeight = FontWeight.Medium
                             )
                         }

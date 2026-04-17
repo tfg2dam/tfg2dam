@@ -2,12 +2,14 @@ package com.simutrade.ui.auth
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -20,13 +22,17 @@ fun LoginScreen(
     viewModel: AuthViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val focusManager = LocalFocusManager.current
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.success) {
-        if (uiState.success) onLoginSuccess()
+        if (uiState.success) {
+            onLoginSuccess()
+            viewModel.clearSuccess()
+        }
     }
 
     Column(
@@ -36,49 +42,80 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("SimuTrade", style = MaterialTheme.typography.displaySmall)
+
+        // TÍTULO
+        Text(
+            "SimuTrade",
+            style = MaterialTheme.typography.headlineLarge
+        )
+
         Text(
             "Aprende a invertir sin riesgo",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(40.dp))
 
+        // EMAIL
         OutlinedTextField(
             value = email,
-            onValueChange = { email = it },
+            onValueChange = {
+                email = it
+                viewModel.clearError()
+            },
             label = { Text("Email") },
-            leadingIcon = { Icon(Icons.Default.Email, null) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            leadingIcon = { Icon(Icons.Default.Email, contentDescription = "Email") },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Next
+            ),
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            isError = uiState.error != null
         )
 
         Spacer(Modifier.height(16.dp))
 
+        // PASSWORD
         OutlinedTextField(
             value = password,
-            onValueChange = { password = it },
+            onValueChange = {
+                password = it
+                viewModel.clearError()
+            },
             label = { Text("Contraseña") },
-            leadingIcon = { Icon(Icons.Default.Lock, null) },
+            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Contraseña") },
             trailingIcon = {
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                     Icon(
                         if (passwordVisible) Icons.Default.VisibilityOff
-                        else Icons.Default.Visibility, null
+                        else Icons.Default.Visibility,
+                        contentDescription = "Mostrar u ocultar contraseña"
                     )
                 }
             },
-            visualTransformation = if (passwordVisible) VisualTransformation.None
+            visualTransformation = if (passwordVisible)
+                VisualTransformation.None
             else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    focusManager.clearFocus()
+                    viewModel.login(email, password)
+                }
+            ),
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            isError = uiState.error != null
         )
 
         Spacer(Modifier.height(8.dp))
 
+        // ERROR
         uiState.error?.let { error ->
             Text(
                 error,
@@ -88,15 +125,27 @@ fun LoginScreen(
             Spacer(Modifier.height(8.dp))
         }
 
+        // BOTÓN LOGIN
         Button(
-            onClick = { viewModel.login(email, password) },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            enabled = !uiState.isLoading && email.isNotBlank() && password.isNotBlank()
+            onClick = {
+                focusManager.clearFocus()
+                viewModel.login(email, password)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            enabled = !uiState.isLoading &&
+                    email.isNotBlank() &&
+                    password.isNotBlank()
         ) {
-            if (uiState.isLoading)
-                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-            else
+            if (uiState.isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
                 Text("Iniciar sesión")
+            }
         }
 
         Spacer(Modifier.height(16.dp))

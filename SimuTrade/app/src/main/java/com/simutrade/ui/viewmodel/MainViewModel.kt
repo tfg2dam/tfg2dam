@@ -12,10 +12,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class MainViewModel : ViewModel() {
+
     private val repository = UserRepository()
     private val marketRepository = MarketRepository()
 
-// ================= STATE =================
+    // ================= STATE =================
 
     private val _userData = MutableStateFlow(UserData())
     val userData: StateFlow<UserData> = _userData.asStateFlow()
@@ -26,7 +27,7 @@ class MainViewModel : ViewModel() {
     private val _transacciones = MutableStateFlow<List<Transaction>>(emptyList())
     val transacciones: StateFlow<List<Transaction>> = _transacciones.asStateFlow()
 
-    private val _assets = MutableStateFlow(MockData.mockAssets)
+    private val _assets = MutableStateFlow<List<Asset>>(emptyList())
     val assets: StateFlow<List<Asset>> = _assets.asStateFlow()
 
     private val _selectedAsset = MutableStateFlow<Asset?>(null)
@@ -48,7 +49,7 @@ class MainViewModel : ViewModel() {
     val isLoadingRetos: StateFlow<Boolean> = _isLoadingRetos.asStateFlow()
 
 
-// ================= INIT =================
+    // ================= INIT =================
 
     init {
         cargarDatos()
@@ -56,7 +57,7 @@ class MainViewModel : ViewModel() {
     }
 
 
-// ================= DATA =================
+    // ================= DATA =================
 
     fun cargarDatos() {
         viewModelScope.launch {
@@ -107,7 +108,7 @@ class MainViewModel : ViewModel() {
     }
 
 
-// ================= NAVIGATION =================
+    // ================= NAVIGATION =================
 
     fun navigateTo(page: String) {
         _currentPage.value = page
@@ -141,9 +142,13 @@ class MainViewModel : ViewModel() {
     }
 
 
-// ================= TRADING =================
+    // ================= TRADING =================
 
-    fun buyAsset(asset: Asset, quantity: Double, onResult: (OperationResult) -> Unit) {
+    fun buyAsset(
+        asset: Asset,
+        quantity: Double,
+        onResult: (OperationResult) -> Unit
+    ) {
         viewModelScope.launch {
 
             if (quantity <= 0 || quantity.isNaN()) {
@@ -152,22 +157,23 @@ class MainViewModel : ViewModel() {
             }
 
             val total = quantity * asset.currentPrice
-            val userData = _userData.value
+            val currentUser = _userData.value
 
-            if (total > userData.saldo) {
+            if (total > currentUser.saldo) {
                 onResult(OperationResult.Error("Saldo insuficiente"))
                 return@launch
             }
 
-            val nuevoSaldo = userData.saldo - total
+            val nuevoSaldo = currentUser.saldo - total
             repository.updateSaldo(nuevoSaldo)
-            _userData.value = userData.copy(saldo = nuevoSaldo)
+            _userData.value = currentUser.copy(saldo = nuevoSaldo)
 
             val existente = _cartera.value.find { it.assetId == asset.id }
 
             val holding = if (existente != null) {
                 val totalQty = existente.quantity + quantity
                 val totalCost = existente.averagePrice * existente.quantity + total
+
                 existente.copy(
                     quantity = totalQty,
                     averagePrice = totalCost / totalQty,
@@ -175,8 +181,13 @@ class MainViewModel : ViewModel() {
                 )
             } else {
                 PortfolioHolding(
-                    asset.id, asset.symbol, asset.name, asset.type,
-                    quantity, asset.currentPrice, asset.currentPrice
+                    asset.id,
+                    asset.symbol,
+                    asset.name,
+                    asset.type,
+                    quantity,
+                    asset.currentPrice,
+                    asset.currentPrice
                 )
             }
 
@@ -206,7 +217,12 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun sellAsset(assetId: String, quantity: Double, currentPrice: Double, onResult: (OperationResult) -> Unit) {
+    fun sellAsset(
+        assetId: String,
+        quantity: Double,
+        currentPrice: Double,
+        onResult: (OperationResult) -> Unit
+    ) {
         viewModelScope.launch {
 
             val holding = _cartera.value.find { it.assetId == assetId }
@@ -262,10 +278,11 @@ class MainViewModel : ViewModel() {
     }
 
 
-// ================= RETOS =================
+    // ================= RETOS =================
 
     fun getRetosDelDia(): List<Reto> {
         val dia = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR)
+
         return listOf(
             Reto("reto_${dia}_1", "Primera operación", "Realiza una compra o venta hoy", "📈", 2.0),
             Reto("reto_${dia}_2", "Diversifica", "Ten al menos 2 activos en cartera", "🎯", 3.0),
@@ -306,11 +323,14 @@ class MainViewModel : ViewModel() {
 
     fun completarReto(retoId: String, recompensa: Double) {
         viewModelScope.launch {
+
             val nuevos = _retosData.value.retosCompletados + retoId
+
             val nuevaData = _retosData.value.copy(
                 retosCompletados = nuevos,
                 ultimaVez = System.currentTimeMillis()
             )
+
             repository.saveRetosData(nuevaData)
             _retosData.value = nuevaData
 
@@ -321,9 +341,10 @@ class MainViewModel : ViewModel() {
     }
 
 
-// ================= CALCULATIONS =================
+    // ================= CALCULATIONS =================
 
-    fun getPortfolioValue() = repository.calcularValorCartera(_cartera.value)
+    fun getPortfolioValue() =
+        repository.calcularValorCartera(_cartera.value)
 
     fun getTotalValue() =
         repository.calcularValorTotal(_userData.value.saldo, getPortfolioValue())
@@ -336,5 +357,4 @@ class MainViewModel : ViewModel() {
 
     fun getCurrentRank() =
         MockData.getRankFromProfit(getProfit())
-
 }

@@ -1,5 +1,6 @@
 package com.simutrade.ui.challenges
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -7,17 +8,23 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.draw.alpha
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.simutrade.data.model.Reto
 import com.simutrade.ui.viewmodel.MainViewModel
 
+// COLORES DE ÉXITO
+private val SuccessColor = Color(0xFF16A34A)
+private val SuccessBackground = Color(0xFFD1FAE5)
+
 @Composable
 fun ChallengesScreen(viewModel: MainViewModel) {
-    val retosData by viewModel.retosData.collectAsState()
-    val isLoading by viewModel.isLoadingRetos.collectAsState()
+
+    val retosData by viewModel.retosData.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoadingRetos.collectAsStateWithLifecycle()
     val retosDelDia = viewModel.getRetosDelDia()
 
     LaunchedEffect(Unit) {
@@ -39,7 +46,7 @@ fun ChallengesScreen(viewModel: MainViewModel) {
             )
         }
 
-        // 🔥 RACHA
+        // RACHA
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -72,14 +79,13 @@ fun ChallengesScreen(viewModel: MainViewModel) {
 
                     Text(
                         text = "${retosData.rachaActual}",
-                        style = MaterialTheme.typography.displaySmall,
+                        style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
         }
 
-        // HEADER
         item {
             val completados = retosDelDia.count { it.id in retosData.retosCompletados }
 
@@ -87,20 +93,14 @@ fun ChallengesScreen(viewModel: MainViewModel) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                Text("Hoy", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
-                    text = "Hoy",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = "$completados/${retosDelDia.size}",
+                    "$completados/${retosDelDia.size}",
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        // LOADING
         if (isLoading) {
             item {
                 Box(
@@ -119,13 +119,8 @@ fun ChallengesScreen(viewModel: MainViewModel) {
             }
         }
 
-        // INSIGNIAS
         item {
-            Text(
-                text = "🏅 Insignias",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
+            Text("🏅 Insignias", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
 
         item {
@@ -143,14 +138,18 @@ fun ChallengesScreen(viewModel: MainViewModel) {
 
 @Composable
 fun RetoCard(reto: Reto, completado: Boolean) {
+
+    // ANIMACIÓN COLOR (pro 💅)
+    val backgroundColor by animateColorAsState(
+        targetValue = if (completado) SuccessBackground else MaterialTheme.colorScheme.surface,
+        label = "reto_background"
+    )
+
+    val textColor = if (completado) SuccessColor else MaterialTheme.colorScheme.primary
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (completado)
-                Color(0xFFE8F5E9)
-            else
-                MaterialTheme.colorScheme.surface
-        )
+        colors = CardDefaults.cardColors(containerColor = backgroundColor)
     ) {
         Row(
             modifier = Modifier
@@ -169,28 +168,21 @@ fun RetoCard(reto: Reto, completado: Boolean) {
                 Text(text = if (completado) "✅" else reto.emoji)
 
                 Column {
-                    Text(
-                        text = reto.titulo,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text(reto.titulo, fontWeight = FontWeight.Bold)
 
-                    // 👇 AQUÍ ESTÁ LA CLAVE (explicación simple)
                     Text(
-                        text = reto.descripcion,
+                        reto.descripcion,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(Modifier.height(4.dp))
 
                     Text(
                         text = if (completado) "Completado" else "En progreso",
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (completado)
-                            Color(0xFF16a34a)
-                        else
-                            MaterialTheme.colorScheme.primary
+                        color = textColor
                     )
                 }
             }
@@ -198,7 +190,7 @@ fun RetoCard(reto: Reto, completado: Boolean) {
             Text(
                 text = "+€${String.format("%.2f", reto.recompensa)}",
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF16a34a)
+                color = SuccessColor
             )
         }
     }

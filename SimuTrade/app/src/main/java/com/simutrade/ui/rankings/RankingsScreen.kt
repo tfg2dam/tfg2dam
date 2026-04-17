@@ -9,18 +9,23 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.simutrade.ui.theme.positive
 import com.simutrade.ui.viewmodel.MainViewModel
 
 @Composable
 fun RankingsScreen(viewModel: MainViewModel) {
+
     val userData by viewModel.userData.collectAsState()
     val leaderboard by viewModel.leaderboard.collectAsState()
     val isLoading by viewModel.isLoadingLeaderboard.collectAsState()
     val currentRank = viewModel.getCurrentRank()
     val profit = viewModel.getProfit()
+
+    val profitColor =
+        if (profit >= 0) MaterialTheme.colorScheme.positive
+        else MaterialTheme.colorScheme.error
 
     LaunchedEffect(Unit) {
         viewModel.cargarLeaderboard()
@@ -33,7 +38,6 @@ fun RankingsScreen(viewModel: MainViewModel) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
 
-        // 🔹 TÍTULO
         item {
             Text(
                 text = "Ranking",
@@ -42,7 +46,7 @@ fun RankingsScreen(viewModel: MainViewModel) {
             )
         }
 
-        // 🔥 TU POSICIÓN (MEJORADA)
+        // 🔥 TU POSICIÓN
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -58,37 +62,25 @@ fun RankingsScreen(viewModel: MainViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(
-                            text = "Tu ranking",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        Text("Tu ranking", style = MaterialTheme.typography.bodySmall)
 
                         Text(
-                            text = userData.nombreUsuario,
+                            text = userData.nombreUsuario.ifBlank { "Usuario" },
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            fontWeight = FontWeight.Bold
                         )
 
                         Text(
-                            text = "${if (profit >= 0) "+" else ""}€${String.format("%.2f", profit)}",
+                            text = "${if (profit >= 0) "+" else ""}€${"%.2f".format(profit)}",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (profit >= 0) Color(0xFF16a34a) else Color(0xFFdc2626)
+                            color = profitColor
                         )
                     }
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = currentRank.icon,
-                            style = MaterialTheme.typography.headlineLarge
-                        )
-                        Text(
-                            text = currentRank.name,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text(currentRank.icon, style = MaterialTheme.typography.headlineLarge)
+                        Text(currentRank.name, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -113,7 +105,6 @@ fun RankingsScreen(viewModel: MainViewModel) {
             }
         }
 
-        // LOADING
         if (isLoading) {
             item {
                 Box(
@@ -127,7 +118,6 @@ fun RankingsScreen(viewModel: MainViewModel) {
             }
         }
 
-        // EMPTY
         else if (leaderboard.isEmpty()) {
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
@@ -137,26 +127,26 @@ fun RankingsScreen(viewModel: MainViewModel) {
                             .padding(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "No hay datos aún",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text("No hay datos aún")
                     }
                 }
             }
         }
 
-        // LISTA
         else {
             itemsIndexed(leaderboard) { index, entry ->
 
                 val isCurrentUser = entry.username == userData.nombreUsuario
 
+                val entryColor =
+                    if (entry.profit >= 0) MaterialTheme.colorScheme.positive
+                    else MaterialTheme.colorScheme.error
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isCurrentUser)
-                            Color(0xFFE0F2FE) // 🔥 highlight usuario
+                            MaterialTheme.colorScheme.secondaryContainer
                         else
                             MaterialTheme.colorScheme.surface
                     )
@@ -182,7 +172,6 @@ fun RankingsScreen(viewModel: MainViewModel) {
                                     2 -> "🥉"
                                     else -> "${index + 1}"
                                 },
-                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
 
@@ -191,10 +180,7 @@ fun RankingsScreen(viewModel: MainViewModel) {
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = entry.username,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Text(entry.username, fontWeight = FontWeight.Bold)
 
                                     if (isCurrentUser) {
                                         Surface(
@@ -213,18 +199,17 @@ fun RankingsScreen(viewModel: MainViewModel) {
                             }
                         }
 
-                        // DERECHA (LO IMPORTANTE)
+                        // DERECHA
                         Column(horizontalAlignment = Alignment.End) {
 
                             Text(
-                                text = "${if (entry.profit >= 0) "+" else ""}€${String.format("%.2f", entry.profit)}",
-                                style = MaterialTheme.typography.titleMedium,
+                                text = "${if (entry.profit >= 0) "+" else ""}€${"%.2f".format(entry.profit)}",
                                 fontWeight = FontWeight.Bold,
-                                color = if (entry.profit >= 0) Color(0xFF16a34a) else Color(0xFFdc2626)
+                                color = entryColor
                             )
 
                             Text(
-                                text = "€${String.format("%.2f", entry.portfolioValue)}",
+                                text = "€${"%.2f".format(entry.portfolioValue)}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

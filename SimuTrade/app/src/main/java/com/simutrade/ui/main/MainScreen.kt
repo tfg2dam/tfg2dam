@@ -8,6 +8,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.simutrade.data.model.UserData
+import com.simutrade.data.mock.MockData
 import com.simutrade.ui.auth.AuthViewModel
 import com.simutrade.ui.challenges.ChallengesScreen
 import com.simutrade.ui.dashboard.DashboardScreen
@@ -23,9 +25,14 @@ fun MainScreen(
     mainViewModel: MainViewModel = viewModel(),
     authViewModel: AuthViewModel = viewModel()
 ) {
+
     val currentPage by mainViewModel.currentPage.collectAsState()
-    val userData by mainViewModel.userData.collectAsState()
-    val currentRank = mainViewModel.getCurrentRank()
+
+    // 🔒 evitar crash inicial
+    val userData by mainViewModel.userData.collectAsState(initial = UserData())
+
+    val currentRank = mainViewModel.getCurrentRank() ?: MockData.ranks.first()
+
     var showProfileDialog by remember { mutableStateOf(false) }
 
     val navigationItems = listOf(
@@ -53,9 +60,11 @@ fun MainScreen(
                 title = {
                     Column {
                         Text("SimuTrade", style = MaterialTheme.typography.titleLarge)
+
                         Text(
-                            "€${String.format("%.2f", userData.saldo)} • ${currentRank.icon} ${currentRank.name}",
-                            style = MaterialTheme.typography.bodySmall
+                            "€${"%.2f".format(userData.saldo)} • ${currentRank.icon} ${currentRank.name}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
@@ -79,16 +88,25 @@ fun MainScreen(
             }
         }
     ) { paddingValues ->
-        Surface(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
             when (currentPage) {
-                "dashboard"   -> DashboardScreen(mainViewModel)
-                "market"      -> MarketScreen(mainViewModel)
-                "trading"     -> TradingScreen(mainViewModel)
-                "rankings"    -> RankingsScreen(mainViewModel)
+                "dashboard"  -> DashboardScreen(mainViewModel)
+                "market"     -> MarketScreen(mainViewModel)
+                "trading"    -> TradingScreen(mainViewModel)
+                "rankings"   -> RankingsScreen(mainViewModel)
                 "challenges" -> ChallengesScreen(mainViewModel)
             }
         }
     }
 }
 
-data class NavigationItem(val route: String, val label: String, val icon: ImageVector)
+data class NavigationItem(
+    val route: String,
+    val label: String,
+    val icon: ImageVector
+)
