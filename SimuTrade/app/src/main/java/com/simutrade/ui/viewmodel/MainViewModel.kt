@@ -2,7 +2,7 @@ package com.simutrade.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.simutrade.data.repository.MockData
+import com.simutrade.data.mock.MockData
 import com.simutrade.data.model.*
 import com.simutrade.data.repository.MarketRepository
 import com.simutrade.data.repository.UserRepository

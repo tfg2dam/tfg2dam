@@ -20,7 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.simutrade.data.repository.MockData
+import com.simutrade.data.mock.MockData
 import com.simutrade.data.model.PortfolioHolding
 import com.simutrade.data.model.Rank
 import com.simutrade.data.model.Transaction
