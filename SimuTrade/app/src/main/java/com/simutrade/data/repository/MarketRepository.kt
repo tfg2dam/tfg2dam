@@ -7,7 +7,12 @@ import com.simutrade.data.remote.FinnhubClient
 
 class MarketRepository {
 
-    // Acciones fijas que queremos mostrar
+    companion object {
+        private const val SEARCH_LIMIT = 5
+    }
+
+    // ================= STOCKS FIJOS =================
+
     private val defaultStocks = listOf(
         "AAPL" to "Apple",
         "MSFT" to "Microsoft",
@@ -21,20 +26,13 @@ class MarketRepository {
         "JPM" to "JPMorgan"
     )
 
+    // ================= GET TOP =================
+
     suspend fun getTopCryptos(): List<Asset> {
         return try {
-            CoinGeckoClient.api.getTopCoins().map { coin ->
-                Asset(
-                    id = coin.id,
-                    symbol = coin.symbol.uppercase(),
-                    name = coin.name,
-                    type = AssetType.CRYPTO,
-                    currentPrice = coin.currentPrice,
-                    priceChange24h = coin.priceChange24h,
-                    priceChangePercent24h = coin.priceChangePercent24h
-                )
-            }
+            CoinGeckoClient.api.getTopCoins().map { it.toAsset() }
         } catch (e: Exception) {
+            e.printStackTrace()
             emptyList()
         }
     }
@@ -44,34 +42,29 @@ class MarketRepository {
             try {
                 val quote = FinnhubClient.api.getQuote(symbol)
                 if (quote.currentPrice > 0) {
-                    Asset(
-                        id = symbol,
-                        symbol = symbol,
-                        name = name,
-                        type = AssetType.STOCK,
-                        currentPrice = quote.currentPrice,
-                        priceChange24h = quote.change,
-                        priceChangePercent24h = quote.changePercent
-                    )
+                    quote.toAsset(symbol, name)
                 } else null
             } catch (e: Exception) {
+                e.printStackTrace()
                 null
             }
         }
     }
 
+    // ================= SEARCH =================
+
     suspend fun searchAssets(query: String): List<Asset> {
         val results = mutableListOf<Asset>()
 
-        // Buscar criptos
+        // CRYPTO
         try {
-            val cryptoResults = CoinGeckoClient.api.searchCoins(query).coins.take(5)
-            cryptoResults.forEach { coin ->
+            val cryptoResults = CoinGeckoClient.api.searchCoins(query).coins.take(SEARCH_LIMIT)
+            cryptoResults.forEach {
                 results.add(
                     Asset(
-                        id = coin.id,
-                        symbol = coin.symbol.uppercase(),
-                        name = coin.name,
+                        id = it.id,
+                        symbol = it.symbol.uppercase(),
+                        name = it.name,
                         type = AssetType.CRYPTO,
                         currentPrice = 0.0,
                         priceChange24h = 0.0,
@@ -79,13 +72,20 @@ class MarketRepository {
                     )
                 )
             }
-        } catch (e: Exception) { }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
-        // Buscar acciones
+        // STOCKS
         try {
-            val stockResults = FinnhubClient.api.searchSymbol(query).result.take(5)
+            val stockResults = FinnhubClient.api.searchSymbol(query).result.take(SEARCH_LIMIT)
             stockResults.forEach { item ->
-                val quote = try { FinnhubClient.api.getQuote(item.symbol) } catch (e: Exception) { null }
+                val quote = try {
+                    FinnhubClient.api.getQuote(item.symbol)
+                } catch (e: Exception) {
+                    null
+                }
+
                 results.add(
                     Asset(
                         id = item.symbol,
@@ -98,10 +98,14 @@ class MarketRepository {
                     )
                 )
             }
-        } catch (e: Exception) { }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         return results
     }
+
+    // ================= HISTORY =================
 
     suspend fun getAssetHistory(asset: Asset, period: String = "7d"): List<Pair<Long, Double>> {
         return try {
@@ -114,35 +118,64 @@ class MarketRepository {
                     "1A"  -> 365 to "daily"
                     else  -> 7 to "daily"
                 }
-                val history = CoinGeckoClient.api.getCoinHistory(
-                    coinId = asset.id,
-                    days = days,
-                    interval = interval
-                )
-                // Para 1h cogemos solo las últimas 60 entradas
+
+                val history = CoinGeckoClient.api.getCoinHistory(asset.id, days = days, interval = interval)
                 val prices = if (period == "1h") history.prices.takeLast(60) else history.prices
+
                 prices.map { it[0].toLong() to it[1] }
+
             } else {
                 generateSimulatedHistory(asset.currentPrice, asset.priceChangePercent24h, period)
             }
         } catch (e: Exception) {
+            e.printStackTrace()
             generateSimulatedHistory(asset.currentPrice, asset.priceChangePercent24h, period)
         }
     }
 
+    // ================= MAPPERS =================
+
+    private fun com.simutrade.data.remote.CoinGeckoItemDto.toAsset(): Asset {
+        return Asset(
+            id = id,
+            symbol = symbol.uppercase(),
+            name = name,
+            type = AssetType.CRYPTO,
+            currentPrice = currentPrice,
+            priceChange24h = priceChange24h,
+            priceChangePercent24h = priceChangePercent24h
+        )
+    }
+
+    private fun com.simutrade.data.remote.FinnhubQuoteDto.toAsset(symbol: String, name: String): Asset {
+        return Asset(
+            id = symbol,
+            symbol = symbol,
+            name = name,
+            type = AssetType.STOCK,
+            currentPrice = currentPrice,
+            priceChange24h = change,
+            priceChangePercent24h = changePercent
+        )
+    }
+
+    // ================= SIMULACIÓN =================
+
     private fun generateSimulatedHistory(
         currentPrice: Double,
         changePercent24h: Double,
-        period: String = "7d"
+        period: String
     ): List<Pair<Long, Double>> {
+
         val now = System.currentTimeMillis()
+
         val (points, intervalMs) = when (period) {
-            "1h"  -> 60 to (60 * 1000L)           // 60 puntos cada minuto
-            "1d"  -> 24 to (60 * 60 * 1000L)       // 24 puntos cada hora
-            "7d"  -> 8  to (24 * 60 * 60 * 1000L)  // 8 puntos cada día
-            "30d" -> 30 to (24 * 60 * 60 * 1000L)  // 30 puntos cada día
-            "1A"  -> 52 to (7 * 24 * 60 * 60 * 1000L) // 52 puntos cada semana
-            else  -> 8  to (24 * 60 * 60 * 1000L)
+            "1h"  -> 60 to 60_000L
+            "1d"  -> 24 to 3_600_000L
+            "7d"  -> 8 to 86_400_000L
+            "30d" -> 30 to 86_400_000L
+            "1A"  -> 52 to 604_800_000L
+            else  -> 8 to 86_400_000L
         }
 
         val multiplier = when (period) {

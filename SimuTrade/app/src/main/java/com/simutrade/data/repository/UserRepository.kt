@@ -1,5 +1,6 @@
 package com.simutrade.data.repository
 
+import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -8,29 +9,34 @@ import kotlinx.coroutines.tasks.await
 import kotlin.math.round
 
 class UserRepository {
+
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
 
-    private val uid get() = auth.currentUser?.uid ?: throw Exception("Usuario no autenticado")
+    private val uid get() = auth.currentUser?.uid
 
     companion object {
         const val USERS = "Usuarios"
         const val CARTERA = "Cartera"
         const val TRANSACCIONES = "Transacciones"
         const val RETOS = "Retos"
+
+        private const val TAG = "UserRepository"
     }
 
-// ================= UTILS =================
+    // ================= UTILS =================
 
     private fun redondear(valor: Double): Double {
         return round(valor * 100) / 100
     }
 
-// ================= USER =================
+    // ================= USER =================
 
     suspend fun getUserData(): UserData {
+        val userId = uid ?: return UserData()
+
         return try {
-            val doc = firestore.collection(USERS).document(uid).get().await()
+            val doc = firestore.collection(USERS).document(userId).get().await()
             UserData(
                 idUsuario     = doc.getString("id_usuario") ?: "",
                 nombreUsuario = doc.getString("nombre_usuario") ?: "",
@@ -42,33 +48,39 @@ class UserRepository {
                 ultimoLogin   = doc.getLong("ultimo_login") ?: 0L
             )
         } catch (e: Exception) {
-            println("Error getUserData: ${e.message}")
+            Log.e(TAG, "Error getUserData", e)
             UserData()
         }
     }
 
     suspend fun updateSaldo(nuevoSaldo: Double) {
+        val userId = uid ?: return
+
         try {
-            firestore.collection(USERS).document(uid)
+            firestore.collection(USERS).document(userId)
                 .update("saldo", redondear(nuevoSaldo)).await()
         } catch (e: Exception) {
-            println("Error updateSaldo: ${e.message}")
+            Log.e(TAG, "Error updateSaldo", e)
         }
     }
 
     suspend fun updateRango(idRango: String) {
+        val userId = uid ?: return
+
         try {
-            firestore.collection(USERS).document(uid)
+            firestore.collection(USERS).document(userId)
                 .update("id_rango", idRango).await()
         } catch (e: Exception) {
-            println("Error updateRango: ${e.message}")
+            Log.e(TAG, "Error updateRango", e)
         }
     }
 
     suspend fun updateUserStats(totalValue: Double, profit: Double) {
+        val userId = uid ?: return
+
         try {
             firestore.collection(USERS)
-                .document(uid)
+                .document(userId)
                 .update(
                     mapOf(
                         "portfolio_value" to redondear(totalValue),
@@ -76,16 +88,18 @@ class UserRepository {
                     )
                 ).await()
         } catch (e: Exception) {
-            println("Error updateUserStats: ${e.message}")
+            Log.e(TAG, "Error updateUserStats", e)
         }
     }
 
-// ================= CARTERA =================
+    // ================= CARTERA =================
 
     suspend fun getCartera(): List<PortfolioHolding> {
+        val userId = uid ?: return emptyList()
+
         return try {
             val snapshot = firestore.collection(CARTERA)
-                .whereEqualTo("id_usuario", uid)
+                .whereEqualTo("id_usuario", userId)
                 .get().await()
 
             snapshot.documents.map { doc ->
@@ -100,17 +114,19 @@ class UserRepository {
                 )
             }
         } catch (e: Exception) {
-            println("Error getCartera: ${e.message}")
+            Log.e(TAG, "Error getCartera", e)
             emptyList()
         }
     }
 
     suspend fun upsertCartera(holding: PortfolioHolding) {
+        val userId = uid ?: return
+
         try {
-            val docId = "${uid}_${holding.assetId}"
+            val docId = "${userId}_${holding.assetId}"
 
             val data = hashMapOf(
-                "id_usuario"      to uid,
+                "id_usuario"      to userId,
                 "id_activo"       to holding.assetId,
                 "simbolo"         to holding.symbol,
                 "nombre"          to holding.name,
@@ -124,26 +140,30 @@ class UserRepository {
             firestore.collection(CARTERA).document(docId).set(data).await()
 
         } catch (e: Exception) {
-            println("Error upsertCartera: ${e.message}")
+            Log.e(TAG, "Error upsertCartera", e)
         }
     }
 
     suspend fun deleteCartera(assetId: String) {
+        val userId = uid ?: return
+
         try {
             firestore.collection(CARTERA)
-                .document("${uid}_${assetId}")
+                .document("${userId}_${assetId}")
                 .delete().await()
         } catch (e: Exception) {
-            println("Error deleteCartera: ${e.message}")
+            Log.e(TAG, "Error deleteCartera", e)
         }
     }
 
-// ================= TRANSACCIONES =================
+    // ================= TRANSACCIONES =================
 
     suspend fun getTransacciones(): List<Transaction> {
+        val userId = uid ?: return emptyList()
+
         return try {
             val snapshot = firestore.collection(TRANSACCIONES)
-                .whereEqualTo("id_usuario", uid)
+                .whereEqualTo("id_usuario", userId)
                 .orderBy("ejecutado_en", Query.Direction.DESCENDING)
                 .get().await()
 
@@ -160,15 +180,17 @@ class UserRepository {
                 )
             }
         } catch (e: Exception) {
-            println("Error getTransacciones: ${e.message}")
+            Log.e(TAG, "Error getTransacciones", e)
             emptyList()
         }
     }
 
     suspend fun addTransaccion(transaction: Transaction) {
+        val userId = uid ?: return
+
         try {
             val data = hashMapOf(
-                "id_usuario"   to uid,
+                "id_usuario"   to userId,
                 "id_activo"    to transaction.assetId,
                 "simbolo"      to transaction.symbol,
                 "tipo"         to transaction.type.name,
@@ -181,11 +203,11 @@ class UserRepository {
             firestore.collection(TRANSACCIONES).add(data).await()
 
         } catch (e: Exception) {
-            println("Error addTransaccion: ${e.message}")
+            Log.e(TAG, "Error addTransaccion", e)
         }
     }
 
-// ================= LEADERBOARD =================
+    // ================= LEADERBOARD =================
 
     suspend fun getLeaderboard(): List<LeaderboardEntry> {
         return try {
@@ -206,16 +228,18 @@ class UserRepository {
                 )
             }
         } catch (e: Exception) {
-            println("Error leaderboard: ${e.message}")
+            Log.e(TAG, "Error leaderboard", e)
             emptyList()
         }
     }
 
-// ================= RETOS =================
+    // ================= RETOS =================
 
     suspend fun getRetosData(): RetosData {
+        val userId = uid ?: return RetosData()
+
         return try {
-            val doc = firestore.collection(RETOS).document(uid).get().await()
+            val doc = firestore.collection(RETOS).document(userId).get().await()
 
             RetosData(
                 rachaActual = doc.getLong("racha_actual")?.toInt() ?: 0,
@@ -225,12 +249,14 @@ class UserRepository {
                 diaActual = doc.getLong("dia_actual")?.toInt() ?: 0
             )
         } catch (e: Exception) {
-            println("Error getRetosData: ${e.message}")
+            Log.e(TAG, "Error getRetosData", e)
             RetosData()
         }
     }
 
     suspend fun saveRetosData(retosData: RetosData) {
+        val userId = uid ?: return
+
         try {
             val data = hashMapOf(
                 "racha_actual" to retosData.rachaActual,
@@ -240,14 +266,14 @@ class UserRepository {
                 "dia_actual" to retosData.diaActual
             )
 
-            firestore.collection(RETOS).document(uid).set(data).await()
+            firestore.collection(RETOS).document(userId).set(data).await()
 
         } catch (e: Exception) {
-            println("Error saveRetosData: ${e.message}")
+            Log.e(TAG, "Error saveRetosData", e)
         }
     }
 
-// ================= CALCULOS =================
+    // ================= CALCULOS =================
 
     fun calcularValorCartera(cartera: List<PortfolioHolding>): Double =
         cartera.sumOf { it.quantity * it.currentPrice }
@@ -260,5 +286,4 @@ class UserRepository {
 
     fun calcularBeneficioPct(valorTotal: Double, saldoInicial: Double): Double =
         ((valorTotal - saldoInicial) / saldoInicial) * 100
-
 }

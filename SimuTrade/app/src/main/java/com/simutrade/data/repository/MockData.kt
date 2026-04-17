@@ -1,116 +1,31 @@
 package com.simutrade.data.repository
 
-import com.simutrade.data.model.Asset
-import com.simutrade.data.model.AssetType
-import com.simutrade.data.model.LeaderboardEntry
-import com.simutrade.data.model.PriceHistory
-import com.simutrade.data.model.Rank
+import com.simutrade.data.model.*
 import java.util.Calendar
 import kotlin.math.max
+import kotlin.random.Random
+
+// ================= MOCK DATA =================
+// Datos mock utilizados para desarrollo y como fallback en caso de fallo de APIs/Firebase
 
 object MockData {
 
     val mockAssets = listOf(
-        Asset(
-            id = "aapl",
-            symbol = "AAPL",
-            name = "Apple",
-            type = AssetType.STOCK,
-            currentPrice = 178.45,
-            priceChange24h = 2.34,
-            priceChangePercent24h = 1.33
-        ),
-        Asset(
-            id = "msft",
-            symbol = "MSFT",
-            name = "Microsoft",
-            type = AssetType.STOCK,
-            currentPrice = 412.88,
-            priceChange24h = -3.12,
-            priceChangePercent24h = -0.75
-        ),
-        Asset(
-            id = "amzn",
-            symbol = "AMZN",
-            name = "Amazon",
-            type = AssetType.STOCK,
-            currentPrice = 178.92,
-            priceChange24h = 4.56,
-            priceChangePercent24h = 2.61
-        ),
-        Asset(
-            id = "tsla",
-            symbol = "TSLA",
-            name = "Tesla",
-            type = AssetType.STOCK,
-            currentPrice = 234.56,
-            priceChange24h = -8.34,
-            priceChangePercent24h = -3.43
-        ),
-        Asset(
-            id = "nvda",
-            symbol = "NVDA",
-            name = "NVIDIA",
-            type = AssetType.STOCK,
-            currentPrice = 523.45,
-            priceChange24h = 12.78,
-            priceChangePercent24h = 2.50
-        ),
-        Asset(
-            id = "googl",
-            symbol = "GOOGL",
-            name = "Google",
-            type = AssetType.STOCK,
-            currentPrice = 142.65,
-            priceChange24h = 1.87,
-            priceChangePercent24h = 1.33
-        ),
-        Asset(
-            id = "btc",
-            symbol = "BTC",
-            name = "Bitcoin",
-            type = AssetType.CRYPTO,
-            currentPrice = 43567.89,
-            priceChange24h = 1234.56,
-            priceChangePercent24h = 2.92
-        ),
-        Asset(
-            id = "eth",
-            symbol = "ETH",
-            name = "Ethereum",
-            type = AssetType.CRYPTO,
-            currentPrice = 2345.67,
-            priceChange24h = -67.89,
-            priceChangePercent24h = -2.81
-        ),
-        Asset(
-            id = "bnb",
-            symbol = "BNB",
-            name = "Binance Coin",
-            type = AssetType.CRYPTO,
-            currentPrice = 312.45,
-            priceChange24h = 8.92,
-            priceChangePercent24h = 2.94
-        ),
-        Asset(
-            id = "sol",
-            symbol = "SOL",
-            name = "Solana",
-            type = AssetType.CRYPTO,
-            currentPrice = 98.76,
-            priceChange24h = 5.43,
-            priceChangePercent24h = 5.82
-        ),
-        Asset(
-            id = "ada",
-            symbol = "ADA",
-            name = "Cardano",
-            type = AssetType.CRYPTO,
-            currentPrice = 0.54,
-            priceChange24h = -0.02,
-            priceChangePercent24h = -3.57
-        )
+        Asset("aapl", "AAPL", "Apple", AssetType.STOCK, 178.45, 2.34, 1.33),
+        Asset("msft", "MSFT", "Microsoft", AssetType.STOCK, 412.88, -3.12, -0.75),
+        Asset("amzn", "AMZN", "Amazon", AssetType.STOCK, 178.92, 4.56, 2.61),
+        Asset("tsla", "TSLA", "Tesla", AssetType.STOCK, 234.56, -8.34, -3.43),
+        Asset("nvda", "NVDA", "NVIDIA", AssetType.STOCK, 523.45, 12.78, 2.50),
+        Asset("googl", "GOOGL", "Google", AssetType.STOCK, 142.65, 1.87, 1.33),
+
+        Asset("btc", "BTC", "Bitcoin", AssetType.CRYPTO, 43567.89, 1234.56, 2.92),
+        Asset("eth", "ETH", "Ethereum", AssetType.CRYPTO, 2345.67, -67.89, -2.81),
+        Asset("bnb", "BNB", "Binance Coin", AssetType.CRYPTO, 312.45, 8.92, 2.94),
+        Asset("sol", "SOL", "Solana", AssetType.CRYPTO, 98.76, 5.43, 5.82),
+        Asset("ada", "ADA", "Cardano", AssetType.CRYPTO, 0.54, -0.02, -3.57)
     )
+
+    // ================= PRICE HISTORY =================
 
     fun generatePriceHistory(basePrice: Double): List<PriceHistory> {
         val history = mutableListOf<PriceHistory>()
@@ -119,28 +34,27 @@ object MockData {
 
         for (i in 30 downTo 0) {
             calendar.add(Calendar.DAY_OF_YEAR, -i)
-            val change = (Math.random() - 0.5) * basePrice * 0.05
+
+            val change = (Random.nextDouble() - 0.5) * basePrice * 0.05
             price = max(price + change, basePrice * 0.7)
+
             history.add(
                 PriceHistory(
                     time = "${calendar.get(Calendar.DAY_OF_MONTH)}/${calendar.get(Calendar.MONTH) + 1}",
-                    price = Math.round(price * 100.0) / 100.0
+                    price = (price * 100).toInt() / 100.0
                 )
             )
+
             calendar.add(Calendar.DAY_OF_YEAR, i)
         }
 
         return history
     }
 
+    // ================= RANKS =================
+
     val ranks = listOf(
-        Rank(
-            "Bronce",
-            Double.NEGATIVE_INFINITY,
-            "#CD7F32",
-            "🥉",
-            "Novato en el mundo de las inversiones"
-        ),
+        Rank("Bronce", Double.NEGATIVE_INFINITY, "#CD7F32", "🥉", "Novato en el mundo de las inversiones"),
         Rank("Plata", 50.0, "#C0C0C0", "🥈", "Inversor con conocimientos básicos"),
         Rank("Oro", 150.0, "#FFD700", "🥇", "Trader experimentado"),
         Rank("Platino", 300.0, "#E5E4E2", "💎", "Experto en mercados financieros"),
@@ -150,6 +64,8 @@ object MockData {
     fun getRankFromProfit(profit: Double): Rank {
         return ranks.lastOrNull { profit >= it.minProfit } ?: ranks.first()
     }
+
+    // ================= LEADERBOARD =================
 
     val mockLeaderboard = listOf(
         LeaderboardEntry("1", "InversionMaster", 892.45, "Diamante", 992.45),
