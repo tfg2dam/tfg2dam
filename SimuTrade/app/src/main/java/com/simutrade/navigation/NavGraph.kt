@@ -1,7 +1,7 @@
 package com.simutrade.navigation
 
-import androidx.compose.runtime.*
-import androidx.navigation.*
+import androidx.compose.runtime.Composable
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
 import com.google.firebase.auth.FirebaseAuth
 import com.simutrade.ui.auth.LoginScreen
@@ -12,17 +12,13 @@ object Routes {
     const val LOGIN = "login"
     const val REGISTER = "register"
     const val MAIN = "main"
-    const val DASHBOARD = "dashboard"
-    const val MARKET = "market"
-    const val TRADING = "trading/{assetId}"
-    const val RANKINGS = "rankings"
-    const val CHALLENGES = "challenges"
 }
 
 @Composable
 fun NavGraph(navController: NavHostController) {
-    val auth = FirebaseAuth.getInstance()
-    val startDestination = if (auth.currentUser != null) Routes.MAIN else Routes.LOGIN
+
+    val isLoggedIn = FirebaseAuth.getInstance().currentUser != null
+    val startDestination = if (isLoggedIn) Routes.MAIN else Routes.LOGIN
 
     NavHost(navController = navController, startDestination = startDestination) {
 
