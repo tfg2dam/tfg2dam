@@ -12,9 +12,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class MainViewModel : ViewModel() {
-
     private val repository = UserRepository()
     private val marketRepository = MarketRepository()
+
+// ================= STATE =================
 
     private val _userData = MutableStateFlow(UserData())
     val userData: StateFlow<UserData> = _userData.asStateFlow()
@@ -46,10 +47,16 @@ class MainViewModel : ViewModel() {
     private val _isLoadingRetos = MutableStateFlow(false)
     val isLoadingRetos: StateFlow<Boolean> = _isLoadingRetos.asStateFlow()
 
+
+// ================= INIT =================
+
     init {
         cargarDatos()
         cargarAssets()
     }
+
+
+// ================= DATA =================
 
     fun cargarDatos() {
         viewModelScope.launch {
@@ -57,7 +64,7 @@ class MainViewModel : ViewModel() {
             _cartera.value = repository.getCartera()
             _transacciones.value = repository.getTransacciones()
 
-            verificarRetosAutomaticos() // ✅ SOLO AQUÍ
+            verificarRetosAutomaticos()
         }
     }
 
@@ -68,7 +75,7 @@ class MainViewModel : ViewModel() {
                 val stocks = marketRepository.getTopStocks()
                 _assets.value = cryptos + stocks
             } catch (e: Exception) {
-                // silencioso
+                println("Error cargando assets: ${e.message}")
             }
         }
     }
@@ -79,6 +86,7 @@ class MainViewModel : ViewModel() {
             try {
                 _leaderboard.value = repository.getLeaderboard()
             } catch (e: Exception) {
+                println("Error leaderboard: ${e.message}")
             } finally {
                 _isLoadingLeaderboard.value = false
             }
@@ -91,129 +99,15 @@ class MainViewModel : ViewModel() {
             try {
                 _retosData.value = repository.getRetosData()
             } catch (e: Exception) {
+                println("Error retos: ${e.message}")
             } finally {
                 _isLoadingRetos.value = false
             }
         }
     }
 
-    fun completarReto(retoId: String, recompensa: Double) {
-        viewModelScope.launch {
-            val retosData = _retosData.value
-            if (retoId in retosData.retosCompletados) return@launch
 
-            val hoy = java.util.Calendar.getInstance().apply {
-                set(java.util.Calendar.HOUR_OF_DAY, 0)
-                set(java.util.Calendar.MINUTE, 0)
-                set(java.util.Calendar.SECOND, 0)
-                set(java.util.Calendar.MILLISECOND, 0)
-            }.timeInMillis
-
-            val ayer = hoy - 24 * 60 * 60 * 1000
-
-            val nuevaRacha = when {
-                retosData.ultimaVez >= hoy -> retosData.rachaActual
-                retosData.ultimaVez >= ayer -> retosData.rachaActual + 1
-                else -> 1
-            }
-
-            val nuevosRetosCompletados = retosData.retosCompletados + retoId
-
-            val nuevaRetosData = retosData.copy(
-                rachaActual = nuevaRacha,
-                rachaMaxima = maxOf(nuevaRacha, retosData.rachaMaxima),
-                ultimaVez = System.currentTimeMillis(),
-                retosCompletados = nuevosRetosCompletados
-            )
-
-            repository.saveRetosData(nuevaRetosData)
-            _retosData.value = nuevaRetosData
-
-            val bonusRacha = when {
-                nuevaRacha >= 30 -> 15.0
-                nuevaRacha >= 7 -> 5.0
-                else -> 2.0
-            }
-
-            val totalRecompensa = recompensa + bonusRacha
-            val nuevoSaldo = _userData.value.saldo + totalRecompensa
-
-            repository.updateSaldo(nuevoSaldo)
-            _userData.value = _userData.value.copy(saldo = nuevoSaldo)
-        }
-    }
-
-    fun getRetosDelDia(): List<Reto> {
-        val dia = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR)
-        return listOf(
-            Reto("reto_${dia}_1", "Primera operación", "Realiza una compra o venta hoy", "📈", 2.0),
-            Reto("reto_${dia}_2", "Diversifica", "Ten al menos 2 activos en cartera", "🎯", 3.0),
-            Reto("reto_${dia}_3", "Inversor activo", "Opera con un activo de cada tipo", "⚡", 5.0)
-        )
-    }
-
-    fun verificarRetosAutomaticos() {
-
-        // 🔥 1. RESET DIARIO
-        val hoy = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR)
-
-        if (_retosData.value.diaActual != hoy) {
-
-            val nuevosDatos = _retosData.value.copy(
-                retosCompletados = emptyList(),
-                diaActual = hoy
-            )
-
-            viewModelScope.launch {
-                repository.saveRetosData(nuevosDatos)
-            }
-
-            _retosData.value = nuevosDatos
-        }
-
-        // 🔥 2. TRANSACCIONES DE HOY (CLAVE 🔥)
-        val inicioDia = java.util.Calendar.getInstance().apply {
-            set(java.util.Calendar.HOUR_OF_DAY, 0)
-            set(java.util.Calendar.MINUTE, 0)
-            set(java.util.Calendar.SECOND, 0)
-            set(java.util.Calendar.MILLISECOND, 0)
-        }.timeInMillis
-
-        val transaccionesHoy = _transacciones.value.filter {
-            it.date >= inicioDia
-        }
-
-        // 🔥 3. VERIFICAR RETOS
-        val retos = getRetosDelDia()
-        val completados = _retosData.value.retosCompletados
-
-        retos.forEach { reto ->
-            if (reto.id in completados) return@forEach
-
-            val completado = when {
-
-                // 📈 Reto 1 → operación HOY
-                reto.id.endsWith("_1") ->
-                    transaccionesHoy.isNotEmpty()
-
-                // 🎯 Reto 2 → 2 activos distintos
-                reto.id.endsWith("_2") ->
-                    _cartera.value.map { it.assetId }.distinct().size >= 2
-
-                // ⚡ Reto 3 → stock + crypto
-                reto.id.endsWith("_3") -> {
-                    val tipos = _cartera.value.map { it.type }.toSet()
-                    tipos.contains(AssetType.STOCK) && tipos.contains(AssetType.CRYPTO)
-                }
-
-                else -> false
-            }
-
-            if (completado) {
-                completarReto(reto.id, reto.recompensa)
-            }
-        }
-    }
+// ================= NAVIGATION =================
 
     fun navigateTo(page: String) {
         _currentPage.value = page
@@ -224,18 +118,39 @@ class MainViewModel : ViewModel() {
         navigateTo("trading")
     }
 
-    fun getCurrentRank() = MockData.getRankFromProfit(
-        repository.calcularBeneficio(
-            repository.calcularValorTotal(
-                _userData.value.saldo,
-                repository.calcularValorCartera(_cartera.value)
-            ),
-            _userData.value.saldoInicial
-        )
-    )
+    fun clearSelectedAsset() {
+        _selectedAsset.value = null
+    }
 
-    fun comprarActivo(asset: Asset, quantity: Double, onResult: (OperationResult) -> Unit) {
+    fun navigateToTradingFromCartera(holding: PortfolioHolding) {
+        val assetFromMarket = _assets.value.find {
+            it.id == holding.assetId || it.symbol == holding.symbol
+        }
+
+        selectAsset(
+            assetFromMarket ?: Asset(
+                id = holding.assetId,
+                symbol = holding.symbol,
+                name = holding.name,
+                type = holding.type,
+                currentPrice = holding.currentPrice,
+                priceChange24h = 0.0,
+                priceChangePercent24h = 0.0
+            )
+        )
+    }
+
+
+// ================= TRADING =================
+
+    fun buyAsset(asset: Asset, quantity: Double, onResult: (OperationResult) -> Unit) {
         viewModelScope.launch {
+
+            if (quantity <= 0 || quantity.isNaN()) {
+                onResult(OperationResult.Error("Cantidad inválida"))
+                return@launch
+            }
+
             val total = quantity * asset.currentPrice
             val userData = _userData.value
 
@@ -249,6 +164,7 @@ class MainViewModel : ViewModel() {
             _userData.value = userData.copy(saldo = nuevoSaldo)
 
             val existente = _cartera.value.find { it.assetId == asset.id }
+
             val holding = if (existente != null) {
                 val totalQty = existente.quantity + quantity
                 val totalCost = existente.averagePrice * existente.quantity + total
@@ -280,6 +196,7 @@ class MainViewModel : ViewModel() {
             repository.addTransaccion(transaction)
 
             cargarDatos()
+            verificarRetosAutomaticos()
 
             val totalValue = getTotalValue()
             val profit = getProfit()
@@ -289,16 +206,17 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun venderActivo(assetId: String, quantity: Double, currentPrice: Double, onResult: (OperationResult) -> Unit) {
+    fun sellAsset(assetId: String, quantity: Double, currentPrice: Double, onResult: (OperationResult) -> Unit) {
         viewModelScope.launch {
+
             val holding = _cartera.value.find { it.assetId == assetId }
                 ?: run {
                     onResult(OperationResult.Error("No tienes este activo"))
                     return@launch
                 }
 
-            if (quantity > holding.quantity) {
-                onResult(OperationResult.Error("Cantidad insuficiente"))
+            if (quantity <= 0 || quantity > holding.quantity) {
+                onResult(OperationResult.Error("Cantidad inválida"))
                 return@launch
             }
 
@@ -333,6 +251,7 @@ class MainViewModel : ViewModel() {
             repository.addTransaccion(transaction)
 
             cargarDatos()
+            verificarRetosAutomaticos()
 
             val totalValue = getTotalValue()
             val profit = getProfit()
@@ -342,41 +261,80 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun navigateToTradingFromCartera(holding: PortfolioHolding) {
-        val assetFromMarket = _assets.value.find {
-            it.id == holding.assetId || it.symbol == holding.symbol
-        }
 
-        if (assetFromMarket != null) {
-            selectAsset(assetFromMarket)
-        } else {
-            val tempAsset = Asset(
-                id = holding.assetId,
-                symbol = holding.symbol,
-                name = holding.name,
-                type = holding.type,
-                currentPrice = holding.currentPrice,
-                priceChange24h = 0.0,
-                priceChangePercent24h = 0.0
-            )
-            selectAsset(tempAsset)
+// ================= RETOS =================
+
+    fun getRetosDelDia(): List<Reto> {
+        val dia = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR)
+        return listOf(
+            Reto("reto_${dia}_1", "Primera operación", "Realiza una compra o venta hoy", "📈", 2.0),
+            Reto("reto_${dia}_2", "Diversifica", "Ten al menos 2 activos en cartera", "🎯", 3.0),
+            Reto("reto_${dia}_3", "Inversor activo", "Opera con un activo de cada tipo", "⚡", 5.0)
+        )
+    }
+
+    fun verificarRetosAutomaticos() {
+        val inicioDia = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val transaccionesHoy = _transacciones.value.filter { it.date >= inicioDia }
+        val retos = getRetosDelDia()
+        val completados = _retosData.value.retosCompletados
+
+        retos.forEach { reto ->
+            if (reto.id in completados) return@forEach
+
+            val completado = when {
+                reto.id.endsWith("_1") -> transaccionesHoy.isNotEmpty()
+                reto.id.endsWith("_2") -> _cartera.value.map { it.assetId }.distinct().size >= 2
+                reto.id.endsWith("_3") -> {
+                    val tipos = _cartera.value.map { it.type }.toSet()
+                    tipos.contains(AssetType.STOCK) && tipos.contains(AssetType.CRYPTO)
+                }
+                else -> false
+            }
+
+            if (completado) {
+                completarReto(reto.id, reto.recompensa)
+            }
         }
     }
+
+    fun completarReto(retoId: String, recompensa: Double) {
+        viewModelScope.launch {
+            val nuevos = _retosData.value.retosCompletados + retoId
+            val nuevaData = _retosData.value.copy(
+                retosCompletados = nuevos,
+                ultimaVez = System.currentTimeMillis()
+            )
+            repository.saveRetosData(nuevaData)
+            _retosData.value = nuevaData
+
+            val nuevoSaldo = _userData.value.saldo + recompensa
+            repository.updateSaldo(nuevoSaldo)
+            _userData.value = _userData.value.copy(saldo = nuevoSaldo)
+        }
+    }
+
+
+// ================= CALCULATIONS =================
 
     fun getPortfolioValue() = repository.calcularValorCartera(_cartera.value)
-    fun getTotalValue() = repository.calcularValorTotal(_userData.value.saldo, getPortfolioValue())
-    fun getProfit() = repository.calcularBeneficio(getTotalValue(), _userData.value.saldoInicial)
-    fun getProfitPercent() = repository.calcularBeneficioPct(getTotalValue(), _userData.value.saldoInicial)
 
-    fun buyAsset(asset: Asset, quantity: Double, onResult: (OperationResult) -> Unit) {
-        comprarActivo(asset, quantity, onResult)
-    }
+    fun getTotalValue() =
+        repository.calcularValorTotal(_userData.value.saldo, getPortfolioValue())
 
-    fun sellAsset(assetId: String, quantity: Double, currentPrice: Double, onResult: (OperationResult) -> Unit) {
-        venderActivo(assetId, quantity, currentPrice, onResult)
-    }
+    fun getProfit() =
+        repository.calcularBeneficio(getTotalValue(), _userData.value.saldoInicial)
 
-    fun clearSelectedAsset() {
-        _selectedAsset.value = null
-    }
+    fun getProfitPercent() =
+        repository.calcularBeneficioPct(getTotalValue(), _userData.value.saldoInicial)
+
+    fun getCurrentRank() =
+        MockData.getRankFromProfit(getProfit())
+
 }
