@@ -1,4 +1,4 @@
-package com.simutrade.features.trading
+package com.simutrade.ui.trading
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,8 +15,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.simutrade.data.model.*
-import com.simutrade.features.theme.positive
-import com.simutrade.features.viewmodel.MainViewModel
+import com.simutrade.ui.theme.positive
+import com.simutrade.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 
 @Composable

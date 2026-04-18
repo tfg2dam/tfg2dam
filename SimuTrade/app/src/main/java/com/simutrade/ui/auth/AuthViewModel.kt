@@ -1,4 +1,4 @@
-package com.simutrade.features.auth
+package com.simutrade.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

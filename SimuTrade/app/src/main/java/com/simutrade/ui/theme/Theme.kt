@@ -1,4 +1,4 @@
-package com.simutrade.features.theme
+package com.simutrade.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*

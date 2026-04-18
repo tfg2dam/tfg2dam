@@ -1,4 +1,4 @@
-package com.simutrade.features.market
+package com.simutrade.ui.market
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -18,7 +18,7 @@ import com.patrykandpatrick.vico.core.chart.line.LineChart
 import com.patrykandpatrick.vico.core.entry.FloatEntry
 import com.patrykandpatrick.vico.core.entry.entryModelOf
 import com.simutrade.data.model.Asset
-import com.simutrade.features.theme.positive
+import com.simutrade.ui.theme.positive
 import java.text.SimpleDateFormat
 import java.util.*
 

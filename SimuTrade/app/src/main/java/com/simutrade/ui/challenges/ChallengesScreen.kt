@@ -1,4 +1,4 @@
-package com.simutrade.features.challenges
+package com.simutrade.ui.challenges
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.*
@@ -14,7 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.simutrade.data.model.Reto
-import com.simutrade.features.viewmodel.MainViewModel
+import com.simutrade.ui.viewmodel.MainViewModel
 
 // COLORES DE ÉXITO
 private val SuccessColor = Color(0xFF16A34A)

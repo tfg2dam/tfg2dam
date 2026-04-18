@@ -1,4 +1,4 @@
-package com.simutrade.features.trading
+package com.simutrade.ui.trading
 
 class TradingViewModel {
 

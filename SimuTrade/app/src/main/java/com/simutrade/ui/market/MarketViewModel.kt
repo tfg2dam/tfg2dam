@@ -1,4 +1,4 @@
-package com.simutrade.features.market
+package com.simutrade.ui.market
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

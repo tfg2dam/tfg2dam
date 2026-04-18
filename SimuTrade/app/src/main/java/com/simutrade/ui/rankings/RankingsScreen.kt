@@ -1,4 +1,4 @@
-package com.simutrade.features.rankings
+package com.simutrade.ui.rankings
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,8 +11,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.simutrade.features.theme.positive
-import com.simutrade.features.viewmodel.MainViewModel
+import com.simutrade.ui.theme.positive
+import com.simutrade.ui.viewmodel.MainViewModel
 
 @Composable
 fun RankingsScreen(viewModel: MainViewModel) {
