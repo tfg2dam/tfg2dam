@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.navigation.compose.rememberNavController
 import com.simutrade.navigation.NavGraph
-import com.simutrade.ui.theme.SimuTradeTheme
+import com.simutrade.screens.theme.SimuTradeTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

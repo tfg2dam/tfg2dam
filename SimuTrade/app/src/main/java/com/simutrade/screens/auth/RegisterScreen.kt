@@ -1,8 +1,8 @@
-package com.simutrade.ui.auth
+package com.simutrade.screens.auth
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -16,21 +16,28 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
-fun LoginScreen(
-    onLoginSuccess: () -> Unit,
-    onNavigateToRegister: () -> Unit,
+fun RegisterScreen(
+    onRegisterSuccess: () -> Unit,
+    onNavigateToLogin: () -> Unit,
     viewModel: AuthViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
 
+    var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+
+    val passwordMismatch =
+        password.isNotEmpty() &&
+                confirmPassword.isNotEmpty() &&
+                password != confirmPassword
 
     LaunchedEffect(uiState.success) {
         if (uiState.success) {
-            onLoginSuccess()
+            onRegisterSuccess()
             viewModel.clearSuccess()
         }
     }
@@ -45,17 +52,34 @@ fun LoginScreen(
 
         // TÍTULO
         Text(
-            "SimuTrade",
-            style = MaterialTheme.typography.headlineLarge
+            "Crear cuenta",
+            style = MaterialTheme.typography.headlineMedium
         )
 
         Text(
-            "Aprende a invertir sin riesgo",
+            "Empieza con 100€ virtuales",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(Modifier.height(40.dp))
+        Spacer(Modifier.height(32.dp))
+
+        // USERNAME
+        OutlinedTextField(
+            value = username,
+            onValueChange = {
+                username = it
+                viewModel.clearError()
+            },
+            label = { Text("Nombre de usuario") },
+            leadingIcon = { Icon(Icons.Default.Person, contentDescription = "Usuario") },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            isError = uiState.error != null
+        )
+
+        Spacer(Modifier.height(12.dp))
 
         // EMAIL
         OutlinedTextField(
@@ -75,7 +99,7 @@ fun LoginScreen(
             isError = uiState.error != null
         )
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
 
         // PASSWORD
         OutlinedTextField(
@@ -100,17 +124,43 @@ fun LoginScreen(
             else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Next
+            ),
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            isError = passwordMismatch
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        // CONFIRM PASSWORD
+        OutlinedTextField(
+            value = confirmPassword,
+            onValueChange = {
+                confirmPassword = it
+                viewModel.clearError()
+            },
+            label = { Text("Confirmar contraseña") },
+            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Confirmar contraseña") },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.Done
             ),
             keyboardActions = KeyboardActions(
                 onDone = {
                     focusManager.clearFocus()
-                    viewModel.login(email, password)
+                    viewModel.register(email, password, username)
                 }
             ),
+            isError = passwordMismatch,
+            supportingText = {
+                if (passwordMismatch) {
+                    Text("Las contraseñas no coinciden")
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            isError = uiState.error != null
+            singleLine = true
         )
 
         Spacer(Modifier.height(8.dp))
@@ -125,33 +175,35 @@ fun LoginScreen(
             Spacer(Modifier.height(8.dp))
         }
 
-        // BOTÓN LOGIN
+        // BOTÓN
         Button(
             onClick = {
                 focusManager.clearFocus()
-                viewModel.login(email, password)
+                viewModel.register(email, password, username)
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
             enabled = !uiState.isLoading &&
+                    !passwordMismatch &&
+                    username.isNotBlank() &&
                     email.isNotBlank() &&
                     password.isNotBlank()
         ) {
             if (uiState.isLoading) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
+                    Modifier.size(20.dp),
                     strokeWidth = 2.dp
                 )
             } else {
-                Text("Iniciar sesión")
+                Text("Registrarse")
             }
         }
 
         Spacer(Modifier.height(16.dp))
 
-        TextButton(onClick = onNavigateToRegister) {
-            Text("¿No tienes cuenta? Regístrate")
+        TextButton(onClick = onNavigateToLogin) {
+            Text("¿Ya tienes cuenta? Inicia sesión")
         }
     }
 }

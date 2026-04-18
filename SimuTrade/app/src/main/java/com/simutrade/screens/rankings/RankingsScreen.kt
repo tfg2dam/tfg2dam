@@ -1,4 +1,4 @@
-package com.simutrade.ui.rankings
+package com.simutrade.screens.rankings
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,24 +11,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.simutrade.ui.theme.positive
-import com.simutrade.ui.viewmodel.MainViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.simutrade.screens.theme.positive
+import com.simutrade.screens.user.UserViewModel
 
 @Composable
-fun RankingsScreen(viewModel: MainViewModel) {
+fun RankingsScreen(
+    userViewModel: UserViewModel = viewModel(),
+    rankingsViewModel: RankingsViewModel = viewModel()
+) {
 
-    val userData by viewModel.userData.collectAsState()
-    val leaderboard by viewModel.leaderboard.collectAsState()
-    val isLoading by viewModel.isLoadingLeaderboard.collectAsState()
-    val currentRank = viewModel.getCurrentRank()
-    val profit = viewModel.getProfit()
+    val userData by userViewModel.userData.collectAsStateWithLifecycle()
+    val leaderboard by rankingsViewModel.leaderboard.collectAsStateWithLifecycle()
+    val isLoading by rankingsViewModel.isLoading.collectAsStateWithLifecycle()
+
+    val currentRank = userViewModel.getCurrentRank()
+    val profit = userViewModel.getProfit()
 
     val profitColor =
         if (profit >= 0) MaterialTheme.colorScheme.positive
         else MaterialTheme.colorScheme.error
 
     LaunchedEffect(Unit) {
-        viewModel.cargarLeaderboard()
+        rankingsViewModel.loadLeaderboard()
     }
 
     LazyColumn(
@@ -99,7 +105,7 @@ fun RankingsScreen(viewModel: MainViewModel) {
                     fontWeight = FontWeight.Bold
                 )
 
-                IconButton(onClick = { viewModel.cargarLeaderboard() }) {
+                IconButton(onClick = { rankingsViewModel.loadLeaderboard() }) {
                     Icon(Icons.Default.Refresh, contentDescription = "Actualizar")
                 }
             }

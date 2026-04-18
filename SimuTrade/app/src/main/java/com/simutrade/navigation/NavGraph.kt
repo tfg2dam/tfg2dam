@@ -4,9 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
 import com.google.firebase.auth.FirebaseAuth
-import com.simutrade.ui.auth.LoginScreen
-import com.simutrade.ui.auth.RegisterScreen
-import com.simutrade.ui.main.MainScreen
+import com.simutrade.screens.auth.LoginScreen
+import com.simutrade.screens.auth.RegisterScreen
+import com.simutrade.screens.main.MainScreen
 
 object Routes {
     const val LOGIN = "login"

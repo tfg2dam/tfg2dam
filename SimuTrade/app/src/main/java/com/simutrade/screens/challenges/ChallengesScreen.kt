@@ -1,4 +1,4 @@
-package com.simutrade.ui.challenges
+package com.simutrade.screens.challenges
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.*
@@ -13,18 +13,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.simutrade.data.model.Reto
-import com.simutrade.ui.viewmodel.MainViewModel
 
-// COLORES DE ÉXITO
+// COLORES
 private val SuccessColor = Color(0xFF16A34A)
 private val SuccessBackground = Color(0xFFD1FAE5)
 
 @Composable
-fun ChallengesScreen(viewModel: MainViewModel) {
+fun ChallengesScreen(
+    viewModel: ChallengesViewModel = viewModel()
+) {
 
     val retosData by viewModel.retosData.collectAsStateWithLifecycle()
-    val isLoading by viewModel.isLoadingRetos.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val retosDelDia = viewModel.getRetosDelDia()
 
     LaunchedEffect(Unit) {
@@ -46,7 +48,7 @@ fun ChallengesScreen(viewModel: MainViewModel) {
             )
         }
 
-        // RACHA
+        // 🔥 RACHA
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -120,7 +122,11 @@ fun ChallengesScreen(viewModel: MainViewModel) {
         }
 
         item {
-            Text("🏅 Insignias", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                "🏅 Insignias",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
         }
 
         item {
@@ -139,10 +145,9 @@ fun ChallengesScreen(viewModel: MainViewModel) {
 @Composable
 fun RetoCard(reto: Reto, completado: Boolean) {
 
-    // ANIMACIÓN COLOR (pro 💅)
     val backgroundColor by animateColorAsState(
         targetValue = if (completado) SuccessBackground else MaterialTheme.colorScheme.surface,
-        label = "reto_background"
+        label = ""
     )
 
     val textColor = if (completado) SuccessColor else MaterialTheme.colorScheme.primary

@@ -1,4 +1,4 @@
-package com.simutrade.ui.main
+package com.simutrade.screens.main
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -7,31 +7,29 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.simutrade.data.model.UserData
-import com.simutrade.data.mock.MockData
-import com.simutrade.ui.auth.AuthViewModel
-import com.simutrade.ui.challenges.ChallengesScreen
-import com.simutrade.ui.dashboard.DashboardScreen
-import com.simutrade.ui.market.MarketScreen
-import com.simutrade.ui.rankings.RankingsScreen
-import com.simutrade.ui.trading.TradingScreen
-import com.simutrade.ui.viewmodel.MainViewModel
+import com.simutrade.screens.auth.AuthViewModel
+import com.simutrade.screens.challenges.ChallengesScreen
+import com.simutrade.screens.dashboard.DashboardScreen
+import com.simutrade.screens.market.MarketScreen
+import com.simutrade.screens.rankings.RankingsScreen
+import com.simutrade.screens.trading.TradingScreen
+import com.simutrade.screens.user.UserViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     onLogout: () -> Unit,
     mainViewModel: MainViewModel = viewModel(),
+    userViewModel: UserViewModel = viewModel(),
     authViewModel: AuthViewModel = viewModel()
 ) {
 
     val currentPage by mainViewModel.currentPage.collectAsState()
 
-    // 🔒 evitar crash inicial
-    val userData by mainViewModel.userData.collectAsState(initial = UserData())
-
-    val currentRank = mainViewModel.getCurrentRank() ?: MockData.ranks.first()
+    val userData by userViewModel.userData.collectAsStateWithLifecycle()
+    val currentRank = userViewModel.getCurrentRank()
 
     var showProfileDialog by remember { mutableStateOf(false) }
 
@@ -95,11 +93,21 @@ fun MainScreen(
                 .padding(paddingValues)
         ) {
             when (currentPage) {
-                "dashboard"  -> DashboardScreen(mainViewModel)
-                "market"     -> MarketScreen(mainViewModel)
-                "trading"    -> TradingScreen(mainViewModel)
-                "rankings"   -> RankingsScreen(mainViewModel)
-                "challenges" -> ChallengesScreen(mainViewModel)
+
+                "dashboard" ->
+                    DashboardScreen()
+
+                "market" ->
+                    MarketScreen(mainViewModel)
+
+                "trading" ->
+                    TradingScreen(mainViewModel)
+
+                "rankings" ->
+                    RankingsScreen()
+
+                "challenges" ->
+                    ChallengesScreen()
             }
         }
     }

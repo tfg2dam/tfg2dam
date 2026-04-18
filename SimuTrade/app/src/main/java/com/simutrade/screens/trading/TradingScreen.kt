@@ -1,4 +1,4 @@
-package com.simutrade.ui.trading
+package com.simutrade.screens.trading
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -14,19 +14,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.simutrade.data.model.*
-import com.simutrade.ui.theme.positive
-import com.simutrade.ui.viewmodel.MainViewModel
+import com.simutrade.screens.main.MainViewModel
+import com.simutrade.screens.user.UserViewModel
 import kotlinx.coroutines.launch
 
 @Composable
-fun TradingScreen(viewModel: MainViewModel) {
+fun TradingScreen(
+    mainViewModel: MainViewModel = viewModel(),
+    userViewModel: UserViewModel = viewModel()
+) {
 
-    val tradingViewModel = remember { TradingViewModel() }
-
-    val selectedAsset by viewModel.selectedAsset.collectAsState()
-    val userData by viewModel.userData.collectAsState()
-    val cartera by viewModel.cartera.collectAsState()
+    val selectedAsset by mainViewModel.selectedAsset.collectAsStateWithLifecycle()
+    val userData by userViewModel.userData.collectAsStateWithLifecycle()
+    val cartera by userViewModel.cartera.collectAsStateWithLifecycle()
 
     var selectedTab by remember { mutableStateOf(0) }
     var quantity by remember { mutableStateOf("") }
@@ -41,18 +44,15 @@ fun TradingScreen(viewModel: MainViewModel) {
         if (selectedAsset == null) {
             NoAssetSelected(
                 modifier = Modifier.padding(padding),
-                onNavigateToMarket = { viewModel.navigateTo("market") }
+                onNavigateToMarket = { mainViewModel.navigateTo("market") }
             )
         } else {
 
             val asset = selectedAsset!!
             val currentHolding = cartera.find { it.assetId == asset.id }
 
-            val quantityDouble = tradingViewModel.parseQuantity(quantity)
-            val total = tradingViewModel.calculateTotal(asset.currentPrice, quantityDouble)
-
-            val positiveColor = MaterialTheme.colorScheme.positive
-            val negativeColor = MaterialTheme.colorScheme.error
+            val quantityDouble = parseQuantity(quantity)
+            val total = calculateTotal(asset.currentPrice, quantityDouble)
 
             Column(
                 modifier = Modifier
@@ -70,7 +70,11 @@ fun TradingScreen(viewModel: MainViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Operar", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Operar",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
+                        )
                         Text(
                             "Compra y vende activos",
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -78,8 +82,8 @@ fun TradingScreen(viewModel: MainViewModel) {
                     }
 
                     OutlinedButton(onClick = {
-                        viewModel.clearSelectedAsset()
-                        viewModel.navigateTo("market")
+                        mainViewModel.clearSelectedAsset()
+                        mainViewModel.navigateTo("market")
                     }) {
                         Text("Volver")
                     }
@@ -89,88 +93,31 @@ fun TradingScreen(viewModel: MainViewModel) {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
 
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                asset.symbol,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
+                        Text(asset.symbol, fontWeight = FontWeight.Bold)
+                        Text(asset.name)
 
-                            AssistChip(
-                                onClick = {},
-                                label = {
-                                    Text(if (asset.type == AssetType.STOCK) "Acción" else "Cripto")
-                                }
-                            )
-                        }
+                        Spacer(Modifier.height(12.dp))
 
                         Text(
-                            asset.name,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            "€${"%.2f".format(asset.currentPrice)}",
+                            style = MaterialTheme.typography.headlineMedium
                         )
 
-                        Spacer(Modifier.height(16.dp))
-
-                        val isPositive = asset.priceChangePercent24h >= 0
-                        val color = if (isPositive) positiveColor else negativeColor
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "€${"%.2f".format(asset.currentPrice)}",
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            Spacer(Modifier.width(8.dp))
-
-                            Icon(
-                                if (isPositive) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
-                                contentDescription = null,
-                                tint = color
-                            )
-
-                            Spacer(Modifier.width(4.dp))
-
-                            Text(
-                                "${if (isPositive) "+" else ""}${"%.2f".format(asset.priceChangePercent24h)}%",
-                                color = color
-                            )
-                        }
-
                         if (currentHolding != null) {
-                            Spacer(Modifier.height(16.dp))
-
-                            Card(
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            ) {
-                                Column(Modifier.padding(12.dp)) {
-                                    Text("Posición actual")
-                                    Text(
-                                        "${currentHolding.quantity} unidades",
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
+                            Spacer(Modifier.height(8.dp))
+                            Text("Tienes: ${currentHolding.quantity}")
                         }
                     }
                 }
 
-                // BOTONES
+                // TABS
                 SingleChoiceSegmentedButtonRow(
                     modifier = Modifier.fillMaxWidth()
                 ) {
 
                     SegmentedButton(
                         selected = selectedTab == 0,
-                        onClick = {
-                            selectedTab = 0
-                            quantity = ""
-                        },
+                        onClick = { selectedTab = 0; quantity = "" },
                         shape = itemShape(0, 2)
                     ) {
                         Text("Comprar")
@@ -178,10 +125,7 @@ fun TradingScreen(viewModel: MainViewModel) {
 
                     SegmentedButton(
                         selected = selectedTab == 1,
-                        onClick = {
-                            selectedTab = 1
-                            quantity = ""
-                        },
+                        onClick = { selectedTab = 1; quantity = "" },
                         enabled = currentHolding != null,
                         shape = itemShape(1, 2)
                     ) {
@@ -192,56 +136,50 @@ fun TradingScreen(viewModel: MainViewModel) {
                 // FORMULARIOS
                 when (selectedTab) {
 
+                    // 🟢 COMPRAR
                     0 -> BuyForm(
                         asset = asset,
                         quantity = quantity,
                         onQuantityChange = { quantity = it },
                         total = total,
-                        balance = userData.saldo,
-                        enabled = tradingViewModel.canBuy(
-                            quantityDouble,
-                            asset.currentPrice,
-                            userData.saldo
-                        ),
+                        enabled = canBuy(quantityDouble, asset.currentPrice, userData.saldo),
                         onBuy = {
-                            viewModel.buyAsset(asset, quantityDouble) { result ->
+                            userViewModel.buyAsset(asset, quantityDouble) { result ->
                                 scope.launch {
-                                    when (result) {
-                                        is OperationResult.Success -> {
-                                            snackbarHostState.showSnackbar("Compra realizada correctamente")
-                                            quantity = ""
+                                    snackbarHostState.showSnackbar(
+                                        when (result) {
+                                            is OperationResult.Success -> "Compra realizada"
+                                            is OperationResult.Error -> result.message
                                         }
-                                        is OperationResult.Error -> {
-                                            snackbarHostState.showSnackbar(result.message)
-                                        }
-                                    }
+                                    )
+                                    quantity = ""
                                 }
                             }
                         }
                     )
 
+                    // 🔴 VENDER
                     1 -> SellForm(
                         asset = asset,
                         quantity = quantity,
                         onQuantityChange = { quantity = it },
                         total = total,
                         currentHolding = currentHolding,
-                        enabled = tradingViewModel.canSell(
-                            quantityDouble,
-                            currentHolding?.quantity
-                        ),
+                        enabled = canSell(quantityDouble, currentHolding?.quantity),
                         onSell = {
-                            viewModel.sellAsset(asset.id, quantityDouble, asset.currentPrice) { result ->
+                            userViewModel.sellAsset(
+                                asset.id,
+                                quantityDouble,
+                                asset.currentPrice
+                            ) { result ->
                                 scope.launch {
-                                    when (result) {
-                                        is OperationResult.Success -> {
-                                            snackbarHostState.showSnackbar("Venta realizada correctamente")
-                                            quantity = ""
+                                    snackbarHostState.showSnackbar(
+                                        when (result) {
+                                            is OperationResult.Success -> "Venta realizada"
+                                            is OperationResult.Error -> result.message
                                         }
-                                        is OperationResult.Error -> {
-                                            snackbarHostState.showSnackbar(result.message)
-                                        }
-                                    }
+                                    )
+                                    quantity = ""
                                 }
                             }
                         }
@@ -282,7 +220,6 @@ fun BuyForm(
     quantity: String,
     onQuantityChange: (String) -> Unit,
     total: Double,
-    balance: Double,
     enabled: Boolean,
     onBuy: () -> Unit
 ) {
@@ -341,3 +278,17 @@ fun SellForm(
         }
     }
 }
+
+// ================= HELPERS =================
+
+private fun parseQuantity(input: String): Double =
+    input.toDoubleOrNull() ?: 0.0
+
+private fun calculateTotal(price: Double, quantity: Double): Double =
+    price * quantity
+
+private fun canBuy(quantity: Double, price: Double, balance: Double): Boolean =
+    quantity > 0 && (quantity * price) <= balance
+
+private fun canSell(quantity: Double, holdingQuantity: Double?): Boolean =
+    holdingQuantity != null && quantity > 0 && quantity <= holdingQuantity

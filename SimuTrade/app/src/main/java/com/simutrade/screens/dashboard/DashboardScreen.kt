@@ -1,4 +1,4 @@
-package com.simutrade.ui.dashboard
+package com.simutrade.screens.dashboard
 
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
@@ -19,25 +19,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.simutrade.data.mock.MockData
 import com.simutrade.data.model.*
-import com.simutrade.ui.theme.positive
-import com.simutrade.ui.viewmodel.MainViewModel
+import com.simutrade.screens.theme.positive
+import com.simutrade.screens.main.MainViewModel
+import com.simutrade.screens.user.UserViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
-fun DashboardScreen(viewModel: MainViewModel) {
+fun DashboardScreen(
+    mainViewModel: MainViewModel = viewModel(),
+    userViewModel: UserViewModel = viewModel()
+) {
 
-    val userData by viewModel.userData.collectAsState()
-    val cartera by viewModel.cartera.collectAsState()
-    val transacciones by viewModel.transacciones.collectAsState()
+    val userData by userViewModel.userData.collectAsStateWithLifecycle()
+    val cartera by userViewModel.cartera.collectAsStateWithLifecycle()
+    val transacciones by userViewModel.transacciones.collectAsStateWithLifecycle()
 
-    val portfolioValue = viewModel.getPortfolioValue()
-    val totalValue = viewModel.getTotalValue()
-    val profit = viewModel.getProfit()
-    val profitPercent = viewModel.getProfitPercent()
-    val currentRank = viewModel.getCurrentRank()
+    val portfolioValue = userViewModel.getPortfolioValue()
+    val totalValue = userViewModel.getTotalValue()
+    val profit = userViewModel.getProfit()
+    val profitPercent = userViewModel.getProfitPercent()
+    val currentRank = userViewModel.getCurrentRank()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -113,9 +119,11 @@ fun DashboardScreen(viewModel: MainViewModel) {
 
         // 📦 CARTERA
         item {
-            Text("Mi Cartera",
+            Text(
+                "Mi Cartera",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold)
+                fontWeight = FontWeight.Bold
+            )
         }
 
         if (cartera.isEmpty()) {
@@ -125,16 +133,18 @@ fun DashboardScreen(viewModel: MainViewModel) {
         } else {
             items(cartera) {
                 PortfolioHoldingCard(it) {
-                    viewModel.navigateToTradingFromCartera(it)
+                    mainViewModel.selectAsset(it.toAsset())
                 }
             }
         }
 
         // 💳 TRANSACCIONES
         item {
-            Text("Transacciones Recientes",
+            Text(
+                "Transacciones Recientes",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold)
+                fontWeight = FontWeight.Bold
+            )
         }
 
         if (transacciones.isEmpty()) {
@@ -147,6 +157,22 @@ fun DashboardScreen(viewModel: MainViewModel) {
     }
 }
 
+// ================= EXTENSIÓN =================
+
+fun PortfolioHolding.toAsset(): Asset {
+    return Asset(
+        id = assetId,
+        symbol = symbol,
+        name = name,
+        type = type,
+        currentPrice = currentPrice,
+        priceChange24h = 0.0,
+        priceChangePercent24h = 0.0
+    )
+}
+
+// ================= COMPONENTES =================
+
 @Composable
 fun EmptyCard(text: String) {
     Card(Modifier.fillMaxWidth()) {
@@ -158,8 +184,6 @@ fun EmptyCard(text: String) {
         }
     }
 }
-
-// ================= COMPONENTES =================
 
 @Composable
 fun SummaryCard(
@@ -177,24 +201,32 @@ fun SummaryCard(
                 Arrangement.SpaceBetween,
                 Alignment.CenterVertically
             ) {
-                Text(title,
+                Text(
+                    title,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-                Icon(icon, null,
+                Icon(
+                    icon, null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp))
+                    modifier = Modifier.size(16.dp)
+                )
             }
 
             Spacer(Modifier.height(8.dp))
 
-            Text(value,
+            Text(
+                value,
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold)
+                fontWeight = FontWeight.Bold
+            )
 
-            Text(subtitle,
+            Text(
+                subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -204,9 +236,11 @@ fun RankProgressCard(nextRank: Rank, currentProfit: Double, progress: Float) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
 
-            Text("Progreso al siguiente rango",
+            Text(
+                "Progreso al siguiente rango",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold)
+                fontWeight = FontWeight.Bold
+            )
 
             Spacer(Modifier.height(4.dp))
 
