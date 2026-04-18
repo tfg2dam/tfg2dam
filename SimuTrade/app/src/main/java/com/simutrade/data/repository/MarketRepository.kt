@@ -109,7 +109,10 @@ class MarketRepository {
 
     suspend fun getAssetHistory(asset: Asset, period: String = "7d"): List<Pair<Long, Double>> {
         return try {
+
+            // 🔵 CRYPTO (CoinGecko)
             if (asset.type == AssetType.CRYPTO) {
+
                 val (days, interval) = when (period) {
                     "1h"  -> 1 to "minute"
                     "1d"  -> 1 to "hourly"
@@ -119,17 +122,50 @@ class MarketRepository {
                     else  -> 7 to "daily"
                 }
 
-                val history = CoinGeckoClient.api.getCoinHistory(asset.id, days = days, interval = interval)
+                val history = CoinGeckoClient.api.getCoinHistory(
+                    coinId = asset.id,
+                    days = days,
+                    interval = interval
+                )
+
                 val prices = if (period == "1h") history.prices.takeLast(60) else history.prices
 
                 prices.map { it[0].toLong() to it[1] }
-
-            } else {
-                generateSimulatedHistory(asset.currentPrice, asset.priceChangePercent24h, period)
             }
+
+            // 🟢 STOCKS (Finnhub REAL)
+            else {
+
+                val now = System.currentTimeMillis() / 1000
+
+                val (from, resolution) = when (period) {
+                    "1h"  -> now - 3600 to "1"
+                    "1d"  -> now - 86400 to "5"
+                    "7d"  -> now - 604800 to "15"
+                    "30d" -> now - 2592000 to "D"
+                    "1A"  -> now - 31536000 to "W"
+                    else  -> now - 604800 to "60"
+                }
+
+                val response = FinnhubClient.api.getStockHistory(
+                    symbol = asset.symbol,
+                    resolution = resolution,
+                    from = from,
+                    to = now
+                )
+
+                if (response.status == "ok") {
+                    response.timestamps.zip(response.close)
+                } else {
+                    emptyList()
+                }
+            }
+
         } catch (e: Exception) {
             e.printStackTrace()
-            generateSimulatedHistory(asset.currentPrice, asset.priceChangePercent24h, period)
+
+            // fallback por si falla la API
+            generateSimulatedHistory(asset.currentPrice, period)
         }
     }
 
@@ -159,11 +195,10 @@ class MarketRepository {
         )
     }
 
-    // ================= SIMULACIÓN =================
+    // ================= FALLBACK =================
 
     private fun generateSimulatedHistory(
         currentPrice: Double,
-        changePercent24h: Double,
         period: String
     ): List<Pair<Long, Double>> {
 
@@ -178,23 +213,11 @@ class MarketRepository {
             else  -> 8 to 86_400_000L
         }
 
-        val multiplier = when (period) {
-            "1h"  -> 0.1
-            "1d"  -> 1.0
-            "7d"  -> 7.0
-            "30d" -> 30.0
-            "1A"  -> 365.0
-            else  -> 7.0
-        }
-
-        val priceStart = currentPrice / (1 + (changePercent24h / 100) * multiplier / 30)
-
         return (0 until points).map { i ->
             val timestamp = now - (points - 1 - i) * intervalMs
             val progress = i.toDouble() / (points - 1)
-            val basePrice = priceStart + (currentPrice - priceStart) * progress
-            val variation = basePrice * 0.008 * (Math.random() - 0.5)
-            timestamp to (basePrice + variation)
+            val price = currentPrice * (0.95 + 0.1 * progress)
+            timestamp to price
         }
     }
 }

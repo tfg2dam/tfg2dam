@@ -1,4 +1,4 @@
-package com.simutrade.ui.auth
+package com.simutrade.features.auth
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions

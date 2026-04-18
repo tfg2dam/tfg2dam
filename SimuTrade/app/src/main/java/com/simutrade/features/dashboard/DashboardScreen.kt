@@ -1,4 +1,4 @@
-package com.simutrade.ui.dashboard
+package com.simutrade.features.dashboard
 
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
@@ -21,8 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.simutrade.data.mock.MockData
 import com.simutrade.data.model.*
-import com.simutrade.ui.theme.positive
-import com.simutrade.ui.viewmodel.MainViewModel
+import com.simutrade.features.theme.positive
+import com.simutrade.features.viewmodel.MainViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 

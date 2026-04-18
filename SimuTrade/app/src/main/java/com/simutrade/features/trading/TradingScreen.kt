@@ -1,4 +1,4 @@
-package com.simutrade.ui.trading
+package com.simutrade.features.trading
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,12 +15,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.simutrade.data.model.*
-import com.simutrade.ui.theme.positive
-import com.simutrade.ui.viewmodel.MainViewModel
+import com.simutrade.features.theme.positive
+import com.simutrade.features.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 
 @Composable
 fun TradingScreen(viewModel: MainViewModel) {
+
+    val tradingViewModel = remember { TradingViewModel() }
 
     val selectedAsset by viewModel.selectedAsset.collectAsState()
     val userData by viewModel.userData.collectAsState()
@@ -45,8 +47,9 @@ fun TradingScreen(viewModel: MainViewModel) {
 
             val asset = selectedAsset!!
             val currentHolding = cartera.find { it.assetId == asset.id }
-            val quantityDouble = quantity.toDoubleOrNull() ?: 0.0
-            val total = quantityDouble * asset.currentPrice
+
+            val quantityDouble = tradingViewModel.parseQuantity(quantity)
+            val total = tradingViewModel.calculateTotal(asset.currentPrice, quantityDouble)
 
             val positiveColor = MaterialTheme.colorScheme.positive
             val negativeColor = MaterialTheme.colorScheme.error
@@ -68,8 +71,10 @@ fun TradingScreen(viewModel: MainViewModel) {
                 ) {
                     Column {
                         Text("Operar", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                        Text("Compra y vende activos",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "Compra y vende activos",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
 
                     OutlinedButton(onClick = {
@@ -88,9 +93,11 @@ fun TradingScreen(viewModel: MainViewModel) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(asset.symbol,
+                            Text(
+                                asset.symbol,
                                 style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold)
+                                fontWeight = FontWeight.Bold
+                            )
 
                             AssistChip(
                                 onClick = {},
@@ -100,8 +107,10 @@ fun TradingScreen(viewModel: MainViewModel) {
                             )
                         }
 
-                        Text(asset.name,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            asset.name,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
                         Spacer(Modifier.height(16.dp))
 
@@ -109,9 +118,11 @@ fun TradingScreen(viewModel: MainViewModel) {
                         val color = if (isPositive) positiveColor else negativeColor
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("€${"%.2f".format(asset.currentPrice)}",
+                            Text(
+                                "€${"%.2f".format(asset.currentPrice)}",
                                 style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold)
+                                fontWeight = FontWeight.Bold
+                            )
 
                             Spacer(Modifier.width(8.dp))
 
@@ -139,15 +150,17 @@ fun TradingScreen(viewModel: MainViewModel) {
                             ) {
                                 Column(Modifier.padding(12.dp)) {
                                     Text("Posición actual")
-                                    Text("${currentHolding.quantity} unidades",
-                                        fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "${currentHolding.quantity} unidades",
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }
                     }
                 }
 
-                // 🔥 NUEVOS BOTONES (ANTES TABROW)
+                // BOTONES
                 SingleChoiceSegmentedButtonRow(
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -185,6 +198,11 @@ fun TradingScreen(viewModel: MainViewModel) {
                         onQuantityChange = { quantity = it },
                         total = total,
                         balance = userData.saldo,
+                        enabled = tradingViewModel.canBuy(
+                            quantityDouble,
+                            asset.currentPrice,
+                            userData.saldo
+                        ),
                         onBuy = {
                             viewModel.buyAsset(asset, quantityDouble) { result ->
                                 scope.launch {
@@ -208,6 +226,10 @@ fun TradingScreen(viewModel: MainViewModel) {
                         onQuantityChange = { quantity = it },
                         total = total,
                         currentHolding = currentHolding,
+                        enabled = tradingViewModel.canSell(
+                            quantityDouble,
+                            currentHolding?.quantity
+                        ),
                         onSell = {
                             viewModel.sellAsset(asset.id, quantityDouble, asset.currentPrice) { result ->
                                 scope.launch {
@@ -236,7 +258,9 @@ fun NoAssetSelected(
     onNavigateToMarket: () -> Unit
 ) {
     Column(
-        modifier = modifier.fillMaxSize().padding(32.dp),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -259,6 +283,7 @@ fun BuyForm(
     onQuantityChange: (String) -> Unit,
     total: Double,
     balance: Double,
+    enabled: Boolean,
     onBuy: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -277,7 +302,7 @@ fun BuyForm(
         Button(
             onClick = onBuy,
             modifier = Modifier.fillMaxWidth(),
-            enabled = quantity.toDoubleOrNull()?.let { it > 0 && total <= balance } == true
+            enabled = enabled
         ) {
             Text("Comprar ${asset.symbol}")
         }
@@ -291,6 +316,7 @@ fun SellForm(
     onQuantityChange: (String) -> Unit,
     total: Double,
     currentHolding: PortfolioHolding?,
+    enabled: Boolean,
     onSell: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -309,7 +335,7 @@ fun SellForm(
         Button(
             onClick = onSell,
             modifier = Modifier.fillMaxWidth(),
-            enabled = currentHolding != null
+            enabled = enabled
         ) {
             Text("Vender ${asset.symbol}")
         }

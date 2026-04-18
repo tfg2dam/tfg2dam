@@ -1,4 +1,4 @@
-package com.simutrade.ui.main
+package com.simutrade.features.main
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape

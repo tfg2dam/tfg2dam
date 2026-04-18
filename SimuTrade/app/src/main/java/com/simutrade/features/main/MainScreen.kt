@@ -1,4 +1,4 @@
-package com.simutrade.ui.main
+package com.simutrade.features.main
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -10,13 +10,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.simutrade.data.model.UserData
 import com.simutrade.data.mock.MockData
-import com.simutrade.ui.auth.AuthViewModel
-import com.simutrade.ui.challenges.ChallengesScreen
-import com.simutrade.ui.dashboard.DashboardScreen
-import com.simutrade.ui.market.MarketScreen
-import com.simutrade.ui.rankings.RankingsScreen
-import com.simutrade.ui.trading.TradingScreen
-import com.simutrade.ui.viewmodel.MainViewModel
+import com.simutrade.features.auth.AuthViewModel
+import com.simutrade.features.challenges.ChallengesScreen
+import com.simutrade.features.dashboard.DashboardScreen
+import com.simutrade.features.market.MarketScreen
+import com.simutrade.features.rankings.RankingsScreen
+import com.simutrade.features.trading.TradingScreen
+import com.simutrade.features.viewmodel.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
