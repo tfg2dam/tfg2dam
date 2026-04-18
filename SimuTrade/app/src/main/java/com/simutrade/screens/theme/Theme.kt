@@ -5,7 +5,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// 🎨 COLORES BASE
+// ================= COLORES BASE =================
+
 private val Blue600 = Color(0xFF2563EB)
 private val Blue100 = Color(0xFFDBEAFE)
 
@@ -16,11 +17,16 @@ private val Green100 = Color(0xFFD1FAE5)
 
 private val Red600 = Color(0xFFDC2626)
 
-// ================= EXTENSIÓN PRO =================
+// ================= EXTENSIONES DE COLOR =================
 
-// 👇 añadimos positive al sistema de colores
 val ColorScheme.positive: Color
     get() = Green600
+
+val ColorScheme.positiveContainer: Color
+    get() = Green100
+
+val ColorScheme.negativo: Color
+    get() = Red600
 
 // ================= LIGHT =================
 
