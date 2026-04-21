@@ -37,6 +37,7 @@ class UserRepository {
 
         return try {
             val doc = firestore.collection(USERS).document(userId).get().await()
+
             UserData(
                 idUsuario     = doc.getString("id_usuario") ?: "",
                 nombreUsuario = doc.getString("nombre_usuario") ?: "",
@@ -246,6 +247,7 @@ class UserRepository {
                 rachaMaxima = doc.getLong("racha_maxima")?.toInt() ?: 0,
                 ultimaVez = doc.getLong("ultima_vez") ?: 0L,
                 retosCompletados = (doc.get("retos_completados") as? List<String>) ?: emptyList(),
+                retosDelDia = (doc.get("retos_del_dia") as? List<String>) ?: emptyList(),
                 diaActual = doc.getLong("dia_actual")?.toInt() ?: 0
             )
         } catch (e: Exception) {
@@ -263,6 +265,7 @@ class UserRepository {
                 "racha_maxima" to retosData.rachaMaxima,
                 "ultima_vez" to retosData.ultimaVez,
                 "retos_completados" to retosData.retosCompletados,
+                "retos_del_dia" to retosData.retosDelDia,
                 "dia_actual" to retosData.diaActual
             )
 

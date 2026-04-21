@@ -8,7 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -23,17 +23,23 @@ import kotlinx.coroutines.delay
 fun ChallengesScreen(
     viewModel: ChallengesViewModel = viewModel()
 ) {
+
     val retosData by viewModel.retosData.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val millisHastaReset by viewModel.millisHastaReset.collectAsStateWithLifecycle()
-    val retosDelDia = viewModel.getRetosDelDia()
 
-    val todosCompletados = retosDelDia.all { it.id in retosData.retosCompletados }
+    val retosDelDia = remember(retosData) {
+        viewModel.getRetosDelDia()
+    }
+
+    val completados = retosDelDia.count { it.id in retosData.retosCompletados }
+    val todosCompletados = completados == retosDelDia.size
 
     var dialogMensaje by remember { mutableStateOf<String?>(null) }
     var dialogExito by remember { mutableStateOf(false) }
 
     var tiempoRestante by remember { mutableStateOf(millisHastaReset) }
+
     LaunchedEffect(millisHastaReset) {
         tiempoRestante = millisHastaReset
         while (tiempoRestante > 0) {
@@ -92,7 +98,7 @@ fun ChallengesScreen(
             )
         }
 
-        // Racha
+        // 🔥 RACHA
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -106,18 +112,23 @@ fun ChallengesScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Racha", fontWeight = FontWeight.Bold)
+                        Text("🔥 Racha", fontWeight = FontWeight.Bold)
+
                         Text(
-                            if (retosData.rachaActual == 0) "Empieza hoy"
-                            else "${retosData.rachaActual} dias seguidos"
+                            if (retosData.rachaActual == 0)
+                                "Empieza hoy"
+                            else
+                                "${retosData.rachaActual} días seguidos"
                         )
+
                         Text(
                             "Max: ${retosData.rachaMaxima}",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
+
                     Text(
-                        "${retosData.rachaActual}",
+                        "🔥 ${retosData.rachaActual}",
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -125,13 +136,13 @@ fun ChallengesScreen(
             }
         }
 
-        // Countdown si todos completados
+        // ⏳ TODOS COMPLETADOS (FONDO AMARILLO 🔥)
         if (todosCompletados) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.positiveContainer
+                        containerColor = Color(0xFFFFF3CD) // 🟡 FONDO AMARILLO
                     )
                 ) {
                     Column(
@@ -140,47 +151,43 @@ fun ChallengesScreen(
                     ) {
                         Text(
                             "Todos los retos completados",
-                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.positive
+                            color = Color(0xFF856404)
                         )
+
                         Spacer(Modifier.height(8.dp))
+
                         Text(
                             "Nuevos retos en",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = Color(0xFF856404)
                         )
+
                         Spacer(Modifier.height(4.dp))
+
                         Text(
                             formatearTiempo(tiempoRestante),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.positive
+                            color = Color(0xFF856404)
                         )
                     }
                 }
             }
         }
 
-        // Progreso del dia
+        // 📊 PROGRESO
         item {
-            val completados = retosDelDia.count { it.id in retosData.retosCompletados }
             Column {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        "Hoy",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "$completados/${retosDelDia.size} completados",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text("Hoy", fontWeight = FontWeight.Bold)
+                    Text("$completados/${retosDelDia.size}")
                 }
+
                 Spacer(Modifier.height(8.dp))
+
                 LinearProgressIndicator(
                     progress = if (retosDelDia.isEmpty()) 0f
                     else completados.toFloat() / retosDelDia.size,
@@ -189,6 +196,7 @@ fun ChallengesScreen(
             }
         }
 
+        // 🔄 LISTA
         if (isLoading) {
             item {
                 Box(
@@ -200,7 +208,9 @@ fun ChallengesScreen(
             }
         } else {
             items(retosDelDia) { reto ->
+
                 val completado = reto.id in retosData.retosCompletados
+
                 RetoCard(
                     reto = reto,
                     completado = completado,
@@ -213,28 +223,10 @@ fun ChallengesScreen(
                 )
             }
         }
-
-        // Insignias
-        item {
-            Text(
-                "Insignias",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                BadgeCard("7 dias",   retosData.rachaMaxima >= 7,   Modifier.weight(1f))
-                BadgeCard("30 dias",  retosData.rachaMaxima >= 30,  Modifier.weight(1f))
-                BadgeCard("100 dias", retosData.rachaMaxima >= 100, Modifier.weight(1f))
-            }
-        }
     }
 }
+
+// ================= COMPONENTES =================
 
 @Composable
 fun RetoCard(
@@ -242,6 +234,7 @@ fun RetoCard(
     completado: Boolean,
     onCompletar: () -> Unit
 ) {
+
     val backgroundColor by animateColorAsState(
         targetValue = if (completado)
             MaterialTheme.colorScheme.positiveContainer
@@ -254,24 +247,26 @@ fun RetoCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = backgroundColor)
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
+
                 Column(modifier = Modifier.weight(1f)) {
                     Text(reto.titulo, fontWeight = FontWeight.Bold)
+
                     Spacer(Modifier.height(2.dp))
+
                     Text(
                         reto.descripcion,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
+
                 Text(
-                    "+${"%.2f".format(reto.recompensa)} EUR",
+                    "+${"%.2f".format(reto.recompensa)}€",
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.positive
                 )
@@ -281,8 +276,7 @@ fun RetoCard(
 
             if (completado) {
                 Text(
-                    "Completado y recompensado",
-                    style = MaterialTheme.typography.bodySmall,
+                    "Completado",
                     color = MaterialTheme.colorScheme.positive,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -294,45 +288,6 @@ fun RetoCard(
                     Text("Reclamar recompensa")
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun BadgeCard(
-    titulo: String,
-    conseguido: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = if (conseguido)
-                MaterialTheme.colorScheme.positiveContainer
-            else
-                MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp).fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                titulo,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.alpha(if (conseguido) 1f else 0.4f)
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = if (conseguido) "Conseguido" else "Bloqueado",
-                style = MaterialTheme.typography.labelSmall,
-                color = if (conseguido)
-                    MaterialTheme.colorScheme.positive
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
