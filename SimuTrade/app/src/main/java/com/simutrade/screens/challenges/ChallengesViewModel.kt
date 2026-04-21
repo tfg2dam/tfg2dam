@@ -58,7 +58,6 @@ class ChallengesViewModel : ViewModel() {
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
 
-        // PRIMER USO
         if (datos.diaActual == 0L) {
             val inicial = datos.copy(
                 diaActual = hoyInicio,
@@ -68,7 +67,6 @@ class ChallengesViewModel : ViewModel() {
             return inicial
         }
 
-        // NUEVO DÍA
         if (datos.diaActual != hoyInicio) {
 
             val ayerInicio = hoyInicio - (24 * 60 * 60 * 1000)
@@ -136,17 +134,11 @@ class ChallengesViewModel : ViewModel() {
             val id = "reto_${tipo}_${data.diaActual}_${index + 1}"
 
             when (tipo) {
-
                 "operacion" -> Reto(id, "Primera operación", "Haz una compra o venta hoy", "📈", 2.0)
-
                 "diversifica" -> Reto(id, "Diversifica", "Ten al menos 2 activos distintos", "📊", 3.0)
-
                 "trader" -> Reto(id, "Trader activo", "Realiza 3 operaciones hoy", "🔥", 5.0)
-
                 "multimercado" -> Reto(id, "Multi mercado", "Ten acciones y criptos", "🌍", 4.0)
-
                 "beneficio" -> Reto(id, "En beneficio", "Consigue beneficio positivo", "💰", 6.0)
-
                 else -> Reto("error", "Error", "Error", "❌", 0.0)
             }
         }
@@ -237,7 +229,7 @@ class ChallengesViewModel : ViewModel() {
         }
     }
 
-    // ================= COMPLETAR =================
+    // ================= COMPLETAR (CON BONUS 🔥) =================
 
     fun completarReto(
         retoId: String,
@@ -260,8 +252,12 @@ class ChallengesViewModel : ViewModel() {
                 return@launch
             }
 
+            // 🔥 BONUS POR RACHA
+            val bonus = data.rachaActual * 0.5
+            val recompensaFinal = recompensa + bonus
+
             val user = repository.getUserData()
-            repository.updateSaldo(user.saldo + recompensa)
+            repository.updateSaldo(user.saldo + recompensaFinal)
 
             val nuevos = data.retosCompletados + retoId
             val updated = data.copy(retosCompletados = nuevos)
@@ -269,7 +265,6 @@ class ChallengesViewModel : ViewModel() {
             repository.saveRetosData(updated)
             _retosData.value = updated
 
-            // 🔥 comprobar si todos completados
             val retosHoy = getRetosDelDia()
             val todos = retosHoy.all { it.id in nuevos }
 
@@ -277,7 +272,7 @@ class ChallengesViewModel : ViewModel() {
 
             calcularTiempoHastaReset()
 
-            onResult(true, "+${"%.2f".format(recompensa)}€")
+            onResult(true, "+${"%.2f".format(recompensaFinal)}€ (bonus: ${"%.2f".format(bonus)})")
         }
     }
 

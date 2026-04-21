@@ -145,6 +145,7 @@ fun ChallengesScreen(
             }
         }
 
+        // 🟡 TODOS COMPLETADOS
         if (todosCompletados) {
             item {
                 Card(
@@ -215,8 +216,14 @@ fun ChallengesScreen(
 
                 val completado = reto.id in retosData.retosCompletados
 
+                // 🔥 BONUS VISUAL
+                val bonus = retosData.rachaActual * 0.5
+                val recompensaFinal = reto.recompensa + bonus
+
                 RetoCard(
                     reto = reto,
+                    recompensaFinal = recompensaFinal,
+                    bonus = bonus,
                     completado = completado,
                     onCompletar = {
                         viewModel.completarReto(reto.id, reto.recompensa) { exito, mensaje ->
@@ -235,6 +242,8 @@ fun ChallengesScreen(
 @Composable
 fun RetoCard(
     reto: Reto,
+    recompensaFinal: Double,
+    bonus: Double,
     completado: Boolean,
     onCompletar: () -> Unit
 ) {
@@ -265,15 +274,26 @@ fun RetoCard(
 
                     Text(
                         reto.descripcion,
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodyLarge
                     )
                 }
 
-                Text(
-                    "+${"%.2f".format(reto.recompensa)}€",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.positive
-                )
+                Column(horizontalAlignment = Alignment.End) {
+
+                    Text(
+                        "+${"%.2f".format(recompensaFinal)}€",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.positive
+                    )
+
+                    if (bonus > 0) {
+                        Text(
+                            "+${"%.2f".format(bonus)}€ bonus por racha",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.positive
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.height(12.dp))
