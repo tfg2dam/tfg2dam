@@ -44,6 +44,7 @@ class UserRepository {
                 email         = doc.getString("email") ?: "",
                 saldo         = doc.getDouble("saldo") ?: 100.0,
                 saldoInicial  = doc.getDouble("saldo_inicial") ?: 100.0,
+                saldoBonus    = doc.getDouble("saldo_bonus") ?: 0.0,  // ← añadido
                 idRango       = doc.getString("id_rango") ?: "bronce",
                 creadoEn      = doc.getLong("creado_en") ?: 0L,
                 ultimoLogin   = doc.getLong("ultimo_login") ?: 0L
@@ -62,6 +63,25 @@ class UserRepository {
                 .update("saldo", redondear(nuevoSaldo)).await()
         } catch (e: Exception) {
             Log.e(TAG, "Error updateSaldo", e)
+        }
+    }
+
+    // ← nuevo método para recompensas de retos
+    suspend fun updateSaldoBonus(incremento: Double) {
+        val userId = uid ?: return
+
+        try {
+            val doc = firestore.collection(USERS).document(userId).get().await()
+            val saldoActual = doc.getDouble("saldo") ?: 0.0
+            val bonusActual = doc.getDouble("saldo_bonus") ?: 0.0
+
+            firestore.collection(USERS).document(userId)
+                .update(mapOf(
+                    "saldo"       to redondear(saldoActual + incremento),
+                    "saldo_bonus" to redondear(bonusActual + incremento)
+                )).await()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updateSaldoBonus", e)
         }
     }
 
@@ -85,7 +105,7 @@ class UserRepository {
                 .update(
                     mapOf(
                         "portfolio_value" to redondear(totalValue),
-                        "profit" to redondear(profit)
+                        "profit"          to redondear(profit)
                     )
                 ).await()
         } catch (e: Exception) {
@@ -221,10 +241,10 @@ class UserRepository {
                 val idRango = doc.getString("id_rango") ?: "bronce"
 
                 LeaderboardEntry(
-                    id = doc.id,
-                    username = nombre,
-                    profit = doc.getDouble("profit") ?: 0.0,
-                    rank = idRango.replaceFirstChar { it.uppercaseChar() },
+                    id             = doc.id,
+                    username       = nombre,
+                    profit         = doc.getDouble("profit") ?: 0.0,
+                    rank           = idRango.replaceFirstChar { it.uppercaseChar() },
                     portfolioValue = doc.getDouble("portfolio_value") ?: 0.0
                 )
             }
@@ -234,7 +254,7 @@ class UserRepository {
         }
     }
 
-    // ================= RETOS (FIX FINAL 🔥) =================
+    // ================= RETOS =================
 
     suspend fun getRetosData(): RetosData {
         val userId = uid ?: return RetosData()
@@ -243,12 +263,12 @@ class UserRepository {
             val doc = firestore.collection(RETOS).document(userId).get().await()
 
             RetosData(
-                rachaActual = doc.getLong("racha_actual")?.toInt() ?: 0,
-                rachaMaxima = doc.getLong("racha_maxima")?.toInt() ?: 0,
-                ultimaVez = doc.getLong("ultima_vez") ?: 0L,
+                rachaActual      = doc.getLong("racha_actual")?.toInt() ?: 0,
+                rachaMaxima      = doc.getLong("racha_maxima")?.toInt() ?: 0,
+                ultimaVez        = doc.getLong("ultima_vez") ?: 0L,
                 retosCompletados = (doc.get("retos_completados") as? List<String>) ?: emptyList(),
-                retosDelDia = (doc.get("retos_del_dia") as? List<String>) ?: emptyList(),
-                diaActual = doc.getLong("dia_actual") ?: 0L // ✅ LONG CORRECTO
+                retosDelDia      = (doc.get("retos_del_dia") as? List<String>) ?: emptyList(),
+                diaActual        = doc.getLong("dia_actual") ?: 0L
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error getRetosData", e)
@@ -261,12 +281,12 @@ class UserRepository {
 
         try {
             val data = hashMapOf(
-                "racha_actual" to retosData.rachaActual,
-                "racha_maxima" to retosData.rachaMaxima,
-                "ultima_vez" to retosData.ultimaVez,
+                "racha_actual"      to retosData.rachaActual,
+                "racha_maxima"      to retosData.rachaMaxima,
+                "ultima_vez"        to retosData.ultimaVez,
                 "retos_completados" to retosData.retosCompletados,
-                "retos_del_dia" to retosData.retosDelDia,
-                "dia_actual" to retosData.diaActual // ✅ LONG
+                "retos_del_dia"     to retosData.retosDelDia,
+                "dia_actual"        to retosData.diaActual
             )
 
             firestore.collection(RETOS).document(userId).set(data).await()

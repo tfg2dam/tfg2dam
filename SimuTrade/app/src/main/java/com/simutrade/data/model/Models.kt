@@ -60,6 +60,7 @@ data class UserData(
     val email: String = "",
     val saldo: Double = 100.0,
     val saldoInicial: Double = 100.0,
+    val saldoBonus: Double = 0.0,
     val idRango: String = "bronce",
     val creadoEn: Long = 0L,
     val ultimoLogin: Long = 0L

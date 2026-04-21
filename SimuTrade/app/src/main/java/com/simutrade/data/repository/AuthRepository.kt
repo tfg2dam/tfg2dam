@@ -28,7 +28,6 @@ class AuthRepository {
 
             val now = System.currentTimeMillis()
 
-            // Actualizar ultimo_login
             firestore.collection("Usuarios")
                 .document(user.uid)
                 .update("ultimo_login", now)
@@ -49,16 +48,17 @@ class AuthRepository {
             val now = System.currentTimeMillis()
 
             val userData = hashMapOf(
-                "id_usuario" to user.uid,
-                "nombre_usuario" to username,
-                "email" to email,
-                "saldo" to SALDO_INICIAL,
-                "saldo_inicial" to SALDO_INICIAL,
-                "id_rango" to "bronce",
-                "creado_en" to now,
-                "ultimo_login" to now,
+                "id_usuario"      to user.uid,
+                "nombre_usuario"  to username,
+                "email"           to email,
+                "saldo"           to SALDO_INICIAL,
+                "saldo_inicial"   to SALDO_INICIAL,
+                "saldo_bonus"     to 0.0,
+                "id_rango"        to "bronce",
+                "creado_en"       to now,
+                "ultimo_login"    to now,
                 "portfolio_value" to SALDO_INICIAL,
-                "profit" to 0.0
+                "profit"          to 0.0
             )
 
             firestore.collection("Usuarios")

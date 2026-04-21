@@ -25,7 +25,6 @@ class UserViewModel : ViewModel() {
     private val _transacciones = MutableStateFlow<List<Transaction>>(emptyList())
     val transacciones: StateFlow<List<Transaction>> = _transacciones.asStateFlow()
 
-    // 🔥 RANGO GLOBAL (IMPORTANTE)
     private val _currentRank = MutableStateFlow<Rank?>(null)
     val currentRank: StateFlow<Rank?> = _currentRank.asStateFlow()
 
@@ -46,14 +45,15 @@ class UserViewModel : ViewModel() {
             _cartera.value = carteraData
             _transacciones.value = transaccionesData
 
-            // 🔥 calcular rango UNA VEZ (clave)
-            val profit = calcularBeneficio(
+            // El rango usa SOLO el beneficio de trading (sin bonus de retos)
+            val profitTrading = calcularBeneficioTrading(
                 saldo = user.saldo,
                 saldoInicial = user.saldoInicial,
+                saldoBonus = user.saldoBonus,
                 cartera = carteraData
             )
 
-            _currentRank.value = RankUtils.getRankFromProfit(profit)
+            _currentRank.value = RankUtils.getRankFromProfit(profitTrading)
         }
     }
 
@@ -87,9 +87,7 @@ class UserViewModel : ViewModel() {
 
             val holding = if (existente != null) {
                 val totalQty = existente.quantity + quantity
-                val totalCost =
-                    existente.averagePrice * existente.quantity + total
-
+                val totalCost = existente.averagePrice * existente.quantity + total
                 existente.copy(
                     quantity = totalQty,
                     averagePrice = totalCost / totalQty,
@@ -122,12 +120,12 @@ class UserViewModel : ViewModel() {
 
             repository.addTransaccion(transaction)
 
-            // 🔄 recargar TODO (incluye rango)
             cargarDatos()
 
-            val totalValue = getTotalValue()
-            val profit = getProfit()
-            repository.updateUserStats(totalValue, profit)
+            // updateUserStats usa SOLO el beneficio de trading
+            val profitTrading = getProfitTrading()
+            val totalTrading = getTotalValueTrading()
+            repository.updateUserStats(totalTrading, profitTrading)
 
             onResult(OperationResult.Success("Compra realizada", _userData.value))
         }
@@ -182,12 +180,12 @@ class UserViewModel : ViewModel() {
 
             repository.addTransaccion(transaction)
 
-            // 🔄 recargar TODO (incluye rango)
             cargarDatos()
 
-            val totalValue = getTotalValue()
-            val profit = getProfit()
-            repository.updateUserStats(totalValue, profit)
+            // updateUserStats usa SOLO el beneficio de trading
+            val profitTrading = getProfitTrading()
+            val totalTrading = getTotalValueTrading()
+            repository.updateUserStats(totalTrading, profitTrading)
 
             onResult(OperationResult.Success("Venta realizada", _userData.value))
         }
@@ -198,23 +196,39 @@ class UserViewModel : ViewModel() {
     fun getPortfolioValue() =
         repository.calcularValorCartera(_cartera.value)
 
+    // Valor total incluyendo bonus de retos (para mostrar en UI)
     fun getTotalValue() =
         repository.calcularValorTotal(_userData.value.saldo, getPortfolioValue())
 
+    // Beneficio incluyendo bonus de retos (para mostrar en UI)
     fun getProfit() =
         repository.calcularBeneficio(getTotalValue(), _userData.value.saldoInicial)
 
     fun getProfitPercent() =
         repository.calcularBeneficioPct(getTotalValue(), _userData.value.saldoInicial)
 
-    // 🔥 cálculo independiente (más robusto)
-    private fun calcularBeneficio(
+    // Valor total SOLO de trading (sin contar bonus de retos)
+    private fun getTotalValueTrading(): Double {
+        val user = _userData.value
+        val saldoTrading = user.saldo - user.saldoBonus
+        return saldoTrading + getPortfolioValue()
+    }
+
+    fun getProfitTrading(): Double {
+        val user = _userData.value
+        return repository.calcularBeneficio(getTotalValueTrading(), user.saldoInicial)
+    }
+
+    // Cálculo interno usado en cargarDatos
+    private fun calcularBeneficioTrading(
         saldo: Double,
         saldoInicial: Double,
+        saldoBonus: Double,
         cartera: List<PortfolioHolding>
     ): Double {
+        val saldoTrading = saldo - saldoBonus
         val valorCartera = cartera.sumOf { it.quantity * it.currentPrice }
-        val total = saldo + valorCartera
+        val total = saldoTrading + valorCartera
         return total - saldoInicial
     }
 }

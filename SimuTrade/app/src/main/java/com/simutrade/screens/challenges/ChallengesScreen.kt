@@ -15,13 +15,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.simutrade.data.model.Reto
+import com.simutrade.screens.user.UserViewModel
 import com.simutrade.screens.theme.positive
 import com.simutrade.screens.theme.positiveContainer
 import kotlinx.coroutines.delay
 
 @Composable
 fun ChallengesScreen(
-    viewModel: ChallengesViewModel = viewModel()
+    viewModel: ChallengesViewModel = viewModel(),
+    userViewModel: UserViewModel = viewModel()
 ) {
 
     val retosData by viewModel.retosData.collectAsStateWithLifecycle()
@@ -41,7 +43,6 @@ fun ChallengesScreen(
 
     var tiempoRestante by remember { mutableStateOf(millisHastaReset) }
 
-    // ⏳ countdown
     LaunchedEffect(millisHastaReset) {
         tiempoRestante = millisHastaReset
         while (tiempoRestante > 0) {
@@ -50,7 +51,6 @@ fun ChallengesScreen(
         }
     }
 
-    // 🚀 cargar datos
     LaunchedEffect(Unit) {
         viewModel.cargarRetos()
     }
@@ -107,7 +107,6 @@ fun ChallengesScreen(
             )
         }
 
-        // 🔥 RACHA
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -137,7 +136,7 @@ fun ChallengesScreen(
                     }
 
                     Text(
-                        "🔥 ${retosData.rachaActual}",
+                        "${retosData.rachaActual}",
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -159,7 +158,7 @@ fun ChallengesScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            "🎉 Todos los retos completados",
+                            "Todos los retos completados",
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF856404)
                         )
@@ -181,7 +180,6 @@ fun ChallengesScreen(
             }
         }
 
-        // 📊 PROGRESO
         item {
             Column {
                 Row(
@@ -201,7 +199,6 @@ fun ChallengesScreen(
             }
         }
 
-        // 🔄 LISTA
         if (isLoading) {
             item {
                 Box(
@@ -216,7 +213,6 @@ fun ChallengesScreen(
 
                 val completado = reto.id in retosData.retosCompletados
 
-                // 🔥 BONUS VISUAL
                 val bonus = retosData.rachaActual * 0.5
                 val recompensaFinal = reto.recompensa + bonus
 
@@ -229,6 +225,9 @@ fun ChallengesScreen(
                         viewModel.completarReto(reto.id, reto.recompensa) { exito, mensaje ->
                             dialogExito = exito
                             dialogMensaje = mensaje
+                            if (exito) {
+                                userViewModel.cargarDatos()
+                            }
                         }
                     }
                 )

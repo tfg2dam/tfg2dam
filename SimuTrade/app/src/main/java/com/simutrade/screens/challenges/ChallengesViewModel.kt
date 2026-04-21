@@ -229,8 +229,6 @@ class ChallengesViewModel : ViewModel() {
         }
     }
 
-    // ================= COMPLETAR (CON BONUS 🔥) =================
-
     fun completarReto(
         retoId: String,
         recompensa: Double,
@@ -252,12 +250,11 @@ class ChallengesViewModel : ViewModel() {
                 return@launch
             }
 
-            // 🔥 BONUS POR RACHA
+            // Bonus por racha
             val bonus = data.rachaActual * 0.5
             val recompensaFinal = recompensa + bonus
 
-            val user = repository.getUserData()
-            repository.updateSaldo(user.saldo + recompensaFinal)
+            repository.updateSaldoBonus(recompensaFinal)
 
             val nuevos = data.retosCompletados + retoId
             val updated = data.copy(retosCompletados = nuevos)
@@ -272,7 +269,7 @@ class ChallengesViewModel : ViewModel() {
 
             calcularTiempoHastaReset()
 
-            onResult(true, "+${"%.2f".format(recompensaFinal)}€ (bonus: ${"%.2f".format(bonus)})")
+            onResult(true, "+${"%.2f".format(recompensaFinal)} EUR (bonus racha: ${"%.2f".format(bonus)})")
         }
     }
 

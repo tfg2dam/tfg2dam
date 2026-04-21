@@ -38,12 +38,13 @@ fun DashboardScreen(
     val userData by userViewModel.userData.collectAsStateWithLifecycle()
     val cartera by userViewModel.cartera.collectAsStateWithLifecycle()
     val transacciones by userViewModel.transacciones.collectAsStateWithLifecycle()
-    val currentRank by userViewModel.currentRank.collectAsStateWithLifecycle() // 🔥 IMPORTANTE
+    val currentRank by userViewModel.currentRank.collectAsStateWithLifecycle()
 
     val portfolioValue = userViewModel.getPortfolioValue()
     val totalValue = userViewModel.getTotalValue()
     val profit = userViewModel.getProfit()
     val profitPercent = userViewModel.getProfitPercent()
+    val profitTrading = userViewModel.getProfitTrading()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -91,7 +92,7 @@ fun DashboardScreen(
                     modifier = Modifier.weight(1f)
                 )
 
-                // 🔥 RANGO SEGURO (sin crash)
+                // RANGO SEGURO (sin crash)
                 currentRank?.let { rank ->
                     SummaryCard(
                         title = "Rango",
@@ -104,7 +105,7 @@ fun DashboardScreen(
             }
         }
 
-        // 📊 PROGRESO RANGO
+        // PROGRESO RANGO
         currentRank?.let { rank ->
             item {
                 val ranks = RankUtils.ranks
@@ -113,16 +114,16 @@ fun DashboardScreen(
                 if (currentIndex < ranks.size - 1) {
                     val nextRank = ranks[currentIndex + 1]
 
-                    val progress = ((profit - rank.minProfit) /
+                    val progress = ((profitTrading - rank.minProfit) /
                             (nextRank.minProfit - rank.minProfit))
                         .coerceIn(0.0, 1.0)
 
-                    RankProgressCard(nextRank, profit, progress.toFloat())
+                    RankProgressCard(nextRank, profitTrading, progress.toFloat())
                 }
             }
         }
 
-        // 📦 CARTERA
+        // CARTERA
         item {
             Text(
                 "Mi Cartera",
