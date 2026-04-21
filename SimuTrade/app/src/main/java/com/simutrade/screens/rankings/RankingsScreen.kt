@@ -26,7 +26,9 @@ fun RankingsScreen(
     val leaderboard by rankingsViewModel.leaderboard.collectAsStateWithLifecycle()
     val isLoading by rankingsViewModel.isLoading.collectAsStateWithLifecycle()
 
-    val currentRank = userViewModel.getCurrentRank()
+    // 🔥 RANGO CORRECTO (StateFlow)
+    val currentRank by userViewModel.currentRank.collectAsStateWithLifecycle()
+
     val profit = userViewModel.getProfit()
 
     val profitColor =
@@ -84,9 +86,12 @@ fun RankingsScreen(
                         )
                     }
 
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(currentRank.icon, style = MaterialTheme.typography.headlineLarge)
-                        Text(currentRank.name, fontWeight = FontWeight.Bold)
+                    // 🔥 seguro (evita crash al cargar)
+                    currentRank?.let { rank ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(rank.icon, style = MaterialTheme.typography.headlineLarge)
+                            Text(rank.name, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -111,6 +116,7 @@ fun RankingsScreen(
             }
         }
 
+        // LOADING
         if (isLoading) {
             item {
                 Box(
@@ -124,6 +130,7 @@ fun RankingsScreen(
             }
         }
 
+        // EMPTY
         else if (leaderboard.isEmpty()) {
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
@@ -139,6 +146,7 @@ fun RankingsScreen(
             }
         }
 
+        // LISTA
         else {
             itemsIndexed(leaderboard) { index, entry ->
 
@@ -165,7 +173,6 @@ fun RankingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
 
-                        // IZQUIERDA
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -205,7 +212,6 @@ fun RankingsScreen(
                             }
                         }
 
-                        // DERECHA
                         Column(horizontalAlignment = Alignment.End) {
 
                             Text(

@@ -29,7 +29,7 @@ fun MainScreen(
     val currentPage by mainViewModel.currentPage.collectAsState()
 
     val userData by userViewModel.userData.collectAsStateWithLifecycle()
-    val currentRank = userViewModel.getCurrentRank()
+    val currentRank by userViewModel.currentRank.collectAsStateWithLifecycle() // 🔥 FIX
 
     var showProfileDialog by remember { mutableStateOf(false) }
 
@@ -60,7 +60,9 @@ fun MainScreen(
                         Text("SimuTrade", style = MaterialTheme.typography.titleLarge)
 
                         Text(
-                            "€${"%.2f".format(userData.saldo)} • ${currentRank.icon} ${currentRank.name}",
+                            "€${"%.2f".format(userData.saldo)} • ${
+                                currentRank?.let { "${it.icon} ${it.name}" } ?: ""
+                            }",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

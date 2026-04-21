@@ -21,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.simutrade.data.mock.MockData
+import com.simutrade.screens.rankings.RankUtils
 import com.simutrade.data.model.*
 import com.simutrade.screens.theme.positive
 import com.simutrade.screens.main.MainViewModel
@@ -38,12 +38,12 @@ fun DashboardScreen(
     val userData by userViewModel.userData.collectAsStateWithLifecycle()
     val cartera by userViewModel.cartera.collectAsStateWithLifecycle()
     val transacciones by userViewModel.transacciones.collectAsStateWithLifecycle()
+    val currentRank by userViewModel.currentRank.collectAsStateWithLifecycle() // 🔥 IMPORTANTE
 
     val portfolioValue = userViewModel.getPortfolioValue()
     val totalValue = userViewModel.getTotalValue()
     val profit = userViewModel.getProfit()
     val profitPercent = userViewModel.getProfitPercent()
-    val currentRank = userViewModel.getCurrentRank()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -91,29 +91,34 @@ fun DashboardScreen(
                     modifier = Modifier.weight(1f)
                 )
 
-                SummaryCard(
-                    title = "Rango",
-                    value = currentRank.icon,
-                    subtitle = currentRank.name,
-                    icon = Icons.Default.EmojiEvents,
-                    modifier = Modifier.weight(1f)
-                )
+                // 🔥 RANGO SEGURO (sin crash)
+                currentRank?.let { rank ->
+                    SummaryCard(
+                        title = "Rango",
+                        value = rank.icon,
+                        subtitle = rank.name,
+                        icon = Icons.Default.EmojiEvents,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
 
         // 📊 PROGRESO RANGO
-        item {
-            val ranks = MockData.ranks
-            val currentIndex = ranks.indexOfFirst { it.name == currentRank.name }
+        currentRank?.let { rank ->
+            item {
+                val ranks = RankUtils.ranks
+                val currentIndex = ranks.indexOfFirst { it.name == rank.name }
 
-            if (currentIndex < ranks.size - 1) {
-                val nextRank = ranks[currentIndex + 1]
+                if (currentIndex < ranks.size - 1) {
+                    val nextRank = ranks[currentIndex + 1]
 
-                val progress = ((profit - currentRank.minProfit) /
-                        (nextRank.minProfit - currentRank.minProfit))
-                    .coerceIn(0.0, 1.0)
+                    val progress = ((profit - rank.minProfit) /
+                            (nextRank.minProfit - rank.minProfit))
+                        .coerceIn(0.0, 1.0)
 
-                RankProgressCard(nextRank, profit, progress.toFloat())
+                    RankProgressCard(nextRank, profit, progress.toFloat())
+                }
             }
         }
 
@@ -127,9 +132,7 @@ fun DashboardScreen(
         }
 
         if (cartera.isEmpty()) {
-            item {
-                EmptyCard("No tienes ninguna posición abierta")
-            }
+            item { EmptyCard("No tienes ninguna posición abierta") }
         } else {
             items(cartera) {
                 PortfolioHoldingCard(it) {

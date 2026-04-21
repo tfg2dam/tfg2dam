@@ -2,13 +2,8 @@ package com.simutrade.screens.user
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.simutrade.data.mock.MockData
-import com.simutrade.data.model.Asset
-import com.simutrade.data.model.OperationResult
-import com.simutrade.data.model.PortfolioHolding
-import com.simutrade.data.model.Transaction
-import com.simutrade.data.model.TransactionType
-import com.simutrade.data.model.UserData
+import com.simutrade.screens.rankings.RankUtils
+import com.simutrade.data.model.*
 import com.simutrade.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +25,10 @@ class UserViewModel : ViewModel() {
     private val _transacciones = MutableStateFlow<List<Transaction>>(emptyList())
     val transacciones: StateFlow<List<Transaction>> = _transacciones.asStateFlow()
 
+    // 🔥 RANGO GLOBAL (IMPORTANTE)
+    private val _currentRank = MutableStateFlow<Rank?>(null)
+    val currentRank: StateFlow<Rank?> = _currentRank.asStateFlow()
+
     init {
         cargarDatos()
     }
@@ -38,9 +37,23 @@ class UserViewModel : ViewModel() {
 
     fun cargarDatos() {
         viewModelScope.launch {
-            _userData.value = repository.getUserData()
-            _cartera.value = repository.getCartera()
-            _transacciones.value = repository.getTransacciones()
+
+            val user = repository.getUserData()
+            val carteraData = repository.getCartera()
+            val transaccionesData = repository.getTransacciones()
+
+            _userData.value = user
+            _cartera.value = carteraData
+            _transacciones.value = transaccionesData
+
+            // 🔥 calcular rango UNA VEZ (clave)
+            val profit = calcularBeneficio(
+                saldo = user.saldo,
+                saldoInicial = user.saldoInicial,
+                cartera = carteraData
+            )
+
+            _currentRank.value = RankUtils.getRankFromProfit(profit)
         }
     }
 
@@ -66,12 +79,10 @@ class UserViewModel : ViewModel() {
                 return@launch
             }
 
-            // 💰 actualizar saldo
             val nuevoSaldo = currentUser.saldo - total
             repository.updateSaldo(nuevoSaldo)
             _userData.value = currentUser.copy(saldo = nuevoSaldo)
 
-            // 📦 actualizar cartera
             val existente = _cartera.value.find { it.assetId == asset.id }
 
             val holding = if (existente != null) {
@@ -98,7 +109,6 @@ class UserViewModel : ViewModel() {
 
             repository.upsertCartera(holding)
 
-            // 🧾 transacción
             val transaction = Transaction(
                 id = System.currentTimeMillis().toString(),
                 date = System.currentTimeMillis(),
@@ -112,10 +122,9 @@ class UserViewModel : ViewModel() {
 
             repository.addTransaccion(transaction)
 
-            // 🔄 recargar datos
+            // 🔄 recargar TODO (incluye rango)
             cargarDatos()
 
-            // 📊 actualizar stats
             val totalValue = getTotalValue()
             val profit = getProfit()
             repository.updateUserStats(totalValue, profit)
@@ -145,12 +154,10 @@ class UserViewModel : ViewModel() {
 
             val total = quantity * currentPrice
 
-            // 💰 saldo
             val nuevoSaldo = _userData.value.saldo + total
             repository.updateSaldo(nuevoSaldo)
             _userData.value = _userData.value.copy(saldo = nuevoSaldo)
 
-            // 📦 cartera
             if (quantity == holding.quantity) {
                 repository.deleteCartera(assetId)
             } else {
@@ -162,7 +169,6 @@ class UserViewModel : ViewModel() {
                 )
             }
 
-            // 🧾 transacción
             val transaction = Transaction(
                 id = System.currentTimeMillis().toString(),
                 date = System.currentTimeMillis(),
@@ -176,10 +182,9 @@ class UserViewModel : ViewModel() {
 
             repository.addTransaccion(transaction)
 
-            // 🔄 recargar
+            // 🔄 recargar TODO (incluye rango)
             cargarDatos()
 
-            // 📊 stats
             val totalValue = getTotalValue()
             val profit = getProfit()
             repository.updateUserStats(totalValue, profit)
@@ -202,6 +207,14 @@ class UserViewModel : ViewModel() {
     fun getProfitPercent() =
         repository.calcularBeneficioPct(getTotalValue(), _userData.value.saldoInicial)
 
-    fun getCurrentRank() =
-        MockData.getRankFromProfit(getProfit())
+    // 🔥 cálculo independiente (más robusto)
+    private fun calcularBeneficio(
+        saldo: Double,
+        saldoInicial: Double,
+        cartera: List<PortfolioHolding>
+    ): Double {
+        val valorCartera = cartera.sumOf { it.quantity * it.currentPrice }
+        val total = saldo + valorCartera
+        return total - saldoInicial
+    }
 }
