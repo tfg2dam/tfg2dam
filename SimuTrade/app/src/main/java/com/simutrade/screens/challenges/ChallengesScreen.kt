@@ -28,18 +28,20 @@ fun ChallengesScreen(
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val millisHastaReset by viewModel.millisHastaReset.collectAsStateWithLifecycle()
 
-    val retosDelDia = remember(retosData) {
+    val retosDelDia = remember(retosData.retosDelDia) {
         viewModel.getRetosDelDia()
     }
 
     val completados = retosDelDia.count { it.id in retosData.retosCompletados }
-    val todosCompletados = completados == retosDelDia.size
+    val total = retosDelDia.size
+    val todosCompletados = total > 0 && completados == total
 
     var dialogMensaje by remember { mutableStateOf<String?>(null) }
     var dialogExito by remember { mutableStateOf(false) }
 
     var tiempoRestante by remember { mutableStateOf(millisHastaReset) }
 
+    // ⏳ countdown
     LaunchedEffect(millisHastaReset) {
         tiempoRestante = millisHastaReset
         while (tiempoRestante > 0) {
@@ -48,6 +50,7 @@ fun ChallengesScreen(
         }
     }
 
+    // 🚀 cargar datos
     LaunchedEffect(Unit) {
         viewModel.cargarRetos()
     }
@@ -59,6 +62,8 @@ fun ChallengesScreen(
         val segundos = (ms % (1000 * 60)) / 1000
         return "%02d:%02d:%02d".format(horas, minutos, segundos)
     }
+
+    // ================= DIALOG =================
 
     dialogMensaje?.let { mensaje ->
         AlertDialog(
@@ -85,8 +90,12 @@ fun ChallengesScreen(
         )
     }
 
+    // ================= UI =================
+
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
 
@@ -136,13 +145,12 @@ fun ChallengesScreen(
             }
         }
 
-        // ⏳ TODOS COMPLETADOS (FONDO AMARILLO 🔥)
         if (todosCompletados) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFFFF3CD) // 🟡 FONDO AMARILLO
+                        containerColor = Color(0xFFFFF3CD)
                     )
                 ) {
                     Column(
@@ -150,17 +158,14 @@ fun ChallengesScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            "Todos los retos completados",
+                            "🎉 Todos los retos completados",
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF856404)
                         )
 
                         Spacer(Modifier.height(8.dp))
 
-                        Text(
-                            "Nuevos retos en",
-                            color = Color(0xFF856404)
-                        )
+                        Text("Nuevos retos en", color = Color(0xFF856404))
 
                         Spacer(Modifier.height(4.dp))
 
@@ -183,14 +188,13 @@ fun ChallengesScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("Hoy", fontWeight = FontWeight.Bold)
-                    Text("$completados/${retosDelDia.size}")
+                    Text("$completados/$total")
                 }
 
                 Spacer(Modifier.height(8.dp))
 
                 LinearProgressIndicator(
-                    progress = if (retosDelDia.isEmpty()) 0f
-                    else completados.toFloat() / retosDelDia.size,
+                    progress = if (total == 0) 0f else completados.toFloat() / total,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

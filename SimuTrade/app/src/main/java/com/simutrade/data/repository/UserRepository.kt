@@ -234,7 +234,7 @@ class UserRepository {
         }
     }
 
-    // ================= RETOS =================
+    // ================= RETOS (FIX FINAL 🔥) =================
 
     suspend fun getRetosData(): RetosData {
         val userId = uid ?: return RetosData()
@@ -248,7 +248,7 @@ class UserRepository {
                 ultimaVez = doc.getLong("ultima_vez") ?: 0L,
                 retosCompletados = (doc.get("retos_completados") as? List<String>) ?: emptyList(),
                 retosDelDia = (doc.get("retos_del_dia") as? List<String>) ?: emptyList(),
-                diaActual = doc.getLong("dia_actual")?.toInt() ?: 0
+                diaActual = doc.getLong("dia_actual") ?: 0L // ✅ LONG CORRECTO
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error getRetosData", e)
@@ -266,7 +266,7 @@ class UserRepository {
                 "ultima_vez" to retosData.ultimaVez,
                 "retos_completados" to retosData.retosCompletados,
                 "retos_del_dia" to retosData.retosDelDia,
-                "dia_actual" to retosData.diaActual
+                "dia_actual" to retosData.diaActual // ✅ LONG
             )
 
             firestore.collection(RETOS).document(userId).set(data).await()

@@ -85,30 +85,19 @@ data class LeaderboardEntry(
 
 // ================= RETOS =================
 
-/**
- * Estado persistente de retos del usuario
- */
 data class RetosData(
     val rachaActual: Int = 0,
     val rachaMaxima: Int = 0,
 
-    val ultimaVez: Long = 0L, // opcional (para futuro)
+    val ultimaVez: Long = 0L,
 
     val retosCompletados: List<String> = emptyList(),
 
-    /**
-     * 🔥 MUY IMPORTANTE
-     * Guarda los tipos de retos del día (ej: ["operacion", "trader", "beneficio"])
-     * → evita que cambien en recomposición
-     */
     val retosDelDia: List<String> = emptyList(),
 
-    val diaActual: Int = 0
+    val diaActual: Long = 0L // 🔥 CORREGIDO (antes era Int)
 )
 
-/**
- * Modelo de UI para mostrar un reto
- */
 data class Reto(
     val id: String,
     val titulo: String,

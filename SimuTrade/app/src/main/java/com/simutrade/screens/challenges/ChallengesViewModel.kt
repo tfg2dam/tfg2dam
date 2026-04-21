@@ -50,12 +50,18 @@ class ChallengesViewModel : ViewModel() {
     // ================= RESET DIARIO =================
 
     private suspend fun comprobarResetDiario(datos: RetosData): RetosData {
-        val hoy = getDiaActual()
+
+        val hoyInicio = Calendar.getInstance(TimeZone.getDefault()).apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
 
         // PRIMER USO
-        if (datos.diaActual == 0) {
+        if (datos.diaActual == 0L) {
             val inicial = datos.copy(
-                diaActual = hoy,
+                diaActual = hoyInicio,
                 retosDelDia = generarRetosRandom()
             )
             repository.saveRetosData(inicial)
@@ -63,12 +69,15 @@ class ChallengesViewModel : ViewModel() {
         }
 
         // NUEVO DÍA
-        if (datos.diaActual != hoy) {
+        if (datos.diaActual != hoyInicio) {
 
-            val ayer = hoy - 1
+            val ayerInicio = hoyInicio - (24 * 60 * 60 * 1000)
 
             val nuevaRacha =
-                if (datos.diaActual == ayer) datos.rachaActual else 0
+                if (datos.diaActual == ayerInicio && todoRetosCompletados(datos))
+                    datos.rachaActual
+                else
+                    0
 
             val nuevaMax = maxOf(datos.rachaMaxima, nuevaRacha)
 
@@ -77,7 +86,7 @@ class ChallengesViewModel : ViewModel() {
                 rachaMaxima = nuevaMax,
                 retosCompletados = emptyList(),
                 retosDelDia = generarRetosRandom(),
-                diaActual = hoy
+                diaActual = hoyInicio
             )
 
             repository.saveRetosData(reseteado)
@@ -103,9 +112,6 @@ class ChallengesViewModel : ViewModel() {
         _millisHastaReset.value = manana.timeInMillis - ahora.timeInMillis
     }
 
-    private fun getDiaActual(): Int =
-        Calendar.getInstance(TimeZone.getDefault()).get(Calendar.DAY_OF_YEAR)
-
     // ================= RANDOM =================
 
     private fun generarRetosRandom(): List<String> {
@@ -116,19 +122,18 @@ class ChallengesViewModel : ViewModel() {
             "multimercado",
             "beneficio"
         )
-
         return pool.shuffled().take(3)
     }
 
     // ================= RETOS =================
 
     fun getRetosDelDia(): List<Reto> {
-        val dia = getDiaActual()
 
-        return _retosData.value.retosDelDia.mapIndexed { index, tipo ->
+        val data = _retosData.value
 
-            val numero = index + 1
-            val id = "reto_${tipo}_${dia}_$numero" // 🔥 FIX CLAVE
+        return data.retosDelDia.mapIndexed { index, tipo ->
+
+            val id = "reto_${tipo}_${data.diaActual}_${index + 1}"
 
             when (tipo) {
 
@@ -147,9 +152,10 @@ class ChallengesViewModel : ViewModel() {
         }
     }
 
-    fun todoRetosCompletados(): Boolean {
-        val retos = getRetosDelDia()
-        return retos.all { it.id in _retosData.value.retosCompletados }
+    private fun todoRetosCompletados(datos: RetosData): Boolean {
+        return datos.retosDelDia.all { tipo ->
+            datos.retosCompletados.any { it.contains(tipo) }
+        }
     }
 
     // ================= VALIDACIONES =================
@@ -173,19 +179,17 @@ class ChallengesViewModel : ViewModel() {
 
         return when (tipo) {
 
-            "operacion" -> {
+            "operacion" ->
                 if (transaccionesHoy.isNotEmpty())
                     RetoValidacion(true, "Has hecho ${transaccionesHoy.size} operación(es)")
                 else
                     RetoValidacion(false, "Haz al menos una operación hoy")
-            }
 
-            "trader" -> {
+            "trader" ->
                 if (transaccionesHoy.size >= 3)
                     RetoValidacion(true, "Has hecho ${transaccionesHoy.size} operaciones")
                 else
                     RetoValidacion(false, "Necesitas 3 operaciones")
-            }
 
             "diversifica" -> {
                 val distintos = cartera.map { it.assetId }.distinct().size
@@ -249,24 +253,27 @@ class ChallengesViewModel : ViewModel() {
                 return@launch
             }
 
-            if (retoId in _retosData.value.retosCompletados) {
+            val data = _retosData.value
+
+            if (retoId in data.retosCompletados) {
                 onResult(false, "Ya completado")
                 return@launch
             }
 
             val user = repository.getUserData()
-            val nuevoSaldo = user.saldo + recompensa
-            repository.updateSaldo(nuevoSaldo)
+            repository.updateSaldo(user.saldo + recompensa)
 
-            val nuevos = _retosData.value.retosCompletados + retoId
-            val updated = _retosData.value.copy(retosCompletados = nuevos)
+            val nuevos = data.retosCompletados + retoId
+            val updated = data.copy(retosCompletados = nuevos)
 
             repository.saveRetosData(updated)
             _retosData.value = updated
 
-            if (todoRetosCompletados()) {
-                actualizarRacha()
-            }
+            // 🔥 comprobar si todos completados
+            val retosHoy = getRetosDelDia()
+            val todos = retosHoy.all { it.id in nuevos }
+
+            if (todos) actualizarRacha()
 
             calcularTiempoHastaReset()
 
