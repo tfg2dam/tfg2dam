@@ -31,7 +31,6 @@ fun MarketScreen(
     var selectedFilter by remember { mutableStateOf("Todos") }
     var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
 
-    // 🔥 reloj en vivo
     LaunchedEffect(Unit) {
         while (true) {
             delay(1000)
@@ -39,12 +38,10 @@ fun MarketScreen(
         }
     }
 
-    // 🔥 dialog gráfico
     chartAsset?.let { asset ->
         LaunchedEffect(asset, uiState.selectedPeriod) {
             marketViewModel.loadPriceHistory(asset, uiState.selectedPeriod)
         }
-
         PriceChartDialog(
             asset = asset,
             priceHistory = uiState.priceHistory,
@@ -67,14 +64,16 @@ fun MarketScreen(
         else -> uiState.stocks + uiState.cryptos
     }
 
+    // El botón de refresh solo se activa si han pasado 60 segundos
+    val puedeRefrescar = uiState.lastUpdated == 0L ||
+            (currentTime - uiState.lastUpdated) >= MarketViewModel.MIN_REFRESH_MS
+
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
 
-        // 🔹 HEADER
+        // HEADER
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -86,7 +85,6 @@ fun MarketScreen(
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
-
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (uiState.lastUpdated > 0) {
                         Text(
@@ -96,15 +94,24 @@ fun MarketScreen(
                         )
                         Spacer(Modifier.width(4.dp))
                     }
-
-                    IconButton(onClick = { marketViewModel.loadMarketData() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Actualizar")
+                    IconButton(
+                        onClick = { marketViewModel.loadMarketData() },
+                        enabled = puedeRefrescar
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Actualizar",
+                            tint = if (puedeRefrescar)
+                                MaterialTheme.colorScheme.onSurface
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        )
                     }
                 }
             }
         }
 
-        // 🔍 BUSCADOR
+        // BUSCADOR
         item {
             OutlinedTextField(
                 value = searchQuery,
@@ -116,19 +123,14 @@ fun MarketScreen(
                 leadingIcon = { Icon(Icons.Default.Search, null) },
                 trailingIcon = {
                     when {
-                        uiState.isSearching -> {
-                            CircularProgressIndicator(
-                                Modifier.size(20.dp),
-                                strokeWidth = 2.dp
-                            )
-                        }
-                        searchQuery.isNotEmpty() -> {
-                            IconButton(onClick = {
-                                searchQuery = ""
-                                marketViewModel.search("")
-                            }) {
-                                Icon(Icons.Default.Clear, null)
-                            }
+                        uiState.isSearching -> CircularProgressIndicator(
+                            Modifier.size(20.dp), strokeWidth = 2.dp
+                        )
+                        searchQuery.isNotEmpty() -> IconButton(onClick = {
+                            searchQuery = ""
+                            marketViewModel.search("")
+                        }) {
+                            Icon(Icons.Default.Clear, null)
                         }
                     }
                 },
@@ -137,7 +139,7 @@ fun MarketScreen(
             )
         }
 
-        // 🧠 FILTROS
+        // FILTROS
         if (!isSearching) {
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -152,28 +154,24 @@ fun MarketScreen(
             }
         }
 
-        // ⏳ LOADING
+        // LOADING
         if (uiState.isLoading) {
             item {
                 Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
+                    Modifier.fillMaxWidth().padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator()
                         Spacer(Modifier.height(8.dp))
-                        Text(
-                            "Cargando mercado...",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text("Cargando mercado...",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
         }
 
-        // ❌ ERROR
+        // ERROR
         uiState.error?.let { error ->
             item {
                 Card(
@@ -192,7 +190,7 @@ fun MarketScreen(
             }
         }
 
-        // 📊 CONTADOR
+        // CONTADOR
         if (!uiState.isLoading) {
             item {
                 Text(
@@ -203,13 +201,11 @@ fun MarketScreen(
             }
         }
 
-        // 📭 VACÍO
-        if (displayedAssets.isEmpty() && !uiState.isLoading) {
+        // VACÍO
+        if (displayedAssets.isEmpty() && !uiState.isLoading && uiState.lastUpdated > 0) {
             item {
                 Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
+                    Modifier.fillMaxWidth().padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -219,10 +215,7 @@ fun MarketScreen(
                     )
                 }
             }
-        }
-
-        // 📈 LISTA
-        else {
+        } else {
             items(displayedAssets) { asset ->
                 AssetCard(
                     asset = asset,
@@ -241,30 +234,22 @@ fun AssetCard(
     onChartClick: () -> Unit
 ) {
     val isPositive = asset.priceChangePercent24h >= 0
-    val changeColor =
-        if (isPositive) MaterialTheme.colorScheme.positive
-        else MaterialTheme.colorScheme.error
+    val changeColor = if (isPositive) MaterialTheme.colorScheme.positive
+    else MaterialTheme.colorScheme.error
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-
-            // IZQUIERDA
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-
                 Surface(
                     shape = MaterialTheme.shapes.small,
                     color = if (asset.type == AssetType.STOCK)
@@ -274,49 +259,34 @@ fun AssetCard(
                     modifier = Modifier.size(40.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = if (asset.type == AssetType.STOCK) "📈" else "₿"
-                        )
+                        Text(if (asset.type == AssetType.STOCK) "S" else "C")
                     }
                 }
-
                 Column {
-                    Text(
-                        asset.symbol,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        asset.name,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text(asset.symbol, style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold)
+                    Text(asset.name, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
-            // DERECHA
             Column(horizontalAlignment = Alignment.End) {
-
                 Text(
                     "€${String.format("%.2f", asset.currentPrice)}",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
-
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = if (isPositive)
-                            Icons.Default.TrendingUp
-                        else
-                            Icons.Default.TrendingDown,
+                        imageVector = if (isPositive) Icons.Default.TrendingUp
+                        else Icons.Default.TrendingDown,
                         contentDescription = null,
                         tint = changeColor,
                         modifier = Modifier.size(14.dp)
                     )
-
                     Text(
                         "${if (isPositive) "+" else ""}${String.format("%.2f", asset.priceChangePercent24h)}%",
                         style = MaterialTheme.typography.bodySmall,
@@ -324,7 +294,6 @@ fun AssetCard(
                         fontWeight = FontWeight.Medium
                     )
                 }
-
                 TextButton(
                     onClick = onChartClick,
                     contentPadding = PaddingValues(horizontal = 4.dp),

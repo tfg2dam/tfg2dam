@@ -33,9 +33,12 @@ class MarketViewModel : ViewModel() {
 
     private var searchJob: Job? = null
     private var refreshJob: Job? = null
+    private var loadJob: Job? = null
+    private var lastLoadTime = 0L
 
     companion object {
-        const val REFRESH_INTERVAL_MS = 30_000L
+        const val REFRESH_INTERVAL_MS = 120_000L
+        const val MIN_REFRESH_MS = 60_000L
     }
 
     init {
@@ -48,8 +51,6 @@ class MarketViewModel : ViewModel() {
         refreshJob = viewModelScope.launch {
             while (true) {
                 delay(REFRESH_INTERVAL_MS)
-
-                // 🔥 no refrescar mientras buscas
                 if (_uiState.value.searchResults.isEmpty()) {
                     refreshPrices()
                 }
@@ -58,15 +59,21 @@ class MarketViewModel : ViewModel() {
     }
 
     fun loadMarketData() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isLoading = true,
-                error = null
-            )
+        val ahora = System.currentTimeMillis()
+
+        if (ahora - lastLoadTime < MIN_REFRESH_MS && _uiState.value.cryptos.isNotEmpty()) {
+            return
+        }
+
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
             try {
                 val cryptos = repository.getTopCryptos()
                 val stocks = repository.getTopStocks()
+
+                lastLoadTime = System.currentTimeMillis()
 
                 _uiState.value = _uiState.value.copy(
                     cryptos = cryptos,
@@ -76,10 +83,20 @@ class MarketViewModel : ViewModel() {
                 )
 
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = "Error al cargar datos del mercado"
-                )
+                if (e !is kotlinx.coroutines.CancellationException) {
+                    val esRateLimit = e.message?.contains("429") == true ||
+                            e.toString().contains("429")
+
+                    if (esRateLimit) lastLoadTime = System.currentTimeMillis()
+
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = if (_uiState.value.cryptos.isEmpty()) {
+                            if (esRateLimit) "Demasiadas peticiones. Espera un momento."
+                            else "Error al cargar datos del mercado"
+                        } else null
+                    )
+                }
             }
         }
     }
@@ -90,14 +107,15 @@ class MarketViewModel : ViewModel() {
                 val cryptos = repository.getTopCryptos()
                 val stocks = repository.getTopStocks()
 
+                lastLoadTime = System.currentTimeMillis()
+
                 _uiState.value = _uiState.value.copy(
                     cryptos = cryptos,
                     stocks = stocks,
                     lastUpdated = System.currentTimeMillis()
                 )
-
             } catch (_: Exception) {
-                // 🔥 evitamos crasheos silenciosos
+                // silencioso, mantenemos datos anteriores
             }
         }
     }
@@ -114,18 +132,15 @@ class MarketViewModel : ViewModel() {
         }
 
         searchJob = viewModelScope.launch {
-            delay(500) // debounce
-
+            delay(500)
             _uiState.value = _uiState.value.copy(isSearching = true)
 
             try {
                 val results = repository.searchAssets(query)
-
                 _uiState.value = _uiState.value.copy(
                     searchResults = results,
                     isSearching = false
                 )
-
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isSearching = false,
@@ -137,7 +152,6 @@ class MarketViewModel : ViewModel() {
 
     fun loadPriceHistory(asset: Asset, period: String = "7d") {
         viewModelScope.launch {
-
             _uiState.value = _uiState.value.copy(
                 isLoadingHistory = true,
                 selectedPeriod = period
@@ -145,12 +159,10 @@ class MarketViewModel : ViewModel() {
 
             try {
                 val history = repository.getAssetHistory(asset, period)
-
                 _uiState.value = _uiState.value.copy(
                     priceHistory = history,
                     isLoadingHistory = false
                 )
-
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoadingHistory = false,
@@ -162,6 +174,7 @@ class MarketViewModel : ViewModel() {
 
     override fun onCleared() {
         super.onCleared()
+        loadJob?.cancel()
         refreshJob?.cancel()
         searchJob?.cancel()
     }
