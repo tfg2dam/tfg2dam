@@ -18,8 +18,6 @@ class ChallengesViewModel : ViewModel() {
 
     private val repository = UserRepository()
 
-    // ================= STATE =================
-
     private val _retosData = MutableStateFlow(RetosData())
     val retosData: StateFlow<RetosData> = _retosData.asStateFlow()
 
@@ -28,8 +26,6 @@ class ChallengesViewModel : ViewModel() {
 
     private val _millisHastaReset = MutableStateFlow(0L)
     val millisHastaReset: StateFlow<Long> = _millisHastaReset.asStateFlow()
-
-    // ================= INIT =================
 
     fun cargarRetos() {
         viewModelScope.launch {
@@ -46,8 +42,6 @@ class ChallengesViewModel : ViewModel() {
             }
         }
     }
-
-    // ================= RESET DIARIO =================
 
     private suspend fun comprobarResetDiario(datos: RetosData): RetosData {
 
@@ -94,8 +88,6 @@ class ChallengesViewModel : ViewModel() {
         return datos
     }
 
-    // ================= TIEMPO =================
-
     private fun calcularTiempoHastaReset() {
         val ahora = Calendar.getInstance(TimeZone.getDefault())
 
@@ -110,8 +102,6 @@ class ChallengesViewModel : ViewModel() {
         _millisHastaReset.value = manana.timeInMillis - ahora.timeInMillis
     }
 
-    // ================= RANDOM =================
-
     private fun generarRetosRandom(): List<String> {
         val pool = listOf(
             "operacion",
@@ -123,8 +113,7 @@ class ChallengesViewModel : ViewModel() {
         return pool.shuffled().take(3)
     }
 
-    // ================= RETOS =================
-
+    // 🔥 RECOMPENSAS BALANCEADAS
     fun getRetosDelDia(): List<Reto> {
 
         val data = _retosData.value
@@ -134,23 +123,46 @@ class ChallengesViewModel : ViewModel() {
             val id = "reto_${tipo}_${data.diaActual}_${index + 1}"
 
             when (tipo) {
-                "operacion" -> Reto(id, "Primera operación", "Haz una compra o venta hoy", "📈", 2.0)
-                "diversifica" -> Reto(id, "Diversifica", "Ten al menos 2 activos distintos", "📊", 3.0)
-                "trader" -> Reto(id, "Trader activo", "Realiza 3 operaciones hoy", "🔥", 5.0)
-                "multimercado" -> Reto(id, "Multi mercado", "Ten acciones y criptos", "🌍", 4.0)
-                "beneficio" -> Reto(id, "En beneficio", "Consigue beneficio positivo", "💰", 6.0)
-                else -> Reto("error", "Error", "Error", "❌", 0.0)
+
+                // 🟢 fácil
+                "operacion" ->
+                    Reto(id, "Primera operación", "Haz una compra o venta hoy", "📈", 1.0)
+
+                "diversifica" ->
+                    Reto(id, "Diversifica", "Ten al menos 2 activos distintos", "📊", 1.5)
+
+                // 🟡 medio
+                "multimercado" ->
+                    Reto(id, "Multi mercado", "Ten acciones y criptos", "🌍", 2.0)
+
+                // 🔴 difícil
+                "trader" ->
+                    Reto(id, "Trader activo", "Realiza 3 operaciones hoy", "🔥", 2.5)
+
+                "beneficio" ->
+                    Reto(id, "En beneficio", "Consigue beneficio positivo", "💰", 3.0)
+
+                else ->
+                    Reto("error", "Error", "Error", "❌", 0.0)
             }
         }
     }
 
     private fun todoRetosCompletados(datos: RetosData): Boolean {
-        return datos.retosDelDia.all { tipo ->
-            datos.retosCompletados.any { it.contains(tipo) }
-        }
+        return getRetosDelDia().all { it.id in datos.retosCompletados }
     }
 
-    // ================= VALIDACIONES =================
+    private fun getRecompensaRacha(racha: Int): Double {
+        return when (racha) {
+            3 -> 1.0
+            7 -> 2.0
+            14 -> 4.0
+            30 -> 8.0
+            60 -> 12.0
+            100 -> 20.0
+            else -> 0.0
+        }
+    }
 
     suspend fun validarReto(retoId: String): RetoValidacion {
 
@@ -250,11 +262,7 @@ class ChallengesViewModel : ViewModel() {
                 return@launch
             }
 
-            // Bonus por racha
-            val bonus = data.rachaActual * 0.5
-            val recompensaFinal = recompensa + bonus
-
-            repository.updateSaldoBonus(recompensaFinal)
+            repository.updateSaldoBonus(recompensa)
 
             val nuevos = data.retosCompletados + retoId
             val updated = data.copy(retosCompletados = nuevos)
@@ -265,11 +273,22 @@ class ChallengesViewModel : ViewModel() {
             val retosHoy = getRetosDelDia()
             val todos = retosHoy.all { it.id in nuevos }
 
-            if (todos) actualizarRacha()
+            if (todos) {
+                actualizarRacha()
+
+                val nuevaRacha = _retosData.value.rachaActual
+                val recompensaRacha = getRecompensaRacha(nuevaRacha)
+
+                if (recompensaRacha > 0) {
+                    repository.updateSaldoBonus(recompensaRacha)
+                    onResult(true, "¡Racha de $nuevaRacha días! +${"%.2f".format(recompensaRacha)}€")
+                    return@launch
+                }
+            }
 
             calcularTiempoHastaReset()
 
-            onResult(true, "+${"%.2f".format(recompensaFinal)} EUR (bonus racha: ${"%.2f".format(bonus)})")
+            onResult(true, "+${"%.2f".format(recompensa)}€")
         }
     }
 

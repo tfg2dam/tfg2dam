@@ -4,6 +4,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,6 +44,29 @@ fun ChallengesScreen(
     var dialogExito by remember { mutableStateOf(false) }
 
     var tiempoRestante by remember { mutableStateOf(millisHastaReset) }
+
+    // 🔥 milestone
+    val nextMilestone = remember(retosData.rachaActual) {
+        when {
+            retosData.rachaActual < 3 -> 3
+            retosData.rachaActual < 7 -> 7
+            retosData.rachaActual < 14 -> 14
+            retosData.rachaActual < 30 -> 30
+            retosData.rachaActual < 60 -> 60
+            retosData.rachaActual < 100 -> 100
+            else -> null
+        }
+    }
+
+    val recompensaNext = when (nextMilestone) {
+        3 -> 1.0
+        7 -> 2.0
+        14 -> 4.0
+        30 -> 8.0
+        60 -> 12.0
+        100 -> 20.0
+        else -> 0.0
+    }
 
     LaunchedEffect(millisHastaReset) {
         tiempoRestante = millisHastaReset
@@ -107,6 +132,7 @@ fun ChallengesScreen(
             )
         }
 
+        // 🔥 TARJETA RACHA (MEJORADA)
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -115,31 +141,54 @@ fun ChallengesScreen(
                 )
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+
                     Column {
-                        Text("🔥 Racha", fontWeight = FontWeight.Bold)
 
-                        Text(
-                            if (retosData.rachaActual == 0)
-                                "Empieza hoy"
-                            else
-                                "${retosData.rachaActual} días seguidos"
-                        )
+                        Text("Racha", fontWeight = FontWeight.Bold)
 
-                        Text(
-                            "Max: ${retosData.rachaMaxima}",
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                        Text("Días seguidos: ${retosData.rachaActual}")
+
+                        Spacer(Modifier.height(8.dp))
+
+                        // 🔥 TEXTO MÁS IMPORTANTE
+                        nextMilestone?.let {
+                            val diasRestantes = it - retosData.rachaActual
+
+                            Text(
+                                if (diasRestantes > 1)
+                                    "Te faltan $diasRestantes días para ganar +${"%.2f".format(recompensaNext)}€"
+                                else
+                                    "Te falta 1 día para ganar +${"%.2f".format(recompensaNext)}€",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
 
-                    Text(
-                        "${retosData.rachaActual}",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold
-                    )
+                    // 🔥 ICONO + NÚMERO
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+
+                        Icon(
+                            imageVector = Icons.Default.Whatshot,
+                            contentDescription = null,
+                            tint = Color(0xFFFF9800),
+                            modifier = Modifier.size(30.dp)
+                        )
+
+                        Spacer(Modifier.width(6.dp))
+
+                        Text(
+                            "${retosData.rachaActual}",
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -157,48 +206,33 @@ fun ChallengesScreen(
                         modifier = Modifier.fillMaxWidth().padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            "Todos los retos completados",
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF856404)
-                        )
+                        Text("Todos los retos completados", fontWeight = FontWeight.Bold)
 
                         Spacer(Modifier.height(8.dp))
 
-                        Text("Nuevos retos en", color = Color(0xFF856404))
+                        Text("Nuevos retos en")
 
                         Spacer(Modifier.height(4.dp))
 
                         Text(
                             formatearTiempo(tiempoRestante),
                             style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF856404)
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
         }
 
+        // progreso
         item {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Hoy", fontWeight = FontWeight.Bold)
-                    Text("$completados/$total")
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                LinearProgressIndicator(
-                    progress = if (total == 0) 0f else completados.toFloat() / total,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            LinearProgressIndicator(
+                progress = if (total == 0) 0f else completados.toFloat() / total,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
+        // lista
         if (isLoading) {
             item {
                 Box(
@@ -213,21 +247,14 @@ fun ChallengesScreen(
 
                 val completado = reto.id in retosData.retosCompletados
 
-                val bonus = retosData.rachaActual * 0.5
-                val recompensaFinal = reto.recompensa + bonus
-
                 RetoCard(
                     reto = reto,
-                    recompensaFinal = recompensaFinal,
-                    bonus = bonus,
                     completado = completado,
                     onCompletar = {
                         viewModel.completarReto(reto.id, reto.recompensa) { exito, mensaje ->
                             dialogExito = exito
                             dialogMensaje = mensaje
-                            if (exito) {
-                                userViewModel.cargarDatos()
-                            }
+                            if (exito) userViewModel.cargarDatos()
                         }
                     }
                 )
@@ -236,13 +263,11 @@ fun ChallengesScreen(
     }
 }
 
-// ================= COMPONENTES =================
+// ================= CARD =================
 
 @Composable
 fun RetoCard(
     reto: Reto,
-    recompensaFinal: Double,
-    bonus: Double,
     completado: Boolean,
     onCompletar: () -> Unit
 ) {
@@ -268,41 +293,20 @@ fun RetoCard(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(reto.titulo, fontWeight = FontWeight.Bold)
-
-                    Spacer(Modifier.height(2.dp))
-
-                    Text(
-                        reto.descripcion,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+                    Text(reto.descripcion)
                 }
 
-                Column(horizontalAlignment = Alignment.End) {
-
-                    Text(
-                        "+${"%.2f".format(recompensaFinal)}€",
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.positive
-                    )
-
-                    if (bonus > 0) {
-                        Text(
-                            "+${"%.2f".format(bonus)}€ bonus por racha",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.positive
-                        )
-                    }
-                }
+                Text(
+                    "+${"%.2f".format(reto.recompensa)}€",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.positive
+                )
             }
 
             Spacer(Modifier.height(12.dp))
 
             if (completado) {
-                Text(
-                    "Completado",
-                    color = MaterialTheme.colorScheme.positive,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Text("Completado", color = MaterialTheme.colorScheme.positive)
             } else {
                 Button(
                     onClick = onCompletar,
