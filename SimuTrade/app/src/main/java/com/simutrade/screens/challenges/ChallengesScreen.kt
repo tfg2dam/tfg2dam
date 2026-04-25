@@ -45,7 +45,7 @@ fun ChallengesScreen(
 
     var tiempoRestante by remember { mutableStateOf(millisHastaReset) }
 
-    // 🔥 milestone
+    // milestone
     val nextMilestone = remember(retosData.rachaActual) {
         when {
             retosData.rachaActual < 3 -> 3
@@ -132,7 +132,7 @@ fun ChallengesScreen(
             )
         }
 
-        // 🔥 TARJETA RACHA (MEJORADA)
+        // TARJETA RACHA (MEJORADA)
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -156,7 +156,7 @@ fun ChallengesScreen(
 
                         Spacer(Modifier.height(8.dp))
 
-                        // 🔥 TEXTO MÁS IMPORTANTE
+                        // TEXTO MÁS IMPORTANTE
                         nextMilestone?.let {
                             val diasRestantes = it - retosData.rachaActual
 
@@ -171,7 +171,7 @@ fun ChallengesScreen(
                         }
                     }
 
-                    // 🔥 ICONO + NÚMERO
+                    // ICONO + NÚMERO
                     Row(verticalAlignment = Alignment.CenterVertically) {
 
                         Icon(
@@ -193,7 +193,7 @@ fun ChallengesScreen(
             }
         }
 
-        // 🟡 TODOS COMPLETADOS
+        // TODOS COMPLETADOS
         if (todosCompletados) {
             item {
                 Card(

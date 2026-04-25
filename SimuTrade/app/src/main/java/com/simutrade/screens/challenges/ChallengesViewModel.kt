@@ -113,7 +113,7 @@ class ChallengesViewModel : ViewModel() {
         return pool.shuffled().take(3)
     }
 
-    // 🔥 RECOMPENSAS BALANCEADAS
+    // RECOMPENSAS BALANCEADAS
     fun getRetosDelDia(): List<Reto> {
 
         val data = _retosData.value
@@ -124,18 +124,18 @@ class ChallengesViewModel : ViewModel() {
 
             when (tipo) {
 
-                // 🟢 fácil
+                // fácil
                 "operacion" ->
                     Reto(id, "Primera operación", "Haz una compra o venta hoy", "📈", 1.0)
 
                 "diversifica" ->
                     Reto(id, "Diversifica", "Ten al menos 2 activos distintos", "📊", 1.5)
 
-                // 🟡 medio
+                // medio
                 "multimercado" ->
                     Reto(id, "Multi mercado", "Ten acciones y criptos", "🌍", 2.0)
 
-                // 🔴 difícil
+                // difícil
                 "trader" ->
                     Reto(id, "Trader activo", "Realiza 3 operaciones hoy", "🔥", 2.5)
 

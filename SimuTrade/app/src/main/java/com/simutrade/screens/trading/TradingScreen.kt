@@ -136,7 +136,7 @@ fun TradingScreen(
                 // FORMULARIOS
                 when (selectedTab) {
 
-                    // 🟢 COMPRAR
+                    //  COMPRAR
                     0 -> BuyForm(
                         asset = asset,
                         quantity = quantity,
@@ -158,7 +158,7 @@ fun TradingScreen(
                         }
                     )
 
-                    // 🔴 VENDER
+                    //  VENDER
                     1 -> SellForm(
                         asset = asset,
                         quantity = quantity,

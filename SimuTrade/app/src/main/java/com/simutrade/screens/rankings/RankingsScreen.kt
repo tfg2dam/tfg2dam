@@ -26,7 +26,7 @@ fun RankingsScreen(
     val leaderboard by rankingsViewModel.leaderboard.collectAsStateWithLifecycle()
     val isLoading by rankingsViewModel.isLoading.collectAsStateWithLifecycle()
 
-    // 🔥 RANGO CORRECTO (StateFlow)
+    // RANGO CORRECTO (StateFlow)
     val currentRank by userViewModel.currentRank.collectAsStateWithLifecycle()
 
     val profit = userViewModel.getProfit()
@@ -54,7 +54,7 @@ fun RankingsScreen(
             )
         }
 
-        // 🔥 TU POSICIÓN
+        //  TU POSICIÓN
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -86,7 +86,7 @@ fun RankingsScreen(
                         )
                     }
 
-                    // 🔥 seguro (evita crash al cargar)
+                    // seguro (evita crash al cargar)
                     currentRank?.let { rank ->
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(rank.icon, style = MaterialTheme.typography.headlineLarge)

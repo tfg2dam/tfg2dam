@@ -110,7 +110,7 @@ class MarketRepository {
     suspend fun getAssetHistory(asset: Asset, period: String = "7d"): List<Pair<Long, Double>> {
         return try {
 
-            // 🔵 CRYPTO (CoinGecko)
+            // CRYPTO (CoinGecko)
             if (asset.type == AssetType.CRYPTO) {
 
                 val (days, interval) = when (period) {
@@ -133,7 +133,7 @@ class MarketRepository {
                 prices.map { it[0].toLong() to it[1] }
             }
 
-            // 🟢 STOCKS (Finnhub REAL)
+            // STOCKS (Finnhub REAL)
             else {
 
                 val now = System.currentTimeMillis() / 1000

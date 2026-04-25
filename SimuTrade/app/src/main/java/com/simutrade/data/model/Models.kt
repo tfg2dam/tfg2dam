@@ -96,7 +96,7 @@ data class RetosData(
 
     val retosDelDia: List<String> = emptyList(),
 
-    val diaActual: Long = 0L // 🔥 CORREGIDO (antes era Int)
+    val diaActual: Long = 0L // CORREGIDO (antes era Int)
 )
 
 data class Reto(

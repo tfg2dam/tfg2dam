@@ -22,7 +22,7 @@ class AuthViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    // 🔹 Helper para actualizar estado
+    // Helper para actualizar estado
     private fun updateState(
         isLoading: Boolean? = null,
         error: String? = null,

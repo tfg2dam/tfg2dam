@@ -32,7 +32,7 @@ fun PriceChartDialog(
     onPeriodChange: (String) -> Unit
 ) {
 
-    // 🔥 COLOR SEGÚN TENDENCIA REAL DEL GRÁFICO
+    // COLOR SEGÚN TENDENCIA REAL DEL GRÁFICO
     val isTrendPositive =
         priceHistory.isNotEmpty() &&
                 priceHistory.last().second >= priceHistory.first().second
@@ -69,7 +69,7 @@ fun PriceChartDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
 
-                // 💰 PRECIO + % 24h (independiente del gráfico)
+                // PRECIO + % 24h (independiente del gráfico)
                 Row(
                     Modifier.fillMaxWidth(),
                     Arrangement.SpaceBetween,
@@ -93,7 +93,7 @@ fun PriceChartDialog(
 
                 HorizontalDivider()
 
-                // ⏱ FILTROS
+                // FILTROS
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -108,7 +108,7 @@ fun PriceChartDialog(
                     }
                 }
 
-                // 📊 GRÁFICO
+                // GRÁFICO
                 if (isLoading) {
                     Box(
                         Modifier.fillMaxWidth().height(180.dp),
@@ -133,7 +133,7 @@ fun PriceChartDialog(
 
                 else {
 
-                    // 🔥 NORMALIZACIÓN PARA VER PICOS
+                    // NORMALIZACIÓN PARA VER PICOS
                     val minPrice = priceHistory.minOf { it.second }
                     val maxPrice = priceHistory.maxOf { it.second }
                     val range = (maxPrice - minPrice).takeIf { it != 0.0 } ?: 1.0
@@ -184,7 +184,7 @@ fun PriceChartDialog(
                             .height(180.dp)
                     )
 
-                    // 📉 MIN / MAX REALES
+                    // MIN / MAX REALES
                     Row(
                         Modifier.fillMaxWidth(),
                         Arrangement.SpaceBetween

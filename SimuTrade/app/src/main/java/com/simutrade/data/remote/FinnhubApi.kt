@@ -62,7 +62,7 @@ object FinnhubClient {
 
     private const val BASE_URL = "https://finnhub.io/api/v1/"
 
-    // ⚠️ NOTA: en un proyecto final esto debería ir en local.properties o BuildConfig
+    // NOTA: esto debería ir en local.properties o BuildConfig
     const val API_KEY = "d7dsf8pr01qmm59ebt6gd7dsf8pr01qmm59ebt70"
 
     val api: FinnhubApi by lazy {

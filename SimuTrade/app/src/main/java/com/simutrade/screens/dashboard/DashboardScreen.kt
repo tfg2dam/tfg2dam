@@ -59,7 +59,7 @@ fun DashboardScreen(
             )
         }
 
-        // 🧾 RESUMEN
+        // RESUMEN
         item {
             Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp)) {
 
@@ -142,7 +142,7 @@ fun DashboardScreen(
             }
         }
 
-        // 💳 TRANSACCIONES
+        // TRANSACCIONES
         item {
             Text(
                 "Transacciones Recientes",

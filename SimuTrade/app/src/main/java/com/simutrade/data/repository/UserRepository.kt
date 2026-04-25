@@ -66,7 +66,7 @@ class UserRepository {
         }
     }
 
-    // ← nuevo método para recompensas de retos
+    // ← nuevo médoto para recompensas de retos
     suspend fun updateSaldoBonus(incremento: Double) {
         val userId = uid ?: return
 
