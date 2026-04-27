@@ -5,94 +5,156 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.simutrade.data.model.UserData
+import com.simutrade.data.model.Rank
 
 @Composable
 fun ProfileDialog(
     userData: UserData,
+    currentRank: Rank?,
     onDismiss: () -> Unit,
     onLogout: () -> Unit
 ) {
-    val initial = userData.nombreUsuario
+
+    val username = userData.username
+
+    val initial = username
         .trim()
         .firstOrNull()
         ?.uppercaseChar()
         ?.toString() ?: "?"
 
-    val rango = userData.idRango
-        .takeIf { it.isNotBlank() }
-        ?.replaceFirstChar { it.uppercaseChar() }
-        ?: "Bronce"
+    val rango = currentRank?.name ?: "Bronce"
+    val rangoIcon = currentRank?.icon ?: "🥉"
+
+    var showLogoutConfirm by remember { mutableStateOf(false) }
+
+    // ================= CONFIRM LOGOUT =================
+
+    if (showLogoutConfirm) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirm = false },
+            title = { Text("Cerrar sesión") },
+            text = { Text("¿Seguro que quieres salir?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLogoutConfirm = false
+                        onLogout()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Salir")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirm = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // ================= MAIN DIALOG =================
 
     AlertDialog(
         onDismissRequest = onDismiss,
+
+        // 🔥 HEADER + X
         title = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(48.dp)
+            Box(modifier = Modifier.fillMaxWidth()) {
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
+
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = initial,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    }
+
+                    Column {
                         Text(
-                            text = initial,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            text = username.ifBlank { "Usuario" },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = userData.email,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                Column {
-                    Text(
-                        text = userData.nombreUsuario.ifBlank { "Usuario" },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = userData.email,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.TopEnd)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Cerrar",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
 
-                HorizontalDivider()
+        // 🔥 CONTENIDO MÁS COMPACTO
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp), // 🔥 menos espacio
+                modifier = Modifier.padding(top = 8.dp)
+            ) {
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                )
 
                 ProfileRow(
                     icon = Icons.Default.AccountBalanceWallet,
                     label = "Saldo disponible",
-                    value = "€${"%.2f".format(userData.saldo)}"
+                    value = "€${"%.2f".format(userData.balance)}"
                 )
 
                 ProfileRow(
                     icon = Icons.Default.Savings,
                     label = "Saldo inicial",
-                    value = "€${"%.2f".format(userData.saldoInicial)}"
+                    value = "€${"%.2f".format(userData.initialBalance)}"
                 )
 
                 ProfileRow(
                     icon = Icons.Default.EmojiEvents,
                     label = "Rango actual",
-                    value = rango
+                    value = "rango"
                 )
 
-                HorizontalDivider()
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                )
 
+                // 🔥 LOGOUT MÁS INTEGRADO
                 TextButton(
-                    onClick = onLogout,
+                    onClick = { showLogoutConfirm = true },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
@@ -108,13 +170,12 @@ fun ProfileDialog(
                 }
             }
         },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cerrar")
-            }
-        }
+
+        confirmButton = {}
     )
 }
+
+// ================= ROW =================
 
 @Composable
 fun ProfileRow(
@@ -149,7 +210,7 @@ fun ProfileRow(
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.Medium // 🔥 más elegante
         )
     }
 }

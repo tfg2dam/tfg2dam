@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 data class AuthUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
-    val success: Boolean = false
+    val isSuccess: Boolean = false
 )
 
 class AuthViewModel : ViewModel() {
@@ -26,12 +26,12 @@ class AuthViewModel : ViewModel() {
     private fun updateState(
         isLoading: Boolean? = null,
         error: String? = null,
-        success: Boolean? = null
+        isSuccess: Boolean? = null
     ) {
         _uiState.value = _uiState.value.copy(
             isLoading = isLoading ?: _uiState.value.isLoading,
             error = error,
-            success = success ?: _uiState.value.success
+            isSuccess = isSuccess ?: _uiState.value.isSuccess
         )
     }
 
@@ -43,11 +43,11 @@ class AuthViewModel : ViewModel() {
         }
 
         viewModelScope.launch {
-            updateState(isLoading = true, error = null, success = false)
+            updateState(isLoading = true, error = null, isSuccess = false)
 
             when (val result = repository.login(email, password)) {
                 is AuthResult.Success -> {
-                    updateState(isLoading = false, success = true)
+                    updateState(isLoading = false, isSuccess = true)
                 }
 
                 is AuthResult.Error -> {
@@ -65,11 +65,11 @@ class AuthViewModel : ViewModel() {
         }
 
         viewModelScope.launch {
-            updateState(isLoading = true, error = null, success = false)
+            updateState(isLoading = true, error = null, isSuccess = false)
 
             when (val result = repository.register(email, password, username)) {
                 is AuthResult.Success -> {
-                    updateState(isLoading = false, success = true)
+                    updateState(isLoading = false, isSuccess = true)
                 }
 
                 is AuthResult.Error -> {
@@ -84,7 +84,7 @@ class AuthViewModel : ViewModel() {
     }
 
     fun clearSuccess() {
-        updateState(success = false)
+        updateState(isSuccess = false)
     }
 
     fun logout() {

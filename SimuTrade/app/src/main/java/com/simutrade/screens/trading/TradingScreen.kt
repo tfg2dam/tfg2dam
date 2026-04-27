@@ -18,6 +18,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.simutrade.data.model.*
 import com.simutrade.screens.main.MainViewModel
+import com.simutrade.screens.main.Screen
 import com.simutrade.screens.user.UserViewModel
 import kotlinx.coroutines.launch
 
@@ -29,7 +30,7 @@ fun TradingScreen(
 
     val selectedAsset by mainViewModel.selectedAsset.collectAsStateWithLifecycle()
     val userData by userViewModel.userData.collectAsStateWithLifecycle()
-    val cartera by userViewModel.cartera.collectAsStateWithLifecycle()
+    val portfolio by userViewModel.portfolio.collectAsStateWithLifecycle()
 
     var selectedTab by remember { mutableStateOf(0) }
     var quantity by remember { mutableStateOf("") }
@@ -42,14 +43,19 @@ fun TradingScreen(
     ) { padding ->
 
         if (selectedAsset == null) {
+
             NoAssetSelected(
                 modifier = Modifier.padding(padding),
-                onNavigateToMarket = { mainViewModel.navigateTo("market") }
+                onNavigateToMarket = {
+                    mainViewModel.clearSelectedAsset()
+                    mainViewModel.navigateTo(Screen.Market)
+                }
             )
+
         } else {
 
-            val asset = selectedAsset!!
-            val currentHolding = cartera.find { it.assetId == asset.id }
+            val asset = selectedAsset ?: return@Scaffold
+            val currentHolding = portfolio.find { it.assetId == asset.id }
 
             val quantityDouble = parseQuantity(quantity)
             val total = calculateTotal(asset.currentPrice, quantityDouble)
@@ -63,12 +69,13 @@ fun TradingScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
 
-                // HEADER
+                // ================= HEADER =================
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+
                     Column {
                         Text(
                             "Operar",
@@ -83,13 +90,13 @@ fun TradingScreen(
 
                     OutlinedButton(onClick = {
                         mainViewModel.clearSelectedAsset()
-                        mainViewModel.navigateTo("market")
+                        mainViewModel.navigateTo(Screen.Market)
                     }) {
                         Text("Volver")
                     }
                 }
 
-                // INFO ACTIVO
+                // ================= INFO ACTIVO =================
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
 
@@ -103,21 +110,24 @@ fun TradingScreen(
                             style = MaterialTheme.typography.headlineMedium
                         )
 
-                        if (currentHolding != null) {
+                        currentHolding?.let {
                             Spacer(Modifier.height(8.dp))
-                            Text("Tienes: ${currentHolding.quantity}")
+                            Text("Tienes: ${it.quantity}")
                         }
                     }
                 }
 
-                // TABS
+                // ================= TABS =================
                 SingleChoiceSegmentedButtonRow(
                     modifier = Modifier.fillMaxWidth()
                 ) {
 
                     SegmentedButton(
                         selected = selectedTab == 0,
-                        onClick = { selectedTab = 0; quantity = "" },
+                        onClick = {
+                            selectedTab = 0
+                            quantity = ""
+                        },
                         shape = itemShape(0, 2)
                     ) {
                         Text("Comprar")
@@ -125,7 +135,10 @@ fun TradingScreen(
 
                     SegmentedButton(
                         selected = selectedTab == 1,
-                        onClick = { selectedTab = 1; quantity = "" },
+                        onClick = {
+                            selectedTab = 1
+                            quantity = ""
+                        },
                         enabled = currentHolding != null,
                         shape = itemShape(1, 2)
                     ) {
@@ -133,17 +146,20 @@ fun TradingScreen(
                     }
                 }
 
-                // FORMULARIOS
+                // ================= FORMULARIOS =================
                 when (selectedTab) {
 
-                    //  COMPRAR
+                    // ===== COMPRAR =====
                     0 -> BuyForm(
                         asset = asset,
                         quantity = quantity,
                         onQuantityChange = { quantity = it },
                         total = total,
-                        enabled = canBuy(quantityDouble, asset.currentPrice, userData.saldo),
+                        balance = userData.balance,
+                        enabled = canBuy(quantityDouble, asset.currentPrice, userData.balance),
                         onBuy = {
+                            if (quantityDouble <= 0) return@BuyForm
+
                             userViewModel.buyAsset(asset, quantityDouble) { result ->
                                 scope.launch {
                                     snackbarHostState.showSnackbar(
@@ -158,7 +174,7 @@ fun TradingScreen(
                         }
                     )
 
-                    //  VENDER
+                    // ===== VENDER =====
                     1 -> SellForm(
                         asset = asset,
                         quantity = quantity,
@@ -167,6 +183,8 @@ fun TradingScreen(
                         currentHolding = currentHolding,
                         enabled = canSell(quantityDouble, currentHolding?.quantity),
                         onSell = {
+                            if (quantityDouble <= 0) return@SellForm
+
                             userViewModel.sellAsset(
                                 asset.id,
                                 quantityDouble,
@@ -190,6 +208,10 @@ fun TradingScreen(
     }
 }
 
+//////////////////////////////////////////////////////
+// EMPTY
+//////////////////////////////////////////////////////
+
 @Composable
 fun NoAssetSelected(
     modifier: Modifier = Modifier,
@@ -202,17 +224,32 @@ fun NoAssetSelected(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(Icons.Default.TrendingUp, null, modifier = Modifier.size(64.dp))
+
+        Icon(
+            Icons.Default.TrendingUp,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp)
+        )
+
         Spacer(Modifier.height(16.dp))
+
         Text("Selecciona un activo", style = MaterialTheme.typography.titleLarge)
+
         Spacer(Modifier.height(8.dp))
+
         Text("Ve al mercado para empezar")
+
         Spacer(Modifier.height(24.dp))
+
         Button(onClick = onNavigateToMarket) {
-            Text("Ir al Mercado")
+            Text("Ir al mercado")
         }
     }
 }
+
+//////////////////////////////////////////////////////
+// BUY
+//////////////////////////////////////////////////////
 
 @Composable
 fun BuyForm(
@@ -220,10 +257,13 @@ fun BuyForm(
     quantity: String,
     onQuantityChange: (String) -> Unit,
     total: Double,
+    balance: Double,
     enabled: Boolean,
     onBuy: () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    val quantityDouble = parseQuantity(quantity)
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
 
         OutlinedTextField(
             value = quantity,
@@ -231,20 +271,34 @@ fun BuyForm(
             label = { Text("Cantidad") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            isError = quantity.isNotEmpty() && quantityDouble <= 0
         )
 
-        Text("Total: €${"%.2f".format(total)}", fontWeight = FontWeight.Bold)
+        Text(
+            "Disponible: €${"%.2f".format(balance)}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Text(
+            "Total: €${"%.2f".format(total)}",
+            fontWeight = FontWeight.Bold
+        )
 
         Button(
             onClick = onBuy,
             modifier = Modifier.fillMaxWidth(),
-            enabled = enabled
+            enabled = enabled && quantity.isNotBlank()
         ) {
             Text("Comprar ${asset.symbol}")
         }
     }
 }
+
+//////////////////////////////////////////////////////
+// SELL
+//////////////////////////////////////////////////////
 
 @Composable
 fun SellForm(
@@ -256,6 +310,8 @@ fun SellForm(
     enabled: Boolean,
     onSell: () -> Unit
 ) {
+    val quantityDouble = parseQuantity(quantity)
+
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
 
         OutlinedTextField(
@@ -264,25 +320,34 @@ fun SellForm(
             label = { Text("Cantidad") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            isError = quantity.isNotEmpty() && quantityDouble <= 0
         )
 
-        Text("Recibirás: €${"%.2f".format(total)}", fontWeight = FontWeight.Bold)
+        Text(
+            "Recibirás: €${"%.2f".format(total)}",
+            fontWeight = FontWeight.Bold
+        )
 
         Button(
             onClick = onSell,
             modifier = Modifier.fillMaxWidth(),
-            enabled = enabled
+            enabled = enabled && quantity.isNotBlank()
         ) {
             Text("Vender ${asset.symbol}")
         }
     }
 }
 
-// ================= HELPERS =================
+//////////////////////////////////////////////////////
+// HELPERS
+//////////////////////////////////////////////////////
 
 private fun parseQuantity(input: String): Double =
-    input.toDoubleOrNull() ?: 0.0
+    input
+        .replace(",", ".")
+        .filter { it.isDigit() || it == '.' }
+        .toDoubleOrNull() ?: 0.0
 
 private fun calculateTotal(price: Double, quantity: Double): Double =
     price * quantity

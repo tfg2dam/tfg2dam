@@ -35,8 +35,8 @@ fun RegisterScreen(
                 confirmPassword.isNotEmpty() &&
                 password != confirmPassword
 
-    LaunchedEffect(uiState.success) {
-        if (uiState.success) {
+    LaunchedEffect(uiState.isSuccess) {
+        if (uiState.isSuccess) {
             onRegisterSuccess()
             viewModel.clearSuccess()
         }
@@ -50,21 +50,23 @@ fun RegisterScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        // TÍTULO
+        // ================= TÍTULO =================
+
         Text(
-            "Crear cuenta",
+            text = "Crear cuenta",
             style = MaterialTheme.typography.headlineMedium
         )
 
         Text(
-            "Empieza con 100€ virtuales",
+            text = "Empieza con 100€ virtuales",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Spacer(Modifier.height(32.dp))
 
-        // USERNAME
+        // ================= USUARIO =================
+
         OutlinedTextField(
             value = username,
             onValueChange = {
@@ -72,7 +74,9 @@ fun RegisterScreen(
                 viewModel.clearError()
             },
             label = { Text("Nombre de usuario") },
-            leadingIcon = { Icon(Icons.Default.Person, contentDescription = "Usuario") },
+            leadingIcon = {
+                Icon(Icons.Default.Person, contentDescription = "Usuario")
+            },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
@@ -81,15 +85,18 @@ fun RegisterScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        // EMAIL
+        // ================= EMAIL =================
+
         OutlinedTextField(
             value = email,
             onValueChange = {
                 email = it
                 viewModel.clearError()
             },
-            label = { Text("Email") },
-            leadingIcon = { Icon(Icons.Default.Email, contentDescription = "Email") },
+            label = { Text("Correo electrónico") },
+            leadingIcon = {
+                Icon(Icons.Default.Email, contentDescription = "Correo")
+            },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Email,
                 imeAction = ImeAction.Next
@@ -101,7 +108,8 @@ fun RegisterScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        // PASSWORD
+        // ================= CONTRASEÑA =================
+
         OutlinedTextField(
             value = password,
             onValueChange = {
@@ -109,19 +117,27 @@ fun RegisterScreen(
                 viewModel.clearError()
             },
             label = { Text("Contraseña") },
-            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Contraseña") },
+            leadingIcon = {
+                Icon(Icons.Default.Lock, contentDescription = "Contraseña")
+            },
             trailingIcon = {
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                     Icon(
-                        if (passwordVisible) Icons.Default.VisibilityOff
-                        else Icons.Default.Visibility,
-                        contentDescription = "Mostrar u ocultar contraseña"
+                        imageVector = if (passwordVisible)
+                            Icons.Default.VisibilityOff
+                        else
+                            Icons.Default.Visibility,
+                        contentDescription = if (passwordVisible)
+                            "Ocultar contraseña"
+                        else
+                            "Mostrar contraseña"
                     )
                 }
             },
             visualTransformation = if (passwordVisible)
                 VisualTransformation.None
-            else PasswordVisualTransformation(),
+            else
+                PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.Next
@@ -133,7 +149,8 @@ fun RegisterScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        // CONFIRM PASSWORD
+        // ================= CONFIRMAR =================
+
         OutlinedTextField(
             value = confirmPassword,
             onValueChange = {
@@ -141,7 +158,9 @@ fun RegisterScreen(
                 viewModel.clearError()
             },
             label = { Text("Confirmar contraseña") },
-            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Confirmar contraseña") },
+            leadingIcon = {
+                Icon(Icons.Default.Lock, contentDescription = "Confirmar contraseña")
+            },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
@@ -165,17 +184,19 @@ fun RegisterScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        // ERROR
+        // ================= ERROR =================
+
         uiState.error?.let { error ->
             Text(
-                error,
+                text = error,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(8.dp))
         }
 
-        // BOTÓN
+        // ================= BOTÓN =================
+
         Button(
             onClick = {
                 focusManager.clearFocus()
@@ -192,11 +213,11 @@ fun RegisterScreen(
         ) {
             if (uiState.isLoading) {
                 CircularProgressIndicator(
-                    Modifier.size(20.dp),
+                    modifier = Modifier.size(20.dp),
                     strokeWidth = 2.dp
                 )
             } else {
-                Text("Registrarse")
+                Text("Crear cuenta")
             }
         }
 

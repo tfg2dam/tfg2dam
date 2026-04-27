@@ -25,8 +25,7 @@ fun RankingsScreen(
     val userData by userViewModel.userData.collectAsStateWithLifecycle()
     val leaderboard by rankingsViewModel.leaderboard.collectAsStateWithLifecycle()
     val isLoading by rankingsViewModel.isLoading.collectAsStateWithLifecycle()
-
-    // RANGO CORRECTO (StateFlow)
+    val error by rankingsViewModel.error.collectAsStateWithLifecycle()
     val currentRank by userViewModel.currentRank.collectAsStateWithLifecycle()
 
     val profit = userViewModel.getProfit()
@@ -35,26 +34,29 @@ fun RankingsScreen(
         if (profit >= 0) MaterialTheme.colorScheme.positive
         else MaterialTheme.colorScheme.error
 
+    val position = rankingsViewModel.getUserPosition(userData.userId)
+
     LaunchedEffect(Unit) {
-        rankingsViewModel.loadLeaderboard()
+        if (leaderboard.isEmpty()) {
+            rankingsViewModel.loadLeaderboard()
+        }
     }
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
 
+        // 🔥 TÍTULO
         item {
             Text(
-                text = "Ranking",
+                "Ranking",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        //  TU POSICIÓN
+        // 🔥 TU POSICIÓN (ARREGLADA 🔥)
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -62,57 +64,82 @@ fun RankingsScreen(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             ) {
-                Row(
-                    modifier = Modifier
+                Column(
+                    Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(16.dp)
                 ) {
-                    Column {
-                        Text("Tu ranking", style = MaterialTheme.typography.bodySmall)
+
+                    Text(
+                        "Tu posición",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // 🔹 FILA PRINCIPAL (CLAVE)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
 
                         Text(
-                            text = userData.nombreUsuario.ifBlank { "Usuario" },
+                            text = if (position != -1)
+                                "#$position · ${userData.username}"
+                            else
+                                userData.username,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
 
                         Text(
                             text = "${if (profit >= 0) "+" else ""}€${"%.2f".format(profit)}",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = profitColor
                         )
                     }
 
-                    // seguro (evita crash al cargar)
+                    Spacer(Modifier.height(6.dp))
+
+                    // 🔹 INFO SECUNDARIA
                     currentRank?.let { rank ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(rank.icon, style = MaterialTheme.typography.headlineLarge)
-                            Text(rank.name, fontWeight = FontWeight.Bold)
-                        }
+                        Text(
+                            "Rango: ${rank.name}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
         }
 
-        // HEADER
+        // 🔥 HEADER
         item {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                Modifier.fillMaxWidth(),
+                Arrangement.SpaceBetween,
+                Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Top inversores",
-                    style = MaterialTheme.typography.titleLarge,
+                    "Top inversores",
                     fontWeight = FontWeight.Bold
                 )
 
-                IconButton(onClick = { rankingsViewModel.loadLeaderboard() }) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Actualizar")
+                IconButton(
+                    onClick = { rankingsViewModel.refresh() },
+                    enabled = !isLoading
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null)
                 }
+            }
+        }
+
+        // ERROR
+        error?.let {
+            item {
+                Text(it, color = MaterialTheme.colorScheme.error)
             }
         }
 
@@ -120,28 +147,10 @@ fun RankingsScreen(
         if (isLoading) {
             item {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
+                    Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
-                }
-            }
-        }
-
-        // EMPTY
-        else if (leaderboard.isEmpty()) {
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("No hay datos aún")
-                    }
                 }
             }
         }
@@ -150,82 +159,73 @@ fun RankingsScreen(
         else {
             itemsIndexed(leaderboard) { index, entry ->
 
-                val isCurrentUser = entry.username == userData.nombreUsuario
+                val isMe = entry.id == userData.userId
 
-                val entryColor =
+                val color =
                     if (entry.profit >= 0) MaterialTheme.colorScheme.positive
                     else MaterialTheme.colorScheme.error
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isCurrentUser)
+                        containerColor = if (isMe)
                             MaterialTheme.colorScheme.secondaryContainer
                         else
                             MaterialTheme.colorScheme.surface
                     )
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
 
+                    Column(Modifier.padding(16.dp)) {
+
+                        // 🔹 FILA PRINCIPAL
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
 
-                            Text(
-                                text = when (index) {
-                                    0 -> "🥇"
-                                    1 -> "🥈"
-                                    2 -> "🥉"
-                                    else -> "${index + 1}"
-                                },
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
 
-                            Column {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(entry.username, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = when (index) {
+                                        0 -> "🥇"
+                                        1 -> "🥈"
+                                        2 -> "🥉"
+                                        else -> "${index + 1}."
+                                    },
+                                    fontWeight = FontWeight.Bold
+                                )
 
-                                    if (isCurrentUser) {
-                                        Surface(
-                                            shape = MaterialTheme.shapes.small,
-                                            color = MaterialTheme.colorScheme.primary
-                                        ) {
-                                            Text(
-                                                text = "Tú",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onPrimary,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                    }
+                                Spacer(Modifier.width(8.dp))
+
+                                Text(
+                                    text = entry.username,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                if (isMe) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("• Tú", style = MaterialTheme.typography.labelSmall)
                                 }
                             }
-                        }
-
-                        Column(horizontalAlignment = Alignment.End) {
 
                             Text(
                                 text = "${if (entry.profit >= 0) "+" else ""}€${"%.2f".format(entry.profit)}",
                                 fontWeight = FontWeight.Bold,
-                                color = entryColor
-                            )
-
-                            Text(
-                                text = "€${"%.2f".format(entry.portfolioValue)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = color,
+                                style = MaterialTheme.typography.titleMedium
                             )
                         }
+
+                        Spacer(Modifier.height(4.dp))
+
+                        // 🔹 INFO SECUNDARIA
+                        Text(
+                            text = "Total: €${"%.2f".format(entry.portfolioValue)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }

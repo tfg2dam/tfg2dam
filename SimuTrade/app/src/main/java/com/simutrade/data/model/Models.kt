@@ -1,5 +1,7 @@
 package com.simutrade.data.model
 
+import com.simutrade.screens.rankings.RankIcon
+
 // ================= ASSETS =================
 
 data class Asset(
@@ -55,15 +57,15 @@ enum class TransactionType {
 // ================= USER =================
 
 data class UserData(
-    val idUsuario: String = "",
-    val nombreUsuario: String = "",
+    val userId: String = "",
+    val username: String = "",
     val email: String = "",
-    val saldo: Double = 100.0,
-    val saldoInicial: Double = 100.0,
-    val saldoBonus: Double = 0.0,
-    val idRango: String = "bronce",
-    val creadoEn: Long = 0L,
-    val ultimoLogin: Long = 0L
+    val balance: Double = 100.0,
+    val initialBalance: Double = 100.0,
+    val bonusBalance: Double = 0.0,
+    val rankId: String = "bronce",
+    val createdAt: Long = 0L,
+    val lastLogin: Long = 0L
 )
 
 // ================= RANKING =================
@@ -72,12 +74,12 @@ data class Rank(
     val name: String,
     val minProfit: Double,
     val color: String,
-    val icon: String,
+    val icon: RankIcon,
     val description: String
 )
 
 data class LeaderboardEntry(
-    val id: String,
+    val id: String, // 🔥 este ES el userId real
     val username: String,
     val profit: Double,
     val rank: String,
@@ -86,25 +88,25 @@ data class LeaderboardEntry(
 
 // ================= RETOS =================
 
-data class RetosData(
-    val rachaActual: Int = 0,
-    val rachaMaxima: Int = 0,
+data class ChallengesData(
+    val currentStreak: Int = 0,
+    val maxStreak: Int = 0,
 
-    val ultimaVez: Long = 0L,
+    val lastTime: Long = 0L,
 
-    val retosCompletados: List<String> = emptyList(),
+    val completedChallenges: List<String> = emptyList(),
 
-    val retosDelDia: List<String> = emptyList(),
+    val dailyChallenges: List<String> = emptyList(),
 
-    val diaActual: Long = 0L // CORREGIDO (antes era Int)
+    val currentDay: Long = 0L // CORREGIDO (antes era Int)
 )
 
-data class Reto(
+data class Challenge(
     val id: String,
-    val titulo: String,
-    val descripcion: String,
+    val title: String,
+    val description: String,
     val emoji: String,
-    val recompensa: Double
+    val reward: Double
 )
 
 // ================= COMMON =================

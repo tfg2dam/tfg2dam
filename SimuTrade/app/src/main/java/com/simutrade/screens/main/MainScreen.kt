@@ -34,15 +34,18 @@ fun MainScreen(
     var showProfileDialog by remember { mutableStateOf(false) }
 
     val navigationItems = listOf(
-        NavigationItem("dashboard", "Panel", Icons.Default.Dashboard),
-        NavigationItem("market", "Mercado", Icons.Default.TrendingUp),
-        NavigationItem("rankings", "Rankings", Icons.Default.EmojiEvents),
-        NavigationItem("challenges", "Retos", Icons.Default.Star)
+        NavigationItem(Screen.Dashboard, "Panel", Icons.Default.Dashboard),
+        NavigationItem(Screen.Market, "Mercado", Icons.Default.TrendingUp),
+        NavigationItem(Screen.Rankings, "Ranking", Icons.Default.EmojiEvents),
+        NavigationItem(Screen.Challenges, "Retos", Icons.Default.Star)
     )
+
+    // ================= PERFIL =================
 
     if (showProfileDialog) {
         ProfileDialog(
             userData = userData,
+            currentRank = currentRank,
             onDismiss = { showProfileDialog = false },
             onLogout = {
                 showProfileDialog = false
@@ -52,15 +55,18 @@ fun MainScreen(
         )
     }
 
+    // ================= UI =================
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Column {
                         Text("SimuTrade", style = MaterialTheme.typography.titleLarge)
+
                         Text(
-                            "€${"%.2f".format(userData.saldo)} • ${
-                                currentRank?.let { "${it.icon} ${it.name}" } ?: ""
+                            "€${"%.2f".format(userData.balance)} • ${
+                                currentRank?.name ?: ""
                             }",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -74,14 +80,15 @@ fun MainScreen(
                 }
             )
         },
+
         bottomBar = {
             NavigationBar {
                 navigationItems.forEach { item ->
                     NavigationBarItem(
                         icon = { Icon(item.icon, contentDescription = item.label) },
                         label = { Text(item.label) },
-                        selected = currentPage == item.route,
-                        onClick = { mainViewModel.navigateTo(item.route) }
+                        selected = currentPage == item.screen,
+                        onClick = { mainViewModel.navigateTo(item.screen) }
                     )
                 }
             }
@@ -93,23 +100,20 @@ fun MainScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+
             when (currentPage) {
 
-                "dashboard" ->
-                    DashboardScreen()
+                Screen.Dashboard -> DashboardScreen()
 
-                "market" ->
-                    MarketScreen(mainViewModel)
+                Screen.Market -> MarketScreen(mainViewModel)
 
-                "trading" ->
-                    TradingScreen(mainViewModel)
+                Screen.Trading -> TradingScreen(mainViewModel)
 
-                "rankings" ->
-                    RankingsScreen()
+                Screen.Rankings -> RankingsScreen()
 
-                "challenges" -> {
+                Screen.Challenges -> {
                     LaunchedEffect(Unit) {
-                        userViewModel.cargarDatos()
+                        userViewModel.loadData()
                     }
                     ChallengesScreen(userViewModel = userViewModel)
                 }
@@ -118,8 +122,10 @@ fun MainScreen(
     }
 }
 
+// ================= NAV ITEM =================
+
 data class NavigationItem(
-    val route: String,
+    val screen: Screen,
     val label: String,
     val icon: ImageVector
 )

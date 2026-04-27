@@ -15,7 +15,7 @@ data class CoinGeckoItemDto(
     val name: String,
     @SerializedName("current_price") val currentPrice: Double,
     @SerializedName("price_change_24h") val priceChange24h: Double,
-    @SerializedName("price_change_percentage_24h") val priceChangePercent24h: Double
+    @SerializedName("price_change_percentage_24h") val priceChangePercentage24h: Double
 )
 
 data class CoinGeckoSearchResponseDto(
@@ -28,13 +28,14 @@ data class CoinGeckoSearchItemDto(
     val name: String
 )
 
-data class CoinGeckoHistoryDto(
+data class CoinGeckoMarketChartDto(
     val prices: List<List<Double>>
 )
 
 // ================= API =================
 
 interface CoinGeckoApi {
+
     @GET("coins/markets")
     suspend fun getTopCoins(
         @Query("vs_currency") currency: String = "eur",
@@ -50,18 +51,19 @@ interface CoinGeckoApi {
     ): CoinGeckoSearchResponseDto
 
     @GET("coins/{id}/market_chart")
-    suspend fun getCoinHistory(
+    suspend fun getCoinMarketChart(
         @Path("id") coinId: String,
         @Query("vs_currency") currency: String = "eur",
         @Query("days") days: Int = 7,
         @Query("interval") interval: String = "daily"
-    ): CoinGeckoHistoryDto
+    ): CoinGeckoMarketChartDto
 
 }
 
 // ================= CLIENT =================
 
 object CoinGeckoClient {
+
     private const val BASE_URL = "https://api.coingecko.com/api/v3/"
 
     val api: CoinGeckoApi by lazy {

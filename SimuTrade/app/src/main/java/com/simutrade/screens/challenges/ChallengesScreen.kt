@@ -1,11 +1,12 @@
 package com.simutrade.screens.challenges
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,10 +17,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.simutrade.data.model.Reto
-import com.simutrade.screens.user.UserViewModel
+import com.simutrade.data.model.Challenge
 import com.simutrade.screens.theme.positive
 import com.simutrade.screens.theme.positiveContainer
+import com.simutrade.screens.user.UserViewModel
 import kotlinx.coroutines.delay
 
 @Composable
@@ -28,88 +29,61 @@ fun ChallengesScreen(
     userViewModel: UserViewModel = viewModel()
 ) {
 
-    val retosData by viewModel.retosData.collectAsStateWithLifecycle()
+    val challengesData by viewModel.challengesData.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-    val millisHastaReset by viewModel.millisHastaReset.collectAsStateWithLifecycle()
+    val millisUntilReset by viewModel.millisUntilReset.collectAsStateWithLifecycle()
 
-    val retosDelDia = remember(retosData.retosDelDia) {
-        viewModel.getRetosDelDia()
-    }
+    val challenges = viewModel.getChallengesOfDay()
 
-    val completados = retosDelDia.count { it.id in retosData.retosCompletados }
-    val total = retosDelDia.size
-    val todosCompletados = total > 0 && completados == total
+    val completed = challenges.count { it.id in challengesData.completedChallenges }
+    val total = challenges.size
+    val allCompleted = total > 0 && completed == total
 
-    var dialogMensaje by remember { mutableStateOf<String?>(null) }
-    var dialogExito by remember { mutableStateOf(false) }
+    var dialogMessage by remember { mutableStateOf<String?>(null) }
+    var dialogSuccess by remember { mutableStateOf(false) }
 
-    var tiempoRestante by remember { mutableStateOf(millisHastaReset) }
+    var remainingTime by remember { mutableStateOf(millisUntilReset) }
 
-    // milestone
-    val nextMilestone = remember(retosData.rachaActual) {
-        when {
-            retosData.rachaActual < 3 -> 3
-            retosData.rachaActual < 7 -> 7
-            retosData.rachaActual < 14 -> 14
-            retosData.rachaActual < 30 -> 30
-            retosData.rachaActual < 60 -> 60
-            retosData.rachaActual < 100 -> 100
-            else -> null
-        }
-    }
-
-    val recompensaNext = when (nextMilestone) {
-        3 -> 1.0
-        7 -> 2.0
-        14 -> 4.0
-        30 -> 8.0
-        60 -> 12.0
-        100 -> 20.0
-        else -> 0.0
-    }
-
-    LaunchedEffect(millisHastaReset) {
-        tiempoRestante = millisHastaReset
-        while (tiempoRestante > 0) {
+    LaunchedEffect(millisUntilReset) {
+        remainingTime = millisUntilReset
+        while (remainingTime > 0) {
             delay(1000)
-            tiempoRestante -= 1000
+            remainingTime -= 1000
         }
     }
 
     LaunchedEffect(Unit) {
-        viewModel.cargarRetos()
+        viewModel.loadChallenges()
     }
 
-    fun formatearTiempo(ms: Long): String {
+    fun formatTime(ms: Long): String {
         if (ms <= 0) return "00:00:00"
-        val horas = ms / (1000 * 60 * 60)
-        val minutos = (ms % (1000 * 60 * 60)) / (1000 * 60)
-        val segundos = (ms % (1000 * 60)) / 1000
-        return "%02d:%02d:%02d".format(horas, minutos, segundos)
+        val h = ms / (1000 * 60 * 60)
+        val m = (ms % (1000 * 60 * 60)) / (1000 * 60)
+        val s = (ms % (1000 * 60)) / 1000
+        return "%02d:%02d:%02d".format(h, m, s)
     }
 
     // ================= DIALOG =================
 
-    dialogMensaje?.let { mensaje ->
+    dialogMessage?.let {
         AlertDialog(
-            onDismissRequest = { dialogMensaje = null },
+            onDismissRequest = { dialogMessage = null },
             title = {
-                Text(if (dialogExito) "Reto completado" else "Reto no completado")
+                Text(if (dialogSuccess) "Reto completado" else "No completado")
             },
-            text = {
-                Text(mensaje, textAlign = TextAlign.Center)
-            },
+            text = { Text(it, textAlign = TextAlign.Center) },
             confirmButton = {
                 Button(
-                    onClick = { dialogMensaje = null },
+                    onClick = { dialogMessage = null },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (dialogExito)
+                        containerColor = if (dialogSuccess)
                             MaterialTheme.colorScheme.positive
                         else
                             MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text(if (dialogExito) "Genial" else "Entendido")
+                    Text("Aceptar")
                 }
             }
         )
@@ -124,6 +98,7 @@ fun ChallengesScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
 
+        // ===== TÍTULO =====
         item {
             Text(
                 "Retos diarios",
@@ -132,7 +107,7 @@ fun ChallengesScreen(
             )
         }
 
-        // TARJETA RACHA (MEJORADA)
+        // ===== RACHA =====
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -141,51 +116,36 @@ fun ChallengesScreen(
                 )
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
+                    Modifier.fillMaxWidth().padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
 
                     Column {
-
                         Text("Racha", fontWeight = FontWeight.Bold)
 
-                        Text("Días seguidos: ${retosData.rachaActual}")
+                        Text("${challengesData.currentStreak} días seguidos")
 
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(6.dp))
 
-                        // TEXTO MÁS IMPORTANTE
-                        nextMilestone?.let {
-                            val diasRestantes = it - retosData.rachaActual
-
-                            Text(
-                                if (diasRestantes > 1)
-                                    "Te faltan $diasRestantes días para ganar +${"%.2f".format(recompensaNext)}€"
-                                else
-                                    "Te falta 1 día para ganar +${"%.2f".format(recompensaNext)}€",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                        Text(
+                            "Completa todos los retos para subir tu racha",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
 
-                    // ICONO + NÚMERO
                     Row(verticalAlignment = Alignment.CenterVertically) {
 
                         Icon(
-                            imageVector = Icons.Default.Whatshot,
+                            Icons.Default.LocalFireDepartment,
                             contentDescription = null,
-                            tint = Color(0xFFFF9800),
-                            modifier = Modifier.size(30.dp)
+                            tint = Color(0xFFFF9800)
                         )
 
                         Spacer(Modifier.width(6.dp))
 
                         Text(
-                            "${retosData.rachaActual}",
-                            style = MaterialTheme.typography.displaySmall,
+                            "${challengesData.currentStreak}",
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -193,30 +153,55 @@ fun ChallengesScreen(
             }
         }
 
-        // TODOS COMPLETADOS
-        if (todosCompletados) {
+        // ===== PROGRESO =====
+        item {
+
+            val progress by animateFloatAsState(
+                targetValue = if (total == 0) 0f else completed.toFloat() / total,
+                label = ""
+            )
+
+            Card {
+                Column(Modifier.padding(16.dp)) {
+
+                    Text(
+                        "$completed de $total retos completados",
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    LinearProgressIndicator(
+                        progress = progress,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(10.dp)
+                    )
+                }
+            }
+        }
+
+        // ===== TODOS COMPLETADOS =====
+        if (allCompleted) {
             item {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFFFF3CD)
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
                     )
                 ) {
                     Column(
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        Modifier.fillMaxWidth().padding(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("Todos los retos completados", fontWeight = FontWeight.Bold)
+                        Text("Todos completados", fontWeight = FontWeight.Bold)
 
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(6.dp))
 
                         Text("Nuevos retos en")
 
-                        Spacer(Modifier.height(4.dp))
-
                         Text(
-                            formatearTiempo(tiempoRestante),
-                            style = MaterialTheme.typography.headlineMedium,
+                            formatTime(remainingTime),
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -224,37 +209,32 @@ fun ChallengesScreen(
             }
         }
 
-        // progreso
-        item {
-            LinearProgressIndicator(
-                progress = if (total == 0) 0f else completados.toFloat() / total,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        // lista
+        // ===== LISTA =====
         if (isLoading) {
             item {
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    Modifier.fillMaxWidth().padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
                 }
             }
         } else {
-            items(retosDelDia) { reto ->
+            items(challenges) { challenge ->
 
-                val completado = reto.id in retosData.retosCompletados
+                val isDone = challenge.id in challengesData.completedChallenges
 
-                RetoCard(
-                    reto = reto,
-                    completado = completado,
-                    onCompletar = {
-                        viewModel.completarReto(reto.id, reto.recompensa) { exito, mensaje ->
-                            dialogExito = exito
-                            dialogMensaje = mensaje
-                            if (exito) userViewModel.cargarDatos()
+                ChallengeCard(
+                    challenge = challenge,
+                    completed = isDone,
+                    onComplete = {
+                        viewModel.completeChallenge(
+                            challenge.id,
+                            challenge.reward
+                        ) { success, msg ->
+                            dialogSuccess = success
+                            dialogMessage = msg
+                            if (success) userViewModel.loadData()
                         }
                     }
                 )
@@ -263,17 +243,19 @@ fun ChallengesScreen(
     }
 }
 
-// ================= CARD =================
+//////////////////////////////////////////////////////
+// CARD
+//////////////////////////////////////////////////////
 
 @Composable
-fun RetoCard(
-    reto: Reto,
-    completado: Boolean,
-    onCompletar: () -> Unit
+fun ChallengeCard(
+    challenge: Challenge,
+    completed: Boolean,
+    onComplete: () -> Unit
 ) {
 
-    val backgroundColor by animateColorAsState(
-        targetValue = if (completado)
+    val bg by animateColorAsState(
+        if (completed)
             MaterialTheme.colorScheme.positiveContainer
         else
             MaterialTheme.colorScheme.surface,
@@ -281,38 +263,45 @@ fun RetoCard(
     )
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor)
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = bg)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(reto.titulo, fontWeight = FontWeight.Bold)
-                    Text(reto.descripcion)
-                }
+                Text(challenge.title, fontWeight = FontWeight.Bold)
 
                 Text(
-                    "+${"%.2f".format(reto.recompensa)}€",
+                    "+${"%.2f".format(challenge.reward)}€",
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.positive
                 )
             }
 
-            Spacer(Modifier.height(12.dp))
+            Text(
+                challenge.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-            if (completado) {
-                Text("Completado", color = MaterialTheme.colorScheme.positive)
+            if (completed) {
+                Text(
+                    "Completado",
+                    color = MaterialTheme.colorScheme.positive,
+                    fontWeight = FontWeight.SemiBold
+                )
             } else {
                 Button(
-                    onClick = onCompletar,
+                    onClick = onComplete,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Reclamar recompensa")
+                    Text("Completar")
                 }
             }
         }

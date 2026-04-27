@@ -4,21 +4,23 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.simutrade.data.model.Asset
 import com.simutrade.data.repository.MarketRepository
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 
 data class MarketUiState(
     val cryptos: List<Asset> = emptyList(),
     val stocks: List<Asset> = emptyList(),
     val searchResults: List<Asset> = emptyList(),
-    val isLoading: Boolean = false,
+
+    val isInitialLoading: Boolean = true,
+    val isRefreshing: Boolean = false, // 🔥 CLAVE UX
+
     val isSearching: Boolean = false,
     val error: String? = null,
     val lastUpdated: Long = 0L,
+
     val priceHistory: List<Pair<Long, Double>> = emptyList(),
     val isLoadingHistory: Boolean = false,
     val selectedPeriod: String = "7d"
@@ -34,93 +36,125 @@ class MarketViewModel : ViewModel() {
     private var searchJob: Job? = null
     private var refreshJob: Job? = null
     private var loadJob: Job? = null
+
     private var lastLoadTime = 0L
 
+    // 🔥 CACHE REAL (importantísimo)
+    private var cachedCryptos: List<Asset> = emptyList()
+    private var cachedStocks: List<Asset> = emptyList()
+
     companion object {
-        const val REFRESH_INTERVAL_MS = 120_000L
-        const val MIN_REFRESH_MS = 60_000L
+        const val REFRESH_INTERVAL_MS = 60_000L // 🔥 1 minuto
+        const val MIN_REFRESH_MS = 5_000L
+        const val TIMEOUT_MS = 10_000L
     }
 
     init {
-        loadMarketData()
+        loadMarketData(force = true)
         startAutoRefresh()
     }
 
+    // ================= AUTO REFRESH =================
+
     private fun startAutoRefresh() {
         refreshJob?.cancel()
+
         refreshJob = viewModelScope.launch {
             while (true) {
                 delay(REFRESH_INTERVAL_MS)
-                if (_uiState.value.searchResults.isEmpty()) {
-                    refreshPrices()
-                }
+
+                // 🔥 SIEMPRE refresca (como pedías)
+                loadMarketData(force = true)
             }
         }
     }
 
-    fun loadMarketData() {
-        val ahora = System.currentTimeMillis()
+    // ================= LOAD =================
 
-        if (ahora - lastLoadTime < MIN_REFRESH_MS && _uiState.value.cryptos.isNotEmpty()) {
-            return
-        }
+    fun loadMarketData(force: Boolean = false) {
+
+        val now = System.currentTimeMillis()
+
+        // 🔥 anti spam SOLO si no es manual
+        if (!force &&
+            now - lastLoadTime < MIN_REFRESH_MS &&
+            cachedCryptos.isNotEmpty()
+        ) return
 
         loadJob?.cancel()
+
         loadJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+
+            val hasCache = cachedCryptos.isNotEmpty() || cachedStocks.isNotEmpty()
+
+            _uiState.value = _uiState.value.copy(
+                isInitialLoading = !hasCache, // solo primera vez
+                isRefreshing = hasCache,      // 🔥 loader en lista
+                error = null
+            )
 
             try {
-                val cryptos = repository.getTopCryptos()
-                val stocks = repository.getTopStocks()
+                val (cryptos, stocks) = coroutineScope {
+
+                    val cryptosDeferred = async {
+                        retryIO { repository.getTopCryptos() }
+                    }
+
+                    val stocksDeferred = async {
+                        retryIO { repository.getTopStocks() }
+                    }
+
+                    cryptosDeferred.await() to stocksDeferred.await()
+                }
+
+                // 🔥 SOLO actualizar si hay datos válidos
+                if (cryptos.isNotEmpty()) cachedCryptos = cryptos
+                if (stocks.isNotEmpty()) cachedStocks = stocks
 
                 lastLoadTime = System.currentTimeMillis()
 
                 _uiState.value = _uiState.value.copy(
-                    cryptos = cryptos,
-                    stocks = stocks,
-                    isLoading = false,
-                    lastUpdated = System.currentTimeMillis()
+                    cryptos = cachedCryptos,
+                    stocks = cachedStocks,
+                    isInitialLoading = false,
+                    isRefreshing = false,
+                    lastUpdated = System.currentTimeMillis(),
+                    error = null
                 )
 
             } catch (e: Exception) {
-                if (e !is kotlinx.coroutines.CancellationException) {
-                    val esRateLimit = e.message?.contains("429") == true ||
-                            e.toString().contains("429")
 
-                    if (esRateLimit) lastLoadTime = System.currentTimeMillis()
+                if (e !is CancellationException) {
 
+                    val isRateLimit =
+                        e.message?.contains("429") == true ||
+                                e.toString().contains("429")
+
+                    // 🔥 NUNCA perder datos
                     _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = if (_uiState.value.cryptos.isEmpty()) {
-                            if (esRateLimit) "Demasiadas peticiones. Espera un momento."
-                            else "Error al cargar datos del mercado"
-                        } else null
+                        cryptos = cachedCryptos,
+                        stocks = cachedStocks,
+                        isInitialLoading = false,
+                        isRefreshing = false,
+                        error = if (!hasCache) {
+                            if (isRateLimit) {
+                                "Demasiadas peticiones. Espera unos segundos."
+                            } else {
+                                "Error al cargar el mercado"
+                            }
+                        } else {
+                            null
+                        }
                     )
                 }
             }
         }
     }
 
-    private fun refreshPrices() {
-        viewModelScope.launch {
-            try {
-                val cryptos = repository.getTopCryptos()
-                val stocks = repository.getTopStocks()
-
-                lastLoadTime = System.currentTimeMillis()
-
-                _uiState.value = _uiState.value.copy(
-                    cryptos = cryptos,
-                    stocks = stocks,
-                    lastUpdated = System.currentTimeMillis()
-                )
-            } catch (_: Exception) {
-                // silencioso, mantenemos datos anteriores
-            }
-        }
-    }
+    // ================= SEARCH =================
 
     fun search(query: String) {
+
         searchJob?.cancel()
 
         if (query.isBlank()) {
@@ -132,15 +166,21 @@ class MarketViewModel : ViewModel() {
         }
 
         searchJob = viewModelScope.launch {
-            delay(500)
+
+            delay(400)
+
             _uiState.value = _uiState.value.copy(isSearching = true)
 
             try {
-                val results = repository.searchAssets(query)
+                val results = retryIO {
+                    repository.searchAssets(query)
+                }
+
                 _uiState.value = _uiState.value.copy(
                     searchResults = results,
                     isSearching = false
                 )
+
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isSearching = false,
@@ -150,27 +190,59 @@ class MarketViewModel : ViewModel() {
         }
     }
 
+    // ================= HISTÓRICO =================
+
     fun loadPriceHistory(asset: Asset, period: String = "7d") {
+
         viewModelScope.launch {
+
             _uiState.value = _uiState.value.copy(
                 isLoadingHistory = true,
-                selectedPeriod = period
+                selectedPeriod = period,
+                error = null
             )
 
             try {
-                val history = repository.getAssetHistory(asset, period)
+                val history = retryIO {
+                    repository.getAssetHistory(asset, period)
+                }
+
                 _uiState.value = _uiState.value.copy(
                     priceHistory = history,
                     isLoadingHistory = false
                 )
+
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoadingHistory = false,
-                    error = "Error cargando gráfico"
+                    error = "Error cargando datos"
                 )
             }
         }
     }
+
+    // ================= RETRY =================
+
+    private suspend fun <T> retryIO(
+        times: Int = 2,
+        initialDelay: Long = 500,
+        block: suspend () -> T
+    ): T {
+        var currentDelay = initialDelay
+
+        repeat(times - 1) {
+            try {
+                return withTimeout(TIMEOUT_MS) { block() }
+            } catch (_: Exception) {
+                delay(currentDelay)
+                currentDelay *= 2
+            }
+        }
+
+        return withTimeout(TIMEOUT_MS) { block() }
+    }
+
+    // ================= CLEAN =================
 
     override fun onCleared() {
         super.onCleared()

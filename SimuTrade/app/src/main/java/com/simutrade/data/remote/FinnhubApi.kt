@@ -10,8 +10,8 @@ import retrofit2.http.Query
 
 data class FinnhubQuoteDto(
     @SerializedName("c") val currentPrice: Double,
-    @SerializedName("d") val change: Double,
-    @SerializedName("dp") val changePercent: Double
+    @SerializedName("d") val priceChange: Double,
+    @SerializedName("dp") val priceChangePercentage: Double
 )
 
 data class FinnhubSearchResponseDto(
@@ -24,7 +24,7 @@ data class FinnhubSearchItemDto(
 )
 
 data class FinnhubCandleDto(
-    @SerializedName("c") val close: List<Double>,
+    @SerializedName("c") val closePrices: List<Double>,
     @SerializedName("t") val timestamps: List<Long>,
     @SerializedName("s") val status: String
 )
@@ -40,13 +40,13 @@ interface FinnhubApi {
     ): FinnhubQuoteDto
 
     @GET("search")
-    suspend fun searchSymbol(
+    suspend fun searchSymbols(
         @Query("q") query: String,
         @Query("token") token: String = FinnhubClient.API_KEY
     ): FinnhubSearchResponseDto
 
     @GET("stock/candle")
-    suspend fun getStockHistory(
+    suspend fun getStockCandles(
         @Query("symbol") symbol: String,
         @Query("resolution") resolution: String = "D",
         @Query("from") from: Long,

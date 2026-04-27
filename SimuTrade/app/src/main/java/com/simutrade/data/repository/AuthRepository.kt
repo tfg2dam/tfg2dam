@@ -16,10 +16,11 @@ class AuthRepository {
     private val firestore = FirebaseFirestore.getInstance()
 
     companion object {
-        private const val SALDO_INICIAL = 100.0
+        private const val INITIAL_BALANCE = 100.0
     }
 
-    val currentUser: FirebaseUser? get() = auth.currentUser
+    val currentUser: FirebaseUser?
+        get() = auth.currentUser
 
     suspend fun login(email: String, password: String): AuthResult {
         return try {
@@ -48,16 +49,17 @@ class AuthRepository {
             val now = System.currentTimeMillis()
 
             val userData = hashMapOf(
+                // 🔴 IMPORTANTE: NO CAMBIAR (Firestore depende de esto)
                 "id_usuario"      to user.uid,
                 "nombre_usuario"  to username,
                 "email"           to email,
-                "saldo"           to SALDO_INICIAL,
-                "saldo_inicial"   to SALDO_INICIAL,
+                "saldo"           to INITIAL_BALANCE,
+                "saldo_inicial"   to INITIAL_BALANCE,
                 "saldo_bonus"     to 0.0,
                 "id_rango"        to "bronce",
                 "creado_en"       to now,
                 "ultimo_login"    to now,
-                "portfolio_value" to SALDO_INICIAL,
+                "portfolio_value" to INITIAL_BALANCE,
                 "profit"          to 0.0
             )
 

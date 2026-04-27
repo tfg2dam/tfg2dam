@@ -17,7 +17,7 @@ private val Green100 = Color(0xFFD1FAE5)
 
 private val Red600 = Color(0xFFDC2626)
 
-// ================= EXTENSIONES DE COLOR =================
+// ================= EXTENSIONES =================
 
 val ColorScheme.positive: Color
     get() = Green600
@@ -25,7 +25,7 @@ val ColorScheme.positive: Color
 val ColorScheme.positiveContainer: Color
     get() = Green100
 
-val ColorScheme.negativo: Color
+val ColorScheme.negative: Color
     get() = Red600
 
 // ================= LIGHT =================
@@ -48,6 +48,7 @@ private val LightColorScheme = lightColorScheme(
 
     onBackground = Color(0xFF1C1B1F),
     onSurface = Color(0xFF1C1B1F),
+    onSurfaceVariant = Color(0xFF475569)
 )
 
 // ================= DARK =================
@@ -70,6 +71,7 @@ private val DarkColorScheme = darkColorScheme(
 
     onBackground = Color(0xFFE1E1E1),
     onSurface = Color(0xFFE1E1E1),
+    onSurfaceVariant = Color(0xFFCBD5F5)
 )
 
 // ================= THEME =================
@@ -83,7 +85,7 @@ fun SimuTradeTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = AppTypography,
         content = content
     )
 }

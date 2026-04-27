@@ -1,30 +1,24 @@
 package com.simutrade.screens.dashboard
 
-import androidx.compose.foundation.LocalIndication
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.ui.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.simutrade.screens.rankings.RankUtils
 import com.simutrade.data.model.*
-import com.simutrade.screens.theme.positive
 import com.simutrade.screens.main.MainViewModel
+import com.simutrade.screens.rankings.RankUtils
+import com.simutrade.screens.theme.positive
 import com.simutrade.screens.user.UserViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -36,45 +30,48 @@ fun DashboardScreen(
 ) {
 
     val userData by userViewModel.userData.collectAsStateWithLifecycle()
-    val cartera by userViewModel.cartera.collectAsStateWithLifecycle()
-    val transacciones by userViewModel.transacciones.collectAsStateWithLifecycle()
+    val portfolio by userViewModel.portfolio.collectAsStateWithLifecycle()
+    val transactions by userViewModel.transactions.collectAsStateWithLifecycle()
     val currentRank by userViewModel.currentRank.collectAsStateWithLifecycle()
 
     val portfolioValue = userViewModel.getPortfolioValue()
     val totalValue = userViewModel.getTotalValue()
     val profit = userViewModel.getProfit()
     val profitPercent = userViewModel.getProfitPercent()
-    val profitTrading = userViewModel.getProfitTrading()
+    val profitTrading = userViewModel.getTradingProfit()
+
+    val cashPercent =
+        if (totalValue > 0) (userData.balance / totalValue) * 100
+        else 0.0
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
 
+        // ================= HEADER =================
+
         item {
-            Text(
-                "Panel de Control",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Text("Resumen", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         }
 
-        // RESUMEN
+        // ================= RESUMEN =================
+
         item {
             Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp)) {
 
                 SummaryCard(
-                    title = "Valor Total",
+                    title = "Total",
                     value = "€${"%.2f".format(totalValue)}",
-                    subtitle = "${if (profit >= 0) "+" else ""}€${"%.2f".format(profit)} (${ "%.2f".format(profitPercent)}%)",
+                    subtitle = "Has ganado ${if (profit >= 0) "+" else "-"}€${"%.2f".format(kotlin.math.abs(profit))} (${ "%.0f".format(profitPercent)}%)",
                     icon = Icons.Default.AccountBalance,
                     modifier = Modifier.weight(1f)
                 )
 
                 SummaryCard(
                     title = "Efectivo",
-                    value = "€${"%.2f".format(userData.saldo)}",
-                    subtitle = "${"%.1f".format((userData.saldo / totalValue) * 100)}% del total",
+                    value = "€${"%.2f".format(userData.balance)}",
+                    subtitle = "Disponible para invertir (${ "%.0f".format(cashPercent)}%)",
                     icon = Icons.Default.AccountBalanceWallet,
                     modifier = Modifier.weight(1f)
                 )
@@ -87,17 +84,16 @@ fun DashboardScreen(
                 SummaryCard(
                     title = "Cartera",
                     value = "€${"%.2f".format(portfolioValue)}",
-                    subtitle = "${cartera.size} posiciones",
+                    subtitle = "Invertido en ${portfolio.size} activos",
                     icon = Icons.Default.TrendingUp,
                     modifier = Modifier.weight(1f)
                 )
 
-                // RANGO SEGURO (sin crash)
-                currentRank?.let { rank ->
+                currentRank?.let {
                     SummaryCard(
                         title = "Rango",
-                        value = rank.icon,
-                        subtitle = rank.name,
+                        value = it.name,
+                        subtitle = "Tu nivel actual",
                         icon = Icons.Default.EmojiEvents,
                         modifier = Modifier.weight(1f)
                     )
@@ -105,7 +101,8 @@ fun DashboardScreen(
             }
         }
 
-        // PROGRESO RANGO
+        // ================= PROGRESO RANGO =================
+
         currentRank?.let { rank ->
             item {
                 val ranks = RankUtils.ranks
@@ -123,45 +120,155 @@ fun DashboardScreen(
             }
         }
 
-        // CARTERA
+        // ================= CARTERA =================
+
         item {
-            Text(
-                "Mi Cartera",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
+            Text("Mi cartera", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
 
-        if (cartera.isEmpty()) {
-            item { EmptyCard("No tienes ninguna posición abierta") }
+        if (portfolio.isEmpty()) {
+            item { EmptyCard("Aún no tienes inversiones") }
         } else {
-            items(cartera) {
+            items(portfolio) {
                 PortfolioHoldingCard(it) {
                     mainViewModel.selectAsset(it.toAsset())
                 }
             }
         }
 
-        // TRANSACCIONES
+        // ================= TRANSACCIONES =================
+
         item {
-            Text(
-                "Transacciones Recientes",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
+            Text("Últimas transacciones", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
 
-        if (transacciones.isEmpty()) {
-            item { EmptyCard("No hay transacciones todavía") }
+        if (transactions.isEmpty()) {
+            item { EmptyCard("Aún no hay movimientos") }
         } else {
-            items(transacciones.take(10)) {
+            items(transactions.take(10)) {
                 TransactionCard(it)
             }
         }
     }
 }
 
-// ================= EXTENSIÓN =================
+//////////////////////////////////////////////////////
+// 💥 PORTFOLIO CLARO Y ORDENADO
+//////////////////////////////////////////////////////
+
+@Composable
+fun PortfolioHoldingCard(
+    holding: PortfolioHolding,
+    onClick: () -> Unit
+) {
+
+    val value = holding.quantity * holding.currentPrice
+    val invested = holding.quantity * holding.averagePrice
+    val profit = value - invested
+    val percent = if (invested > 0) (profit / invested) * 100 else 0.0
+
+    val isPositive = profit >= 0
+    val color =
+        if (isPositive) MaterialTheme.colorScheme.positive
+        else MaterialTheme.colorScheme.error
+
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }
+    ) {
+        Column(Modifier.padding(16.dp)) {
+
+            // 🔹 FILA 1
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                Text(holding.symbol, fontWeight = FontWeight.Bold)
+                Text("Ahora vale €${"%.2f".format(value)}", fontWeight = FontWeight.SemiBold)
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // 🔹 FILA 2
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                Text(
+                    "Tienes: ${formatQuantity(holding.quantity)} ${holding.symbol}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    "Invertido: €${"%.2f".format(invested)}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // 🔹 RESULTADO
+            Text(
+                if (isPositive)
+                    "+€${"%.2f".format(profit)} (${ "%.2f".format(percent)}%)"
+                else
+                    "-€${"%.2f".format(kotlin.math.abs(profit))} (${ "%.2f".format(percent)}%)",
+                color = color,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+//////////////////////////////////////////////////////
+// FORMATO CANTIDAD
+//////////////////////////////////////////////////////
+
+fun formatQuantity(quantity: Double): String {
+    return when {
+        quantity >= 1 -> "%.2f".format(quantity)
+        quantity >= 0.01 -> "%.4f".format(quantity)
+        else -> "%.6f".format(quantity)
+    }
+}
+
+//////////////////////////////////////////////////////
+// 💥 TRANSACCIONES CLARAS
+//////////////////////////////////////////////////////
+
+@Composable
+fun TransactionCard(transaction: Transaction) {
+
+    val isBuy = transaction.type == TransactionType.BUY
+    val dateFormat = SimpleDateFormat("dd MMM · HH:mm", Locale.getDefault())
+
+    val color =
+        if (isBuy) MaterialTheme.colorScheme.error
+        else MaterialTheme.colorScheme.positive
+
+    val amount =
+        if (isBuy)
+            "-€${"%.2f".format(transaction.total)}"
+        else
+            "+€${"%.2f".format(transaction.total)}"
+
+    val typeText = if (isBuy) "Compra" else "Venta"
+
+    Card(Modifier.fillMaxWidth()) {
+
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                Text(transaction.symbol, fontWeight = FontWeight.Bold)
+                Text(amount, fontWeight = FontWeight.ExtraBold, color = color)
+            }
+
+            Spacer(Modifier.height(6.dp))
+
+            Text(
+                "$typeText · ${dateFormat.format(Date(transaction.date))}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+//////////////////////////////////////////////////////
+// RESTO
+//////////////////////////////////////////////////////
 
 fun PortfolioHolding.toAsset(): Asset {
     return Asset(
@@ -175,8 +282,6 @@ fun PortfolioHolding.toAsset(): Asset {
     )
 }
 
-// ================= COMPONENTES =================
-
 @Composable
 fun EmptyCard(text: String) {
     Card(Modifier.fillMaxWidth()) {
@@ -184,7 +289,7 @@ fun EmptyCard(text: String) {
             Modifier.fillMaxWidth().padding(32.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text)
         }
     }
 }
@@ -195,161 +300,74 @@ fun SummaryCard(
     value: String,
     subtitle: String,
     icon: ImageVector,
-    modifier: Modifier = Modifier
+    modifier: Modifier
 ) {
     Card(modifier) {
         Column(Modifier.padding(16.dp)) {
 
-            Row(
-                Modifier.fillMaxWidth(),
-                Arrangement.SpaceBetween,
-                Alignment.CenterVertically
-            ) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Icon(
-                    icon, null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp)
-                )
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                Text(title)
+                Icon(icon, null)
             }
 
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                value,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text(value, fontWeight = FontWeight.Bold)
+            Text(subtitle)
         }
     }
 }
 
 @Composable
-fun RankProgressCard(nextRank: Rank, currentProfit: Double, progress: Float) {
-    Card(Modifier.fillMaxWidth()) {
+fun RankProgressCard(
+    nextRank: Rank,
+    currentProfit: Double,
+    progress: Float
+) {
+    val remaining = (nextRank.minProfit - currentProfit).coerceAtLeast(0.0)
+
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        label = "rank_progress"
+    )
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large
+    ) {
         Column(Modifier.padding(16.dp)) {
 
+            // 🔹 TÍTULO
             Text(
-                "Progreso al siguiente rango",
-                style = MaterialTheme.typography.titleMedium,
+                "Siguiente rango: ${nextRank.name}",
                 fontWeight = FontWeight.Bold
-            )
-
-            Spacer(Modifier.height(4.dp))
-
-            Text(
-                "${nextRank.icon} ${nextRank.name} - Necesitas €${"%.2f".format(nextRank.minProfit)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(Modifier.height(12.dp))
 
-            LinearProgressIndicator(progress, Modifier.fillMaxWidth())
+            // 🔹 BARRA PRO
+            LinearProgressIndicator(
+                progress = animatedProgress,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(12.dp), // 🔥 más visible
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
 
             Spacer(Modifier.height(8.dp))
 
-            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                Text("€${"%.2f".format(currentProfit)}")
-                Text("€${"%.2f".format(nextRank.minProfit - currentProfit)} restantes")
-            }
-        }
-    }
-}
-
-@Composable
-fun PortfolioHoldingCard(holding: PortfolioHolding, onClick: () -> Unit) {
-
-    val value = holding.quantity * holding.currentPrice
-    val cost = holding.quantity * holding.averagePrice
-    val profit = value - cost
-    val profitPercent = if (cost > 0) (profit / cost) * 100 else 0.0
-
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val isHovered by interactionSource.collectIsHoveredAsState()
-
-    val backgroundColor by animateColorAsState(
-        when {
-            isPressed -> MaterialTheme.colorScheme.secondaryContainer
-            isHovered -> MaterialTheme.colorScheme.surfaceVariant
-            else -> MaterialTheme.colorScheme.surfaceContainerHigh
-        }, label = ""
-    )
-
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(
-            interactionSource = interactionSource,
-            indication = LocalIndication.current
-        ) { onClick() },
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(0.4f)),
-        colors = CardDefaults.cardColors(backgroundColor)
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(16.dp),
-            Arrangement.SpaceBetween,
-            Alignment.CenterVertically
-        ) {
-
-            Column(Modifier.weight(1f)) {
-                Text(holding.symbol, fontWeight = FontWeight.Bold)
-                Text(holding.name, style = MaterialTheme.typography.bodySmall)
-                Spacer(Modifier.height(8.dp))
-                Text("${holding.quantity} × €${"%.2f".format(holding.currentPrice)}")
-            }
-
-            Column(horizontalAlignment = Alignment.End) {
-                Text("€${"%.2f".format(value)}", fontWeight = FontWeight.Bold)
-
-                Text(
-                    "${if (profit >= 0) "+" else ""}€${"%.2f".format(profit)} (${"%.2f".format(profitPercent)}%)",
-                    color = if (profit >= 0)
-                        MaterialTheme.colorScheme.positive
-                    else
-                        MaterialTheme.colorScheme.error
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun TransactionCard(transaction: Transaction) {
-
-    val isCompra = transaction.type == TransactionType.BUY
-    val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-
-    Card(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.fillMaxWidth().padding(16.dp),
-            Arrangement.SpaceBetween,
-            Alignment.CenterVertically
-        ) {
-
-            Column {
-                Text(transaction.symbol, fontWeight = FontWeight.Bold)
-                Text(if (isCompra) "Compra" else "Venta")
-                Text(dateFormat.format(Date(transaction.date)))
-            }
-
+            // 🔹 PROGRESO NUMÉRICO
             Text(
-                "${if (isCompra) "-" else "+"}€${"%.2f".format(transaction.total)}",
-                fontWeight = FontWeight.Bold,
-                color = if (isCompra)
-                    MaterialTheme.colorScheme.error
-                else
-                    MaterialTheme.colorScheme.positive
+                "€${"%.2f".format(currentProfit)} / €${"%.2f".format(nextRank.minProfit)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // 🔹 MENSAJE CLARO
+            Text(
+                "Te faltan €${"%.2f".format(remaining)} para subir de rango",
+                fontWeight = FontWeight.SemiBold
             )
         }
     }

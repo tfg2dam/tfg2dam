@@ -11,7 +11,7 @@ class MarketRepository {
         private const val SEARCH_LIMIT = 5
     }
 
-    // ================= STOCKS FIJOS =================
+    // ================= DEFAULT STOCKS =================
 
     private val defaultStocks = listOf(
         "AAPL" to "Apple",
@@ -58,7 +58,11 @@ class MarketRepository {
 
         // CRYPTO
         try {
-            val cryptoResults = CoinGeckoClient.api.searchCoins(query).coins.take(SEARCH_LIMIT)
+            val cryptoResults = CoinGeckoClient.api
+                .searchCoins(query)
+                .coins
+                .take(SEARCH_LIMIT)
+
             cryptoResults.forEach {
                 results.add(
                     Asset(
@@ -78,7 +82,11 @@ class MarketRepository {
 
         // STOCKS
         try {
-            val stockResults = FinnhubClient.api.searchSymbol(query).result.take(SEARCH_LIMIT)
+            val stockResults = FinnhubClient.api
+                .searchSymbols(query)
+                .result
+                .take(SEARCH_LIMIT)
+
             stockResults.forEach { item ->
                 val quote = try {
                     FinnhubClient.api.getQuote(item.symbol)
@@ -93,8 +101,8 @@ class MarketRepository {
                         name = item.description,
                         type = AssetType.STOCK,
                         currentPrice = quote?.currentPrice ?: 0.0,
-                        priceChange24h = quote?.change ?: 0.0,
-                        priceChangePercent24h = quote?.changePercent ?: 0.0
+                        priceChange24h = quote?.priceChange ?: 0.0,
+                        priceChangePercent24h = quote?.priceChangePercentage ?: 0.0
                     )
                 )
             }
@@ -107,7 +115,10 @@ class MarketRepository {
 
     // ================= HISTORY =================
 
-    suspend fun getAssetHistory(asset: Asset, period: String = "7d"): List<Pair<Long, Double>> {
+    suspend fun getAssetHistory(
+        asset: Asset,
+        period: String = "7d"
+    ): List<Pair<Long, Double>> {
         return try {
 
             // CRYPTO (CoinGecko)
@@ -122,18 +133,22 @@ class MarketRepository {
                     else  -> 7 to "daily"
                 }
 
-                val history = CoinGeckoClient.api.getCoinHistory(
+                val history = CoinGeckoClient.api.getCoinMarketChart(
                     coinId = asset.id,
                     days = days,
                     interval = interval
                 )
 
-                val prices = if (period == "1h") history.prices.takeLast(60) else history.prices
+                val prices = if (period == "1h") {
+                    history.prices.takeLast(60)
+                } else {
+                    history.prices
+                }
 
                 prices.map { it[0].toLong() to it[1] }
             }
 
-            // STOCKS (Finnhub REAL)
+            // STOCKS (Finnhub)
             else {
 
                 val now = System.currentTimeMillis() / 1000
@@ -147,7 +162,7 @@ class MarketRepository {
                     else  -> now - 604800 to "60"
                 }
 
-                val response = FinnhubClient.api.getStockHistory(
+                val response = FinnhubClient.api.getStockCandles(
                     symbol = asset.symbol,
                     resolution = resolution,
                     from = from,
@@ -155,7 +170,7 @@ class MarketRepository {
                 )
 
                 if (response.status == "ok") {
-                    response.timestamps.zip(response.close)
+                    response.timestamps.zip(response.closePrices)
                 } else {
                     emptyList()
                 }
@@ -163,8 +178,6 @@ class MarketRepository {
 
         } catch (e: Exception) {
             e.printStackTrace()
-
-            // fallback por si falla la API
             generateSimulatedHistory(asset.currentPrice, period)
         }
     }
@@ -179,19 +192,22 @@ class MarketRepository {
             type = AssetType.CRYPTO,
             currentPrice = currentPrice,
             priceChange24h = priceChange24h,
-            priceChangePercent24h = priceChangePercent24h
+            priceChangePercent24h = priceChangePercentage24h
         )
     }
 
-    private fun com.simutrade.data.remote.FinnhubQuoteDto.toAsset(symbol: String, name: String): Asset {
+    private fun com.simutrade.data.remote.FinnhubQuoteDto.toAsset(
+        symbol: String,
+        name: String
+    ): Asset {
         return Asset(
             id = symbol,
             symbol = symbol,
             name = name,
             type = AssetType.STOCK,
             currentPrice = currentPrice,
-            priceChange24h = change,
-            priceChangePercent24h = changePercent
+            priceChange24h = priceChange,
+            priceChangePercent24h = priceChangePercentage
         )
     }
 

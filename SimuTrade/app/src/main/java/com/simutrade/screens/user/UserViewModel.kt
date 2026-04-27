@@ -2,9 +2,9 @@ package com.simutrade.screens.user
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.simutrade.screens.rankings.RankUtils
 import com.simutrade.data.model.*
 import com.simutrade.data.repository.UserRepository
+import com.simutrade.screens.rankings.RankUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,38 +19,37 @@ class UserViewModel : ViewModel() {
     private val _userData = MutableStateFlow(UserData())
     val userData: StateFlow<UserData> = _userData.asStateFlow()
 
-    private val _cartera = MutableStateFlow<List<PortfolioHolding>>(emptyList())
-    val cartera: StateFlow<List<PortfolioHolding>> = _cartera.asStateFlow()
+    private val _portfolio = MutableStateFlow<List<PortfolioHolding>>(emptyList())
+    val portfolio: StateFlow<List<PortfolioHolding>> = _portfolio.asStateFlow()
 
-    private val _transacciones = MutableStateFlow<List<Transaction>>(emptyList())
-    val transacciones: StateFlow<List<Transaction>> = _transacciones.asStateFlow()
+    private val _transactions = MutableStateFlow<List<Transaction>>(emptyList())
+    val transactions: StateFlow<List<Transaction>> = _transactions.asStateFlow()
 
     private val _currentRank = MutableStateFlow<Rank?>(null)
     val currentRank: StateFlow<Rank?> = _currentRank.asStateFlow()
 
     init {
-        cargarDatos()
+        loadData()
     }
 
     // ================= DATA =================
 
-    fun cargarDatos() {
+    fun loadData() {
         viewModelScope.launch {
 
             val user = repository.getUserData()
-            val carteraData = repository.getCartera()
-            val transaccionesData = repository.getTransacciones()
+            val portfolioData = repository.getPortfolio()
+            val transactionsData = repository.getTransactions()
 
             _userData.value = user
-            _cartera.value = carteraData
-            _transacciones.value = transaccionesData
+            _portfolio.value = portfolioData
+            _transactions.value = transactionsData
 
-            // El rango usa SOLO el beneficio de trading (sin bonus de retos)
-            val profitTrading = calcularBeneficioTrading(
-                saldo = user.saldo,
-                saldoInicial = user.saldoInicial,
-                saldoBonus = user.saldoBonus,
-                cartera = carteraData
+            val profitTrading = calculateTradingProfit(
+                balance = user.balance,
+                initialBalance = user.initialBalance,
+                bonusBalance = user.bonusBalance,
+                portfolio = portfolioData
             )
 
             _currentRank.value = RankUtils.getRankFromProfit(profitTrading)
@@ -67,28 +66,31 @@ class UserViewModel : ViewModel() {
         viewModelScope.launch {
 
             if (quantity <= 0 || quantity.isNaN()) {
-                onResult(OperationResult.Error("Cantidad inválida"))
+                onResult(OperationResult.Error("Invalid quantity"))
                 return@launch
             }
 
+            val user = _userData.value
             val total = quantity * asset.currentPrice
-            val currentUser = _userData.value
 
-            if (total > currentUser.saldo) {
-                onResult(OperationResult.Error("Saldo insuficiente"))
+            if (total > user.balance) {
+                onResult(OperationResult.Error("Insufficient balance"))
                 return@launch
             }
 
-            val nuevoSaldo = currentUser.saldo - total
-            repository.updateSaldo(nuevoSaldo)
-            _userData.value = currentUser.copy(saldo = nuevoSaldo)
+            // 🔹 actualizar balance local
+            val newBalance = user.balance - total
+            repository.updateBalance(newBalance)
+            _userData.value = user.copy(balance = newBalance)
 
-            val existente = _cartera.value.find { it.assetId == asset.id }
+            // 🔹 actualizar portfolio local
+            val existing = _portfolio.value.find { it.assetId == asset.id }
 
-            val holding = if (existente != null) {
-                val totalQty = existente.quantity + quantity
-                val totalCost = existente.averagePrice * existente.quantity + total
-                existente.copy(
+            val updatedHolding = if (existing != null) {
+                val totalQty = existing.quantity + quantity
+                val totalCost = existing.averagePrice * existing.quantity + total
+
+                existing.copy(
                     quantity = totalQty,
                     averagePrice = totalCost / totalQty,
                     currentPrice = asset.currentPrice
@@ -105,8 +107,12 @@ class UserViewModel : ViewModel() {
                 )
             }
 
-            repository.upsertCartera(holding)
+            repository.upsertPortfolio(updatedHolding)
 
+            _portfolio.value = _portfolio.value
+                .filter { it.assetId != asset.id } + updatedHolding
+
+            // 🔹 transacción
             val transaction = Transaction(
                 id = System.currentTimeMillis().toString(),
                 date = System.currentTimeMillis(),
@@ -118,16 +124,13 @@ class UserViewModel : ViewModel() {
                 total = total
             )
 
-            repository.addTransaccion(transaction)
+            repository.addTransaction(transaction)
+            _transactions.value = listOf(transaction) + _transactions.value
 
-            cargarDatos()
+            // 🔹 stats
+            updateStats()
 
-            // updateUserStats usa SOLO el beneficio de trading
-            val profitTrading = getProfitTrading()
-            val totalTrading = getTotalValueTrading()
-            repository.updateUserStats(totalTrading, profitTrading)
-
-            onResult(OperationResult.Success("Compra realizada", _userData.value))
+            onResult(OperationResult.Success("Purchase completed", _userData.value))
         }
     }
 
@@ -139,34 +142,41 @@ class UserViewModel : ViewModel() {
     ) {
         viewModelScope.launch {
 
-            val holding = _cartera.value.find { it.assetId == assetId }
+            val holding = _portfolio.value.find { it.assetId == assetId }
                 ?: run {
-                    onResult(OperationResult.Error("No tienes este activo"))
+                    onResult(OperationResult.Error("Asset not owned"))
                     return@launch
                 }
 
             if (quantity <= 0 || quantity > holding.quantity) {
-                onResult(OperationResult.Error("Cantidad inválida"))
+                onResult(OperationResult.Error("Invalid quantity"))
                 return@launch
             }
 
             val total = quantity * currentPrice
 
-            val nuevoSaldo = _userData.value.saldo + total
-            repository.updateSaldo(nuevoSaldo)
-            _userData.value = _userData.value.copy(saldo = nuevoSaldo)
+            // 🔹 actualizar balance
+            val newBalance = _userData.value.balance + total
+            repository.updateBalance(newBalance)
+            _userData.value = _userData.value.copy(balance = newBalance)
 
+            // 🔹 actualizar portfolio
             if (quantity == holding.quantity) {
-                repository.deleteCartera(assetId)
+                repository.deletePortfolio(assetId)
+                _portfolio.value = _portfolio.value.filter { it.assetId != assetId }
             } else {
-                repository.upsertCartera(
-                    holding.copy(
-                        quantity = holding.quantity - quantity,
-                        currentPrice = currentPrice
-                    )
+                val updated = holding.copy(
+                    quantity = holding.quantity - quantity,
+                    currentPrice = currentPrice
                 )
+
+                repository.upsertPortfolio(updated)
+
+                _portfolio.value = _portfolio.value
+                    .filter { it.assetId != assetId } + updated
             }
 
+            // 🔹 transacción
             val transaction = Transaction(
                 id = System.currentTimeMillis().toString(),
                 date = System.currentTimeMillis(),
@@ -178,57 +188,62 @@ class UserViewModel : ViewModel() {
                 total = total
             )
 
-            repository.addTransaccion(transaction)
+            repository.addTransaction(transaction)
+            _transactions.value = listOf(transaction) + _transactions.value
 
-            cargarDatos()
+            // 🔹 stats
+            updateStats()
 
-            // updateUserStats usa SOLO el beneficio de trading
-            val profitTrading = getProfitTrading()
-            val totalTrading = getTotalValueTrading()
-            repository.updateUserStats(totalTrading, profitTrading)
-
-            onResult(OperationResult.Success("Venta realizada", _userData.value))
+            onResult(OperationResult.Success("Sale completed", _userData.value))
         }
     }
 
-    // ================= CÁLCULOS =================
+    // ================= STATS =================
 
-    fun getPortfolioValue() =
-        repository.calcularValorCartera(_cartera.value)
+    private fun updateStats() {
+        val totalTrading = getTradingTotalValue()
+        val profitTrading = getTradingProfit()
 
-    // Valor total incluyendo bonus de retos (para mostrar en UI)
-    fun getTotalValue() =
-        repository.calcularValorTotal(_userData.value.saldo, getPortfolioValue())
+        viewModelScope.launch {
+            repository.updateUserStats(totalTrading, profitTrading)
+        }
 
-    // Beneficio incluyendo bonus de retos (para mostrar en UI)
-    fun getProfit() =
-        repository.calcularBeneficio(getTotalValue(), _userData.value.saldoInicial)
-
-    fun getProfitPercent() =
-        repository.calcularBeneficioPct(getTotalValue(), _userData.value.saldoInicial)
-
-    // Valor total SOLO de trading (sin contar bonus de retos)
-    private fun getTotalValueTrading(): Double {
-        val user = _userData.value
-        val saldoTrading = user.saldo - user.saldoBonus
-        return saldoTrading + getPortfolioValue()
+        _currentRank.value = RankUtils.getRankFromProfit(profitTrading)
     }
 
-    fun getProfitTrading(): Double {
+    // ================= CALCULATIONS =================
+
+    fun getPortfolioValue(): Double =
+        repository.calculatePortfolioValue(_portfolio.value)
+
+    fun getTotalValue(): Double =
+        repository.calculateTotalValue(_userData.value.balance, getPortfolioValue())
+
+    fun getProfit(): Double =
+        repository.calculateProfit(getTotalValue(), _userData.value.initialBalance)
+
+    fun getProfitPercent(): Double =
+        repository.calculateProfitPercentage(getTotalValue(), _userData.value.initialBalance)
+
+    private fun getTradingTotalValue(): Double {
         val user = _userData.value
-        return repository.calcularBeneficio(getTotalValueTrading(), user.saldoInicial)
+        val tradingBalance = user.balance - user.bonusBalance
+        return tradingBalance + getPortfolioValue()
     }
 
-    // Cálculo interno usado en cargarDatos
-    private fun calcularBeneficioTrading(
-        saldo: Double,
-        saldoInicial: Double,
-        saldoBonus: Double,
-        cartera: List<PortfolioHolding>
+    fun getTradingProfit(): Double {
+        val user = _userData.value
+        return repository.calculateProfit(getTradingTotalValue(), user.initialBalance)
+    }
+
+    private fun calculateTradingProfit(
+        balance: Double,
+        initialBalance: Double,
+        bonusBalance: Double,
+        portfolio: List<PortfolioHolding>
     ): Double {
-        val saldoTrading = saldo - saldoBonus
-        val valorCartera = cartera.sumOf { it.quantity * it.currentPrice }
-        val total = saldoTrading + valorCartera
-        return total - saldoInicial
+        val tradingBalance = balance - bonusBalance
+        val portfolioValue = portfolio.sumOf { it.quantity * it.currentPrice }
+        return tradingBalance + portfolioValue - initialBalance
     }
 }

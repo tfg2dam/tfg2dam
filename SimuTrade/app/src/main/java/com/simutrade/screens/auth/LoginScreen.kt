@@ -28,8 +28,8 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.success) {
-        if (uiState.success) {
+    LaunchedEffect(uiState.isSuccess) {
+        if (uiState.isSuccess) {
             onLoginSuccess()
             viewModel.clearSuccess()
         }
@@ -43,29 +43,33 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        // TÍTULO
+        // ================= TÍTULO =================
+
         Text(
-            "SimuTrade",
+            text = "SimuTrade",
             style = MaterialTheme.typography.headlineLarge
         )
 
         Text(
-            "Aprende a invertir sin riesgo",
+            text = "Aprende a invertir sin riesgo",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Spacer(Modifier.height(40.dp))
 
-        // EMAIL
+        // ================= EMAIL =================
+
         OutlinedTextField(
             value = email,
             onValueChange = {
                 email = it
                 viewModel.clearError()
             },
-            label = { Text("Email") },
-            leadingIcon = { Icon(Icons.Default.Email, contentDescription = "Email") },
+            label = { Text("Correo electrónico") },
+            leadingIcon = {
+                Icon(Icons.Default.Email, contentDescription = "Correo")
+            },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Email,
                 imeAction = ImeAction.Next
@@ -77,7 +81,8 @@ fun LoginScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // PASSWORD
+        // ================= CONTRASEÑA =================
+
         OutlinedTextField(
             value = password,
             onValueChange = {
@@ -85,19 +90,27 @@ fun LoginScreen(
                 viewModel.clearError()
             },
             label = { Text("Contraseña") },
-            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Contraseña") },
+            leadingIcon = {
+                Icon(Icons.Default.Lock, contentDescription = "Contraseña")
+            },
             trailingIcon = {
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                     Icon(
-                        if (passwordVisible) Icons.Default.VisibilityOff
-                        else Icons.Default.Visibility,
-                        contentDescription = "Mostrar u ocultar contraseña"
+                        imageVector = if (passwordVisible)
+                            Icons.Default.VisibilityOff
+                        else
+                            Icons.Default.Visibility,
+                        contentDescription = if (passwordVisible)
+                            "Ocultar contraseña"
+                        else
+                            "Mostrar contraseña"
                     )
                 }
             },
             visualTransformation = if (passwordVisible)
                 VisualTransformation.None
-            else PasswordVisualTransformation(),
+            else
+                PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.Done
@@ -115,17 +128,19 @@ fun LoginScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        // ERROR
+        // ================= ERROR =================
+
         uiState.error?.let { error ->
             Text(
-                error,
+                text = error,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(8.dp))
         }
 
-        // BOTÓN LOGIN
+        // ================= BOTÓN LOGIN =================
+
         Button(
             onClick = {
                 focusManager.clearFocus()
@@ -150,8 +165,10 @@ fun LoginScreen(
 
         Spacer(Modifier.height(16.dp))
 
+        // ================= REGISTER =================
+
         TextButton(onClick = onNavigateToRegister) {
-            Text("¿No tienes cuenta? Regístrate")
+            Text("¿No tienes cuenta? Crear cuenta")
         }
     }
 }
