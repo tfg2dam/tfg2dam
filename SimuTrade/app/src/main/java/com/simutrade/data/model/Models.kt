@@ -79,11 +79,13 @@ data class Rank(
 )
 
 data class LeaderboardEntry(
-    val id: String, // 🔥 este ES el userId real
+    val id: String,
     val username: String,
     val profit: Double,
     val rank: String,
-    val portfolioValue: Double
+    val portfolioValue: Double,
+    val balance: Double = 0.0,
+    val totalValue: Double = 0.0
 )
 
 // ================= RETOS =================

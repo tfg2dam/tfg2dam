@@ -39,15 +39,15 @@ class UserRepository {
             val doc = firestore.collection(USERS).document(userId).get().await()
 
             UserData(
-                userId        = doc.getString("id_usuario") ?: "",
-                username      = doc.getString("nombre_usuario") ?: "",
-                email         = doc.getString("email") ?: "",
-                balance       = doc.getDouble("saldo") ?: 100.0,
-                initialBalance= doc.getDouble("saldo_inicial") ?: 100.0,
-                bonusBalance  = doc.getDouble("saldo_bonus") ?: 0.0,
-                rankId        = doc.getString("id_rango") ?: "bronce",
-                createdAt     = doc.getLong("creado_en") ?: 0L,
-                lastLogin     = doc.getLong("ultimo_login") ?: 0L
+                userId         = doc.getString("id_usuario") ?: "",
+                username       = doc.getString("nombre_usuario") ?: "",
+                email          = doc.getString("email") ?: "",
+                balance        = doc.getDouble("saldo") ?: 100.0,
+                initialBalance = doc.getDouble("saldo_inicial") ?: 100.0,
+                bonusBalance   = doc.getDouble("saldo_bonus") ?: 0.0,
+                rankId         = doc.getString("id_rango") ?: "bronce",
+                createdAt      = doc.getLong("creado_en") ?: 0L,
+                lastLogin      = doc.getLong("ultimo_login") ?: 0L
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error getUserData", e)
@@ -57,7 +57,6 @@ class UserRepository {
 
     suspend fun updateBalance(newBalance: Double) {
         val userId = uid ?: return
-
         try {
             firestore.collection(USERS).document(userId)
                 .update("saldo", roundTo2Decimals(newBalance)).await()
@@ -66,10 +65,8 @@ class UserRepository {
         }
     }
 
-    // recompensa de retos
     suspend fun updateBonusBalance(increment: Double) {
         val userId = uid ?: return
-
         try {
             val doc = firestore.collection(USERS).document(userId).get().await()
             val currentBalance = doc.getDouble("saldo") ?: 0.0
@@ -89,7 +86,6 @@ class UserRepository {
 
     suspend fun updateRank(rankId: String) {
         val userId = uid ?: return
-
         try {
             firestore.collection(USERS).document(userId)
                 .update("id_rango", rankId).await()
@@ -100,7 +96,6 @@ class UserRepository {
 
     suspend fun updateUserStats(totalValue: Double, profit: Double) {
         val userId = uid ?: return
-
         try {
             firestore.collection(USERS)
                 .document(userId)
@@ -144,10 +139,8 @@ class UserRepository {
 
     suspend fun upsertPortfolio(holding: PortfolioHolding) {
         val userId = uid ?: return
-
         try {
             val docId = "${userId}_${holding.assetId}"
-
             val data = hashMapOf(
                 "id_usuario"      to userId,
                 "id_activo"       to holding.assetId,
@@ -159,9 +152,7 @@ class UserRepository {
                 "precio_actual"   to holding.currentPrice,
                 "actualizado_en"  to System.currentTimeMillis()
             )
-
             firestore.collection(PORTFOLIO).document(docId).set(data).await()
-
         } catch (e: Exception) {
             Log.e(TAG, "Error upsertPortfolio", e)
         }
@@ -169,7 +160,6 @@ class UserRepository {
 
     suspend fun deletePortfolio(assetId: String) {
         val userId = uid ?: return
-
         try {
             firestore.collection(PORTFOLIO)
                 .document("${userId}_${assetId}")
@@ -210,10 +200,9 @@ class UserRepository {
 
     suspend fun addTransaction(transaction: Transaction) {
         val userId = uid ?: return
-
         try {
             val data = hashMapOf(
-                "id_usuario"   to userId,
+                "id_usuario"   to transaction.assetId,
                 "id_activo"    to transaction.assetId,
                 "simbolo"      to transaction.symbol,
                 "tipo"         to transaction.type.name,
@@ -222,9 +211,7 @@ class UserRepository {
                 "total"        to transaction.total,
                 "ejecutado_en" to transaction.date
             )
-
             firestore.collection(TRANSACTIONS).add(data).await()
-
         } catch (e: Exception) {
             Log.e(TAG, "Error addTransaction", e)
         }
@@ -239,15 +226,28 @@ class UserRepository {
                 .get().await()
 
             snapshot.documents.mapNotNull { doc ->
-                val username = doc.getString("nombre_usuario") ?: return@mapNotNull null
-                val rankId = doc.getString("id_rango") ?: "bronce"
+                val nombre = doc.getString("nombre_usuario") ?: return@mapNotNull null
+                val idRango = doc.getString("id_rango") ?: "bronce"
+                val balance = doc.getDouble("saldo") ?: 0.0
+                val bonusBalance = doc.getDouble("saldo_bonus") ?: 0.0
+                val profit = doc.getDouble("profit") ?: 0.0
+                val initialBalance = doc.getDouble("saldo_inicial") ?: 100.0
+
+                // Total siempre correcto: saldoInicial + profit
+                val totalValue = initialBalance + profit
+
+                // Cartera calculada desde el total y el efectivo de trading
+                val tradingBalance = balance - bonusBalance
+                val portfolioValue = (totalValue - tradingBalance).coerceAtLeast(0.0)
 
                 LeaderboardEntry(
                     id             = doc.id,
-                    username       = username,
-                    profit         = doc.getDouble("profit") ?: 0.0,
-                    rank           = rankId.replaceFirstChar { it.uppercaseChar() },
-                    portfolioValue = doc.getDouble("portfolio_value") ?: 0.0
+                    username       = nombre,
+                    profit         = profit,
+                    rank           = idRango.replaceFirstChar { it.uppercaseChar() },
+                    portfolioValue = portfolioValue,
+                    balance        = balance,
+                    totalValue     = totalValue
                 )
             }
         } catch (e: Exception) {
@@ -265,12 +265,12 @@ class UserRepository {
             val doc = firestore.collection(CHALLENGES).document(userId).get().await()
 
             ChallengesData(
-                currentStreak      = doc.getLong("racha_actual")?.toInt() ?: 0,
-                maxStreak          = doc.getLong("racha_maxima")?.toInt() ?: 0,
-                lastTime           = doc.getLong("ultima_vez") ?: 0L,
-                completedChallenges= (doc.get("retos_completados") as? List<String>) ?: emptyList(),
-                dailyChallenges    = (doc.get("retos_del_dia") as? List<String>) ?: emptyList(),
-                currentDay         = doc.getLong("dia_actual") ?: 0L
+                currentStreak       = doc.getLong("racha_actual")?.toInt() ?: 0,
+                maxStreak           = doc.getLong("racha_maxima")?.toInt() ?: 0,
+                lastTime            = doc.getLong("ultima_vez") ?: 0L,
+                completedChallenges = (doc.get("retos_completados") as? List<String>) ?: emptyList(),
+                dailyChallenges     = (doc.get("retos_del_dia") as? List<String>) ?: emptyList(),
+                currentDay          = doc.getLong("dia_actual") ?: 0L
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error getChallengesData", e)
@@ -280,7 +280,6 @@ class UserRepository {
 
     suspend fun saveChallengesData(challengesData: ChallengesData) {
         val userId = uid ?: return
-
         try {
             val data = hashMapOf(
                 "racha_actual"      to challengesData.currentStreak,
@@ -290,9 +289,7 @@ class UserRepository {
                 "retos_del_dia"     to challengesData.dailyChallenges,
                 "dia_actual"        to challengesData.currentDay
             )
-
             firestore.collection(CHALLENGES).document(userId).set(data).await()
-
         } catch (e: Exception) {
             Log.e(TAG, "Error saveChallengesData", e)
         }

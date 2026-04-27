@@ -29,14 +29,12 @@ fun MarketScreen(
     mainViewModel: MainViewModel,
     marketViewModel: MarketViewModel = viewModel()
 ) {
-
     val uiState by marketViewModel.uiState.collectAsStateWithLifecycle()
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("Todos") }
     var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
 
-    // ⏱ TIMER
     LaunchedEffect(uiState.lastUpdated) {
         if (uiState.lastUpdated > 0) {
             while (true) {
@@ -58,9 +56,10 @@ fun MarketScreen(
 
     val hasData = uiState.stocks.isNotEmpty() || uiState.cryptos.isNotEmpty()
 
-    // 🔥 ANIMACIÓN SOLO CUANDO REFRESCA
-    val infiniteTransition = rememberInfiniteTransition(label = "refresh")
+    val puedeRefrescar = (System.currentTimeMillis() - uiState.lastUpdated) >= MarketViewModel.MIN_REFRESH_MS
+            || uiState.lastUpdated == 0L
 
+    val infiniteTransition = rememberInfiniteTransition(label = "refresh")
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -71,18 +70,15 @@ fun MarketScreen(
     )
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
+        modifier = Modifier.fillMaxSize().padding(16.dp)
     ) {
 
-        // ================= HEADER =================
+        // HEADER
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-
             Text(
                 "Mercado",
                 style = MaterialTheme.typography.headlineMedium,
@@ -90,32 +86,30 @@ fun MarketScreen(
             )
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-
                 if (uiState.lastUpdated > 0) {
-                    val seconds =
-                        ((currentTime - uiState.lastUpdated) / 1000).toInt()
-
+                    val seconds = ((currentTime - uiState.lastUpdated) / 1000).toInt()
                     Text(
                         "Hace ${seconds}s",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-
                     Spacer(Modifier.width(6.dp))
                 }
 
-                // 🔥 BOTÓN CON ANIMACIÓN REAL
                 IconButton(
-                    onClick = {
-                        marketViewModel.loadMarketData(force = true)
-                    }
+                    onClick = { marketViewModel.loadMarketData(force = true) },
+                    enabled = puedeRefrescar
                 ) {
                     Icon(
                         Icons.Default.Refresh,
                         contentDescription = "Actualizar",
                         modifier = Modifier.rotate(
                             if (uiState.isRefreshing) rotation else 0f
-                        )
+                        ),
+                        tint = if (puedeRefrescar)
+                            MaterialTheme.colorScheme.onSurface
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                     )
                 }
             }
@@ -123,7 +117,7 @@ fun MarketScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        // ================= BUSCADOR =================
+        // BUSCADOR
         OutlinedTextField(
             value = searchQuery,
             onValueChange = {
@@ -131,8 +125,19 @@ fun MarketScreen(
                 marketViewModel.search(it)
             },
             placeholder = { Text("Buscar activos...") },
-            leadingIcon = {
-                Icon(Icons.Default.Search, contentDescription = "Buscar")
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
+            trailingIcon = {
+                when {
+                    uiState.isSearching -> CircularProgressIndicator(
+                        Modifier.size(20.dp), strokeWidth = 2.dp
+                    )
+                    searchQuery.isNotEmpty() -> IconButton(onClick = {
+                        searchQuery = ""
+                        marketViewModel.search("")
+                    }) {
+                        Icon(Icons.Default.Clear, null)
+                    }
+                }
             },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
@@ -140,7 +145,7 @@ fun MarketScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        // ================= FILTROS =================
+        // FILTROS
         if (!isSearching) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(filters) { filter ->
@@ -151,41 +156,25 @@ fun MarketScreen(
                     )
                 }
             }
+            Spacer(Modifier.height(12.dp))
         }
 
-        Spacer(Modifier.height(12.dp))
-
-        // ================= CONTENIDO =================
+        // CONTENIDO
         Box(modifier = Modifier.fillMaxSize()) {
 
-            // 🔥 LOADING SOLO PRIMERA VEZ
             if (uiState.isInitialLoading && !hasData) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             }
 
-            // ❌ ERROR SOLO SIN DATOS
             if (uiState.error != null && !hasData) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        uiState.error ?: "",
-                        color = MaterialTheme.colorScheme.error
-                    )
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(uiState.error ?: "", color = MaterialTheme.colorScheme.error)
                 }
             }
 
-            // 📊 LISTA SIEMPRE
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(displayedAssets) { asset ->
                     AssetCard(
                         asset = asset,
@@ -193,13 +182,10 @@ fun MarketScreen(
                     )
                 }
 
-                // 🔥 LOADER ABAJO CUANDO REFRESCA
                 if (uiState.isRefreshing) {
                     item {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
                             horizontalArrangement = Arrangement.Center
                         ) {
                             CircularProgressIndicator()
@@ -211,41 +197,28 @@ fun MarketScreen(
     }
 }
 
-//////////////////////////////////////////////////////
-// CARD
-//////////////////////////////////////////////////////
-
 @Composable
 fun AssetCard(
     asset: Asset,
     onClick: () -> Unit
 ) {
-
     val isPositive = asset.priceChangePercent24h >= 0
-
-    val changeColor =
-        if (isPositive) MaterialTheme.colorScheme.positive
-        else MaterialTheme.colorScheme.error
+    val changeColor = if (isPositive) MaterialTheme.colorScheme.positive
+    else MaterialTheme.colorScheme.error
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }
     ) {
-
         Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            Modifier.fillMaxWidth().padding(16.dp),
             Arrangement.SpaceBetween,
             Alignment.CenterVertically
         ) {
-
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
             ) {
-
                 Surface(
                     shape = CircleShape,
                     color = if (asset.type == AssetType.STOCK)
@@ -261,10 +234,8 @@ fun AssetCard(
                         )
                     }
                 }
-
                 Column {
                     Text(asset.symbol, fontWeight = FontWeight.Bold)
-
                     Text(
                         asset.name,
                         style = MaterialTheme.typography.bodySmall,
@@ -274,15 +245,14 @@ fun AssetCard(
             }
 
             Column(horizontalAlignment = Alignment.End) {
-
                 Text(
                     "€${"%.2f".format(asset.currentPrice)}",
                     fontWeight = FontWeight.Bold
                 )
-
                 Text(
                     "${if (isPositive) "+" else ""}${"%.2f".format(asset.priceChangePercent24h)}%",
-                    color = changeColor
+                    color = changeColor,
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
         }

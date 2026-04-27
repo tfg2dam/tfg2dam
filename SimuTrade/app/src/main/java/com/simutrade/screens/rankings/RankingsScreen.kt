@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
 import com.simutrade.screens.theme.positive
 import com.simutrade.screens.user.UserViewModel
 
@@ -28,18 +29,23 @@ fun RankingsScreen(
     val error by rankingsViewModel.error.collectAsStateWithLifecycle()
     val currentRank by userViewModel.currentRank.collectAsStateWithLifecycle()
 
-    val profit = userViewModel.getProfit()
+    val profit = userViewModel.getTradingProfit()
+    val profitRounded = Math.round(profit * 100) / 100.0
+    val portfolioValue = userViewModel.getPortfolioValue()
+    val totalValue = userData.balance + portfolioValue
 
-    val profitColor =
-        if (profit >= 0) MaterialTheme.colorScheme.positive
-        else MaterialTheme.colorScheme.error
+    val profitColor = when {
+        profitRounded > 0 -> MaterialTheme.colorScheme.positive
+        profitRounded < 0 -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurface
+    }
 
     val position = rankingsViewModel.getUserPosition(userData.userId)
 
     LaunchedEffect(Unit) {
-        if (leaderboard.isEmpty()) {
-            rankingsViewModel.loadLeaderboard()
-        }
+        userViewModel.loadData()
+        delay(1000)
+        rankingsViewModel.loadLeaderboard()
     }
 
     LazyColumn(
@@ -47,7 +53,6 @@ fun RankingsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
 
-        // 🔥 TÍTULO
         item {
             Text(
                 "Ranking",
@@ -56,7 +61,7 @@ fun RankingsScreen(
             )
         }
 
-        // 🔥 TU POSICIÓN (ARREGLADA 🔥)
+        // Tu posicion
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -64,26 +69,17 @@ fun RankingsScreen(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             ) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
 
-                    Text(
-                        "Tu posición",
-                        style = MaterialTheme.typography.labelSmall
-                    )
+                    Text("Tu posicion", style = MaterialTheme.typography.labelSmall)
 
                     Spacer(Modifier.height(8.dp))
 
-                    // 🔹 FILA PRINCIPAL (CLAVE)
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-
                         Text(
                             text = if (position != -1)
                                 "#$position · ${userData.username}"
@@ -94,7 +90,7 @@ fun RankingsScreen(
                         )
 
                         Text(
-                            text = "${if (profit >= 0) "+" else ""}€${"%.2f".format(profit)}",
+                            text = "${if (profitRounded > 0) "+" else ""}€${"%.2f".format(profitRounded)}",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = profitColor
@@ -103,7 +99,32 @@ fun RankingsScreen(
 
                     Spacer(Modifier.height(6.dp))
 
-                    // 🔹 INFO SECUNDARIA
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "Total: €${"%.2f".format(totalValue)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "Cartera: €${"%.2f".format(portfolioValue)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Spacer(Modifier.height(2.dp))
+
+                    Text(
+                        "Efectivo: €${"%.2f".format(userData.balance)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(Modifier.height(4.dp))
+
                     currentRank?.let { rank ->
                         Text(
                             "Rango: ${rank.name}",
@@ -115,17 +136,14 @@ fun RankingsScreen(
             }
         }
 
-        // 🔥 HEADER
+        // Header leaderboard
         item {
             Row(
                 Modifier.fillMaxWidth(),
                 Arrangement.SpaceBetween,
                 Alignment.CenterVertically
             ) {
-                Text(
-                    "Top inversores",
-                    fontWeight = FontWeight.Bold
-                )
+                Text("Top inversores", fontWeight = FontWeight.Bold)
 
                 IconButton(
                     onClick = { rankingsViewModel.refresh() },
@@ -136,34 +154,31 @@ fun RankingsScreen(
             }
         }
 
-        // ERROR
+        // Error
         error?.let {
             item {
                 Text(it, color = MaterialTheme.colorScheme.error)
             }
         }
 
-        // LOADING
+        // Loading
         if (isLoading) {
             item {
-                Box(
-                    Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             }
-        }
-
-        // LISTA
-        else {
+        } else {
             itemsIndexed(leaderboard) { index, entry ->
 
                 val isMe = entry.id == userData.userId
+                val entryProfitRounded = Math.round(entry.profit * 100) / 100.0
 
-                val color =
-                    if (entry.profit >= 0) MaterialTheme.colorScheme.positive
-                    else MaterialTheme.colorScheme.error
+                val color = when {
+                    entryProfitRounded > 0 -> MaterialTheme.colorScheme.positive
+                    entryProfitRounded < 0 -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.onSurface
+                }
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -174,55 +189,52 @@ fun RankingsScreen(
                             MaterialTheme.colorScheme.surface
                     )
                 ) {
-
                     Column(Modifier.padding(16.dp)) {
 
-                        // 🔹 FILA PRINCIPAL
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-
-                                Text(
-                                    text = when (index) {
-                                        0 -> "🥇"
-                                        1 -> "🥈"
-                                        2 -> "🥉"
-                                        else -> "${index + 1}."
-                                    },
-                                    fontWeight = FontWeight.Bold
-                                )
-
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("${index + 1}.", fontWeight = FontWeight.Bold)
                                 Spacer(Modifier.width(8.dp))
-
-                                Text(
-                                    text = entry.username,
-                                    fontWeight = FontWeight.Bold
-                                )
-
+                                Text(entry.username, fontWeight = FontWeight.Bold)
                                 if (isMe) {
                                     Spacer(Modifier.width(6.dp))
-                                    Text("• Tú", style = MaterialTheme.typography.labelSmall)
+                                    Text("Tu", style = MaterialTheme.typography.labelSmall)
                                 }
                             }
 
                             Text(
-                                text = "${if (entry.profit >= 0) "+" else ""}€${"%.2f".format(entry.profit)}",
+                                text = "${if (entryProfitRounded > 0) "+" else ""}€${"%.2f".format(entryProfitRounded)}",
                                 fontWeight = FontWeight.Bold,
                                 color = color,
                                 style = MaterialTheme.typography.titleMedium
                             )
                         }
 
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(6.dp))
 
-                        // 🔹 INFO SECUNDARIA
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "Total: €${"%.2f".format(entry.totalValue)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                "Cartera: €${"%.2f".format(entry.portfolioValue)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Spacer(Modifier.height(2.dp))
+
                         Text(
-                            text = "Total: €${"%.2f".format(entry.portfolioValue)}",
+                            "Efectivo: €${"%.2f".format(entry.balance)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

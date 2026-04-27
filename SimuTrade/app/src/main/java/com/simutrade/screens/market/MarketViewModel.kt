@@ -15,7 +15,7 @@ data class MarketUiState(
     val searchResults: List<Asset> = emptyList(),
 
     val isInitialLoading: Boolean = true,
-    val isRefreshing: Boolean = false, // 🔥 CLAVE UX
+    val isRefreshing: Boolean = false,
 
     val isSearching: Boolean = false,
     val error: String? = null,
@@ -38,14 +38,12 @@ class MarketViewModel : ViewModel() {
     private var loadJob: Job? = null
 
     private var lastLoadTime = 0L
-
-    // 🔥 CACHE REAL (importantísimo)
     private var cachedCryptos: List<Asset> = emptyList()
     private var cachedStocks: List<Asset> = emptyList()
 
     companion object {
-        const val REFRESH_INTERVAL_MS = 60_000L // 🔥 1 minuto
-        const val MIN_REFRESH_MS = 5_000L
+        const val REFRESH_INTERVAL_MS = 120_000L  // ← 2 minutos
+        const val MIN_REFRESH_MS = 60_000L         // ← 60 segundos entre taps
         const val TIMEOUT_MS = 10_000L
     }
 
@@ -58,13 +56,12 @@ class MarketViewModel : ViewModel() {
 
     private fun startAutoRefresh() {
         refreshJob?.cancel()
-
         refreshJob = viewModelScope.launch {
             while (true) {
                 delay(REFRESH_INTERVAL_MS)
-
-                // 🔥 SIEMPRE refresca (como pedías)
-                loadMarketData(force = true)
+                if (_uiState.value.searchResults.isEmpty()) {
+                    loadMarketData(force = true)
+                }
             }
         }
     }
@@ -72,42 +69,42 @@ class MarketViewModel : ViewModel() {
     // ================= LOAD =================
 
     fun loadMarketData(force: Boolean = false) {
-
         val now = System.currentTimeMillis()
 
-        // 🔥 anti spam SOLO si no es manual
+        // Anti spam: si no es forzado y no han pasado 60 segundos, ignorar
         if (!force &&
             now - lastLoadTime < MIN_REFRESH_MS &&
             cachedCryptos.isNotEmpty()
         ) return
 
-        loadJob?.cancel()
+        // Si es tap manual y no ha pasado el cooldown, ignorar también
+        if (force &&
+            now - lastLoadTime < MIN_REFRESH_MS &&
+            cachedCryptos.isNotEmpty()
+        ) return
 
+        loadJob?.cancel()
         loadJob = viewModelScope.launch {
 
             val hasCache = cachedCryptos.isNotEmpty() || cachedStocks.isNotEmpty()
 
             _uiState.value = _uiState.value.copy(
-                isInitialLoading = !hasCache, // solo primera vez
-                isRefreshing = hasCache,      // 🔥 loader en lista
+                isInitialLoading = !hasCache,
+                isRefreshing = hasCache,
                 error = null
             )
 
             try {
                 val (cryptos, stocks) = coroutineScope {
-
                     val cryptosDeferred = async {
                         retryIO { repository.getTopCryptos() }
                     }
-
                     val stocksDeferred = async {
                         retryIO { repository.getTopStocks() }
                     }
-
                     cryptosDeferred.await() to stocksDeferred.await()
                 }
 
-                // 🔥 SOLO actualizar si hay datos válidos
                 if (cryptos.isNotEmpty()) cachedCryptos = cryptos
                 if (stocks.isNotEmpty()) cachedStocks = stocks
 
@@ -123,28 +120,22 @@ class MarketViewModel : ViewModel() {
                 )
 
             } catch (e: Exception) {
-
                 if (e !is CancellationException) {
+                    val isRateLimit = e.message?.contains("429") == true ||
+                            e.toString().contains("429")
 
-                    val isRateLimit =
-                        e.message?.contains("429") == true ||
-                                e.toString().contains("429")
+                    // Si es rate limit, actualizar el cooldown para bloquear más tiempo
+                    if (isRateLimit) lastLoadTime = System.currentTimeMillis()
 
-                    // 🔥 NUNCA perder datos
                     _uiState.value = _uiState.value.copy(
                         cryptos = cachedCryptos,
                         stocks = cachedStocks,
                         isInitialLoading = false,
                         isRefreshing = false,
                         error = if (!hasCache) {
-                            if (isRateLimit) {
-                                "Demasiadas peticiones. Espera unos segundos."
-                            } else {
-                                "Error al cargar el mercado"
-                            }
-                        } else {
-                            null
-                        }
+                            if (isRateLimit) "Demasiadas peticiones. Espera un momento."
+                            else "Error al cargar el mercado"
+                        } else null
                     )
                 }
             }
@@ -154,7 +145,6 @@ class MarketViewModel : ViewModel() {
     // ================= SEARCH =================
 
     fun search(query: String) {
-
         searchJob?.cancel()
 
         if (query.isBlank()) {
@@ -166,21 +156,15 @@ class MarketViewModel : ViewModel() {
         }
 
         searchJob = viewModelScope.launch {
-
             delay(400)
-
             _uiState.value = _uiState.value.copy(isSearching = true)
 
             try {
-                val results = retryIO {
-                    repository.searchAssets(query)
-                }
-
+                val results = retryIO { repository.searchAssets(query) }
                 _uiState.value = _uiState.value.copy(
                     searchResults = results,
                     isSearching = false
                 )
-
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isSearching = false,
@@ -193,9 +177,7 @@ class MarketViewModel : ViewModel() {
     // ================= HISTÓRICO =================
 
     fun loadPriceHistory(asset: Asset, period: String = "7d") {
-
         viewModelScope.launch {
-
             _uiState.value = _uiState.value.copy(
                 isLoadingHistory = true,
                 selectedPeriod = period,
@@ -203,15 +185,11 @@ class MarketViewModel : ViewModel() {
             )
 
             try {
-                val history = retryIO {
-                    repository.getAssetHistory(asset, period)
-                }
-
+                val history = retryIO { repository.getAssetHistory(asset, period) }
                 _uiState.value = _uiState.value.copy(
                     priceHistory = history,
                     isLoadingHistory = false
                 )
-
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoadingHistory = false,
@@ -229,7 +207,6 @@ class MarketViewModel : ViewModel() {
         block: suspend () -> T
     ): T {
         var currentDelay = initialDelay
-
         repeat(times - 1) {
             try {
                 return withTimeout(TIMEOUT_MS) { block() }
@@ -238,7 +215,6 @@ class MarketViewModel : ViewModel() {
                 currentDelay *= 2
             }
         }
-
         return withTimeout(TIMEOUT_MS) { block() }
     }
 
