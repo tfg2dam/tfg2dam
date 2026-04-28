@@ -2,248 +2,497 @@ package com.simutrade.screens.user
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.simutrade.data.model.*
-import com.simutrade.data.repository.UserRepository
+import com.simutrade.data.model.Activo
+import com.simutrade.data.model.ActivoEnCartera
+import com.simutrade.data.model.DatosUsuario
+import com.simutrade.data.model.Rango
+import com.simutrade.data.model.ResultadoOperacion
+import com.simutrade.data.model.TipoTransaccion
+import com.simutrade.data.model.Transaccion
+import com.simutrade.data.repository.RepositorioMercado
+import com.simutrade.data.repository.RepositorioUsuario
 import com.simutrade.screens.rankings.RankUtils
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class UserViewModel : ViewModel() {
 
-    private val repository = UserRepository()
+    private val repositorio = RepositorioUsuario()
+    private val repositorioMercado = RepositorioMercado()
 
     // ================= STATE =================
 
-    private val _userData = MutableStateFlow(UserData())
-    val userData: StateFlow<UserData> = _userData.asStateFlow()
+    data class UiState(
+        val usuario: DatosUsuario = DatosUsuario(),
+        val cartera: List<ActivoEnCartera> = emptyList(),
+        val transacciones: List<Transaccion> = emptyList(),
+        val rangoActual: Rango? = null,
+        val cargando: Boolean = true
+    )
 
-    private val _portfolio = MutableStateFlow<List<PortfolioHolding>>(emptyList())
-    val portfolio: StateFlow<List<PortfolioHolding>> = _portfolio.asStateFlow()
+    private val _uiState = MutableStateFlow(UiState())
 
-    private val _transactions = MutableStateFlow<List<Transaction>>(emptyList())
-    val transactions: StateFlow<List<Transaction>> = _transactions.asStateFlow()
+    val uiState: StateFlow<UiState> =
+        _uiState.asStateFlow()
 
-    private val _currentRank = MutableStateFlow<Rank?>(null)
-    val currentRank: StateFlow<Rank?> = _currentRank.asStateFlow()
+    // evita doble click en comprar/vender
+
+    private val mutexOperacion = Mutex()
 
     init {
-        loadData()
+        cargarDatos()
     }
 
-    // ================= DATA =================
+    // ================= CARGA =================
 
-    fun loadData() {
+    fun cargarDatos() {
         viewModelScope.launch {
 
-            val user = repository.getUserData()
-            val portfolioData = repository.getPortfolio()
-            val transactionsData = repository.getTransactions()
-
-            _userData.value = user
-            _portfolio.value = portfolioData
-            _transactions.value = transactionsData
-
-            val profitTrading = calculateTradingProfit(
-                balance = user.balance,
-                initialBalance = user.initialBalance,
-                bonusBalance = user.bonusBalance,
-                portfolio = portfolioData
-            )
-
-            _currentRank.value = RankUtils.getRankFromProfit(profitTrading)
-        }
-    }
-
-    // ================= TRADING =================
-
-    fun buyAsset(
-        asset: Asset,
-        quantity: Double,
-        onResult: (OperationResult) -> Unit
-    ) {
-        viewModelScope.launch {
-
-            if (quantity <= 0 || quantity.isNaN()) {
-                onResult(OperationResult.Error("Invalid quantity"))
-                return@launch
+            _uiState.update {
+                it.copy(cargando = true)
             }
 
-            val user = _userData.value
-            val total = quantity * asset.currentPrice
+            try {
+                val (usuario, carteraOriginal, transacciones) = coroutineScope {
 
-            if (total > user.balance) {
-                onResult(OperationResult.Error("Insufficient balance"))
-                return@launch
-            }
+                    val usuarioDiferido = async {
+                        repositorio.obtenerDatosUsuario()
+                    }
 
-            // 🔹 actualizar balance local
-            val newBalance = user.balance - total
-            repository.updateBalance(newBalance)
-            _userData.value = user.copy(balance = newBalance)
+                    val carteraDiferida = async {
+                        repositorio.obtenerCartera()
+                    }
 
-            // 🔹 actualizar portfolio local
-            val existing = _portfolio.value.find { it.assetId == asset.id }
+                    val transaccionesDiferidas = async {
+                        repositorio.obtenerTransacciones()
+                    }
 
-            val updatedHolding = if (existing != null) {
-                val totalQty = existing.quantity + quantity
-                val totalCost = existing.averagePrice * existing.quantity + total
-
-                existing.copy(
-                    quantity = totalQty,
-                    averagePrice = totalCost / totalQty,
-                    currentPrice = asset.currentPrice
-                )
-            } else {
-                PortfolioHolding(
-                    assetId = asset.id,
-                    symbol = asset.symbol,
-                    name = asset.name,
-                    type = asset.type,
-                    quantity = quantity,
-                    averagePrice = asset.currentPrice,
-                    currentPrice = asset.currentPrice
-                )
-            }
-
-            repository.upsertPortfolio(updatedHolding)
-
-            _portfolio.value = _portfolio.value
-                .filter { it.assetId != asset.id } + updatedHolding
-
-            // 🔹 transacción
-            val transaction = Transaction(
-                id = System.currentTimeMillis().toString(),
-                date = System.currentTimeMillis(),
-                type = TransactionType.BUY,
-                assetId = asset.id,
-                symbol = asset.symbol,
-                quantity = quantity,
-                price = asset.currentPrice,
-                total = total
-            )
-
-            repository.addTransaction(transaction)
-            _transactions.value = listOf(transaction) + _transactions.value
-
-            // 🔹 stats
-            updateStats()
-
-            onResult(OperationResult.Success("Purchase completed", _userData.value))
-        }
-    }
-
-    fun sellAsset(
-        assetId: String,
-        quantity: Double,
-        currentPrice: Double,
-        onResult: (OperationResult) -> Unit
-    ) {
-        viewModelScope.launch {
-
-            val holding = _portfolio.value.find { it.assetId == assetId }
-                ?: run {
-                    onResult(OperationResult.Error("Asset not owned"))
-                    return@launch
+                    Triple(
+                        usuarioDiferido.await(),
+                        carteraDiferida.await(),
+                        transaccionesDiferidas.await()
+                    )
                 }
 
-            if (quantity <= 0 || quantity > holding.quantity) {
-                onResult(OperationResult.Error("Invalid quantity"))
-                return@launch
-            }
+                val carteraActualizada =
+                    actualizarPreciosCartera(
+                        carteraOriginal
+                    )
 
-            val total = quantity * currentPrice
+                val beneficio =
+                    calcularBeneficioTrading(
+                        usuario,
+                        carteraActualizada
+                    )
 
-            // 🔹 actualizar balance
-            val newBalance = _userData.value.balance + total
-            repository.updateBalance(newBalance)
-            _userData.value = _userData.value.copy(balance = newBalance)
-
-            // 🔹 actualizar portfolio
-            if (quantity == holding.quantity) {
-                repository.deletePortfolio(assetId)
-                _portfolio.value = _portfolio.value.filter { it.assetId != assetId }
-            } else {
-                val updated = holding.copy(
-                    quantity = holding.quantity - quantity,
-                    currentPrice = currentPrice
+                _uiState.value = UiState(
+                    usuario = usuario,
+                    cartera = carteraActualizada,
+                    transacciones = transacciones,
+                    rangoActual =
+                        RankUtils.obtenerRangoPorBeneficio(
+                            beneficio
+                        ),
+                    cargando = false
                 )
 
-                repository.upsertPortfolio(updated)
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(cargando = false)
+                }
+            }
+        }
+    }
 
-                _portfolio.value = _portfolio.value
-                    .filter { it.assetId != assetId } + updated
+    // ================= REFRESCAR PRECIOS =================
+
+    private suspend fun actualizarPreciosCartera(
+        cartera: List<ActivoEnCartera>
+    ): List<ActivoEnCartera> {
+
+        if (cartera.isEmpty()) {
+            return emptyList()
+        }
+
+        val accionesMercado =
+            repositorioMercado.obtenerTopAcciones()
+
+        val criptosMercado =
+            repositorioMercado.obtenerTopCriptomonedas()
+
+        val mercadoCompleto =
+            accionesMercado + criptosMercado
+
+        return cartera.map { activoGuardado ->
+
+            val activoActualizado =
+                mercadoCompleto.find {
+                    it.id.equals(
+                        activoGuardado.idActivo,
+                        ignoreCase = true
+                    ) || it.simbolo.equals(
+                        activoGuardado.simbolo,
+                        ignoreCase = true
+                    )
+                }
+
+            if (activoActualizado != null) {
+
+                val nuevoActivo =
+                    activoGuardado.copy(
+                        precioActual =
+                            activoActualizado.precioActual
+                    )
+
+                repositorio.guardarActivoEnCartera(
+                    nuevoActivo
+                )
+
+                nuevoActivo
+
+            } else {
+                activoGuardado
+            }
+        }
+    }
+
+    // ================= COMPRAR =================
+
+    fun comprarActivo(
+        activo: Activo,
+        cantidad: Double,
+        onResult: (ResultadoOperacion) -> Unit
+    ) {
+        viewModelScope.launch {
+
+            mutexOperacion.withLock {
+
+                val estado = _uiState.value
+
+                if (
+                    cantidad <= 0 ||
+                    cantidad.isNaN() ||
+                    activo.precioActual <= 0
+                ) {
+                    onResult(
+                        ResultadoOperacion.Error(
+                            "Cantidad inválida"
+                        )
+                    )
+                    return@withLock
+                }
+
+                val total =
+                    cantidad * activo.precioActual
+
+                if (total > estado.usuario.saldo) {
+                    onResult(
+                        ResultadoOperacion.Error(
+                            "Saldo insuficiente"
+                        )
+                    )
+                    return@withLock
+                }
+
+                val nuevoSaldo =
+                    estado.usuario.saldo - total
+
+                repositorio.actualizarSaldo(
+                    nuevoSaldo
+                )
+
+                val existente =
+                    estado.cartera.find {
+                        it.idActivo == activo.id
+                    }
+
+                val activoActualizado =
+                    if (existente != null) {
+
+                        val cantidadTotal =
+                            existente.cantidad + cantidad
+
+                        val costeTotal =
+                            (
+                                    existente.precioPromedio *
+                                            existente.cantidad
+                                    ) + total
+
+                        existente.copy(
+                            cantidad = cantidadTotal,
+                            precioPromedio =
+                                costeTotal / cantidadTotal,
+                            precioActual =
+                                activo.precioActual
+                        )
+
+                    } else {
+
+                        ActivoEnCartera(
+                            idActivo = activo.id,
+                            simbolo = activo.simbolo,
+                            nombre = activo.nombre,
+                            tipo = activo.tipo,
+                            cantidad = cantidad,
+                            precioPromedio =
+                                activo.precioActual,
+                            precioActual =
+                                activo.precioActual
+                        )
+                    }
+
+                repositorio.guardarActivoEnCartera(
+                    activoActualizado
+                )
+
+                val transaccion =
+                    Transaccion(
+                        id =
+                            System.currentTimeMillis()
+                                .toString(),
+                        fecha =
+                            System.currentTimeMillis(),
+                        tipo =
+                            TipoTransaccion.COMPRA,
+                        idActivo = activo.id,
+                        simbolo = activo.simbolo,
+                        cantidad = cantidad,
+                        precio =
+                            activo.precioActual,
+                        total = total
+                    )
+
+                repositorio.guardarTransaccion(
+                    transaccion
+                )
+
+                val nuevaCartera =
+                    estado.cartera
+                        .filter {
+                            it.idActivo != activo.id
+                        } + activoActualizado
+
+                val nuevasTransacciones =
+                    listOf(transaccion) +
+                            estado.transacciones
+
+                val nuevoUsuario =
+                    estado.usuario.copy(
+                        saldo = nuevoSaldo
+                    )
+
+                actualizarEstado(
+                    usuario = nuevoUsuario,
+                    cartera = nuevaCartera,
+                    transacciones = nuevasTransacciones
+                )
+
+                onResult(
+                    ResultadoOperacion.Exito(
+                        mensaje = "Compra realizada",
+                        datosUsuario = nuevoUsuario
+                    )
+                )
+            }
+        }
+    }
+
+    // ================= VENDER =================
+
+    fun venderActivo(
+        idActivo: String,
+        cantidad: Double,
+        precioActual: Double,
+        onResult: (ResultadoOperacion) -> Unit
+    ) {
+        viewModelScope.launch {
+
+            mutexOperacion.withLock {
+
+                val estado = _uiState.value
+
+                val activo =
+                    estado.cartera.find {
+                        it.idActivo == idActivo
+                    }
+                        ?: run {
+                            onResult(
+                                ResultadoOperacion.Error(
+                                    "Activo no encontrado"
+                                )
+                            )
+                            return@withLock
+                        }
+
+                if (
+                    cantidad <= 0 ||
+                    cantidad.isNaN() ||
+                    cantidad > activo.cantidad ||
+                    precioActual <= 0
+                ) {
+                    onResult(
+                        ResultadoOperacion.Error(
+                            "Cantidad inválida"
+                        )
+                    )
+                    return@withLock
+                }
+
+                val total =
+                    cantidad * precioActual
+
+                val nuevoSaldo =
+                    estado.usuario.saldo + total
+
+                repositorio.actualizarSaldo(
+                    nuevoSaldo
+                )
+
+                val nuevaCartera =
+                    if (cantidad >= activo.cantidad) {
+
+                        repositorio
+                            .eliminarActivoDeCartera(
+                                idActivo
+                            )
+
+                        estado.cartera.filter {
+                            it.idActivo != idActivo
+                        }
+
+                    } else {
+
+                        val activoActualizado =
+                            activo.copy(
+                                cantidad =
+                                    activo.cantidad - cantidad,
+                                precioActual =
+                                    precioActual
+                            )
+
+                        repositorio
+                            .guardarActivoEnCartera(
+                                activoActualizado
+                            )
+
+                        estado.cartera
+                            .filter {
+                                it.idActivo != idActivo
+                            } + activoActualizado
+                    }
+
+                val transaccion =
+                    Transaccion(
+                        id =
+                            System.currentTimeMillis()
+                                .toString(),
+                        fecha =
+                            System.currentTimeMillis(),
+                        tipo =
+                            TipoTransaccion.VENTA,
+                        idActivo = idActivo,
+                        simbolo = activo.simbolo,
+                        cantidad = cantidad,
+                        precio = precioActual,
+                        total = total
+                    )
+
+                repositorio.guardarTransaccion(
+                    transaccion
+                )
+
+                val nuevasTransacciones =
+                    listOf(transaccion) +
+                            estado.transacciones
+
+                val nuevoUsuario =
+                    estado.usuario.copy(
+                        saldo = nuevoSaldo
+                    )
+
+                actualizarEstado(
+                    usuario = nuevoUsuario,
+                    cartera = nuevaCartera,
+                    transacciones = nuevasTransacciones
+                )
+
+                onResult(
+                    ResultadoOperacion.Exito(
+                        mensaje = "Venta realizada",
+                        datosUsuario = nuevoUsuario
+                    )
+                )
+            }
+        }
+    }
+
+    // ================= ACTUALIZAR =================
+
+    private suspend fun actualizarEstado(
+        usuario: DatosUsuario,
+        cartera: List<ActivoEnCartera>,
+        transacciones: List<Transaccion>
+    ) {
+        val valorCartera =
+            cartera.sumOf {
+                it.cantidad * it.precioActual
             }
 
-            // 🔹 transacción
-            val transaction = Transaction(
-                id = System.currentTimeMillis().toString(),
-                date = System.currentTimeMillis(),
-                type = TransactionType.SELL,
-                assetId = assetId,
-                symbol = holding.symbol,
-                quantity = quantity,
-                price = currentPrice,
-                total = total
+        val valorTotal =
+            usuario.saldo + valorCartera
+
+        val beneficio =
+            valorTotal - usuario.saldoInicial
+
+        _uiState.value =
+            UiState(
+                usuario = usuario,
+                cartera = cartera,
+                transacciones = transacciones,
+                rangoActual =
+                    RankUtils.obtenerRangoPorBeneficio(
+                        beneficio
+                    ),
+                cargando = false
             )
 
-            repository.addTransaction(transaction)
-            _transactions.value = listOf(transaction) + _transactions.value
-
-            // 🔹 stats
-            updateStats()
-
-            onResult(OperationResult.Success("Sale completed", _userData.value))
-        }
+        repositorio.actualizarEstadisticasUsuario(
+            valorCartera = valorCartera,
+            beneficio = beneficio
+        )
     }
+    // ================= CÁLCULOS =================
 
-    // ================= STATS =================
-
-    private fun updateStats() {
-        val totalTrading = getTradingTotalValue()
-        val profitTrading = getTradingProfit()
-
-        viewModelScope.launch {
-            repository.updateUserStats(totalTrading, profitTrading)
-        }
-
-        _currentRank.value = RankUtils.getRankFromProfit(profitTrading)
-    }
-
-    // ================= CALCULATIONS =================
-
-    fun getPortfolioValue(): Double =
-        repository.calculatePortfolioValue(_portfolio.value)
-
-    fun getTotalValue(): Double =
-        repository.calculateTotalValue(_userData.value.balance, getPortfolioValue())
-
-    fun getProfit(): Double =
-        repository.calculateProfit(getTotalValue(), _userData.value.initialBalance)
-
-    fun getProfitPercent(): Double =
-        repository.calculateProfitPercentage(getTotalValue(), _userData.value.initialBalance)
-
-    private fun getTradingTotalValue(): Double {
-        val user = _userData.value
-        val tradingBalance = user.balance - user.bonusBalance
-        return tradingBalance + getPortfolioValue()
-    }
-
-    fun getTradingProfit(): Double {
-        val user = _userData.value
-        return repository.calculateProfit(getTradingTotalValue(), user.initialBalance)
-    }
-
-    private fun calculateTradingProfit(
-        balance: Double,
-        initialBalance: Double,
-        bonusBalance: Double,
-        portfolio: List<PortfolioHolding>
+    private fun calcularValorTradingTotal(
+        usuario: DatosUsuario,
+        cartera: List<ActivoEnCartera>
     ): Double {
-        val tradingBalance = balance - bonusBalance
-        val portfolioValue = portfolio.sumOf { it.quantity * it.currentPrice }
-        return tradingBalance + portfolioValue - initialBalance
+
+        val saldoTrading =
+            usuario.saldo - usuario.saldoBonus
+
+        val valorCartera =
+            cartera.sumOf {
+                it.cantidad * it.precioActual
+            }
+
+        return saldoTrading + valorCartera
+    }
+
+    private fun calcularBeneficioTrading(
+        usuario: DatosUsuario,
+        cartera: List<ActivoEnCartera>
+    ): Double {
+        return calcularValorTradingTotal(
+            usuario,
+            cartera
+        ) - usuario.saldoInicial
     }
 }

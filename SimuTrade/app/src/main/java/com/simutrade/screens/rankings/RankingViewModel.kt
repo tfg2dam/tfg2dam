@@ -2,62 +2,111 @@ package com.simutrade.screens.rankings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.simutrade.data.model.LeaderboardEntry
-import com.simutrade.data.repository.UserRepository
-import kotlinx.coroutines.flow.*
+import com.simutrade.data.model.EntradaRanking
+import com.simutrade.data.repository.RepositorioUsuario
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+data class EstadoUiRankings(
+    val ranking: List<EntradaRanking> = emptyList(),
+    val cargando: Boolean = false,
+    val error: String? = null
+)
 
 class RankingsViewModel : ViewModel() {
 
-    private val repository = UserRepository()
+    private val repositorio = RepositorioUsuario()
 
-    private val _leaderboard = MutableStateFlow<List<LeaderboardEntry>>(emptyList())
-    val leaderboard: StateFlow<List<LeaderboardEntry>> = _leaderboard.asStateFlow()
+    private val _uiState = MutableStateFlow(
+        EstadoUiRankings()
+    )
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    val uiState: StateFlow<EstadoUiRankings> =
+        _uiState.asStateFlow()
 
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error.asStateFlow()
+    private var trabajoCarga: Job? = null
 
     init {
-        loadLeaderboard()
+        cargarRanking()
     }
 
-    fun loadLeaderboard() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
+    // ================= CARGAR =================
+
+    fun cargarRanking() {
+
+        if (_uiState.value.cargando) return
+
+        trabajoCarga?.cancel()
+
+        trabajoCarga = viewModelScope.launch {
+
+            _uiState.update {
+                it.copy(
+                    cargando = true,
+                    error = null
+                )
+            }
 
             try {
-                val data = repository.getLeaderboard()
+                val datosRanking =
+                    repositorio.obtenerRanking()
 
-                // 🔥 IMPORTANTE: ordenar
-                _leaderboard.value = data.sortedByDescending { it.profit }
+                _uiState.update {
+                    it.copy(
+                        ranking = datosRanking
+                            .sortedByDescending { entrada ->
+                                entrada.beneficio
+                            },
+                        cargando = false,
+                        error = null
+                    )
+                }
 
             } catch (e: Exception) {
-                _error.value = "Error cargando ranking"
-            } finally {
-                _isLoading.value = false
+
+                _uiState.update {
+                    it.copy(
+                        cargando = false,
+                        error = e.message
+                            ?: "Error cargando ranking"
+                    )
+                }
             }
         }
     }
 
-    fun refresh() {
-        loadLeaderboard()
+    // ================= RECARGAR =================
+
+    fun recargar() {
+        cargarRanking()
     }
 
-    // 🔥 POSICIÓN DEL USUARIO
-    fun getUserPosition(userId: String): Int {
-        val index = _leaderboard.value.indexOfFirst { it.id == userId }
-        return if (index != -1) index + 1 else -1
+    // ================= HELPERS =================
+
+    fun obtenerPosicionUsuario(
+        idUsuario: String
+    ): Int {
+
+        val indice =
+            _uiState.value.ranking.indexOfFirst {
+                it.id == idUsuario
+            }
+
+        return if (indice != -1) {
+            indice + 1
+        } else {
+            -1
+        }
     }
 
-    // 🔥 DIFERENCIA CON EL SIGUIENTE
-    fun getGapWithNext(index: Int): Double? {
-        val list = _leaderboard.value
-        return if (index < list.size - 1) {
-            list[index].profit - list[index + 1].profit
-        } else null
+    // ================= LIMPIEZA =================
+
+    override fun onCleared() {
+        super.onCleared()
+        trabajoCarga?.cancel()
     }
 }

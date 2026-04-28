@@ -1,126 +1,112 @@
 package com.simutrade.data.model
 
-import com.simutrade.screens.rankings.RankIcon
+// ================= ACTIVOS =================
 
-// ================= ASSETS =================
-
-data class Asset(
+data class Activo(
     val id: String,
-    val symbol: String,
-    val name: String,
-    val type: AssetType,
-    val currentPrice: Double,
-    val priceChange24h: Double,
-    val priceChangePercent24h: Double
+    val simbolo: String,
+    val nombre: String,
+    val tipo: TipoActivo,
+    val precioActual: Double,
+    val cambioPrecio24h: Double,
+    val cambioPorcentaje24h: Double
 )
 
-enum class AssetType {
-    STOCK,
-    CRYPTO
+enum class TipoActivo {
+    ACCION,
+    CRIPTO
 }
 
-data class PriceHistory(
-    val time: String,
-    val price: Double
+// ================= CARTERA =================
+
+data class ActivoEnCartera(
+    val idActivo: String,
+    val simbolo: String,
+    val nombre: String,
+    val tipo: TipoActivo,
+    val cantidad: Double,
+    val precioPromedio: Double,
+    val precioActual: Double
 )
 
-// ================= PORTFOLIO =================
+// ================= TRANSACCIONES =================
 
-data class PortfolioHolding(
-    val assetId: String,
-    val symbol: String,
-    val name: String,
-    val type: AssetType,
-    val quantity: Double,
-    val averagePrice: Double,
-    val currentPrice: Double
-)
-
-// ================= TRANSACTIONS =================
-
-data class Transaction(
+data class Transaccion(
     val id: String,
-    val date: Long,
-    val type: TransactionType,
-    val assetId: String,
-    val symbol: String,
-    val quantity: Double,
-    val price: Double,
+    val fecha: Long,
+    val tipo: TipoTransaccion,
+    val idActivo: String,
+    val simbolo: String,
+    val cantidad: Double,
+    val precio: Double,
     val total: Double
 )
 
-enum class TransactionType {
-    BUY,
-    SELL
+enum class TipoTransaccion {
+    COMPRA,
+    VENTA
 }
 
-// ================= USER =================
+// ================= USUARIO =================
 
-data class UserData(
-    val userId: String = "",
-    val username: String = "",
+data class DatosUsuario(
+    val idUsuario: String = "",
+    val nombreUsuario: String = "",
     val email: String = "",
-    val balance: Double = 100.0,
-    val initialBalance: Double = 100.0,
-    val bonusBalance: Double = 0.0,
-    val rankId: String = "bronce",
-    val createdAt: Long = 0L,
-    val lastLogin: Long = 0L
+    val saldo: Double = 100.0,
+    val saldoInicial: Double = 100.0,
+    val saldoBonus: Double = 0.0,
+    val idRango: String = "bronce",
+    val creadoEn: Long = 0L,
+    val ultimoLogin: Long = 0L
 )
 
 // ================= RANKING =================
 
-data class Rank(
-    val name: String,
-    val minProfit: Double,
+data class Rango(
+    val nombre: String,
+    val beneficioMinimo: Double,
     val color: String,
-    val icon: RankIcon,
-    val description: String
+    val descripcion: String
 )
 
-data class LeaderboardEntry(
-    val id: String,
-    val username: String,
-    val profit: Double,
-    val rank: String,
-    val portfolioValue: Double,
-    val balance: Double = 0.0,
-    val totalValue: Double = 0.0
+data class EntradaRanking(
+    val id: String = "",
+    val nombreUsuario: String = "",
+    val beneficio: Double = 0.0,
+    val valorTotal: Double = 0.0,
+    val valorCartera: Double = 0.0,
+    val saldo: Double = 0.0
 )
 
 // ================= RETOS =================
 
-data class ChallengesData(
-    val currentStreak: Int = 0,
-    val maxStreak: Int = 0,
-
-    val lastTime: Long = 0L,
-
-    val completedChallenges: List<String> = emptyList(),
-
-    val dailyChallenges: List<String> = emptyList(),
-
-    val currentDay: Long = 0L // CORREGIDO (antes era Int)
+data class DatosRetos(
+    val rachaActual: Int = 0,
+    val rachaMaxima: Int = 0,
+    val ultimaVez: Long = 0L,
+    val retosCompletados: List<String> = emptyList(),
+    val retosDelDia: List<String> = emptyList(),
+    val diaActual: Long = 0L
 )
 
-data class Challenge(
+data class Reto(
     val id: String,
-    val title: String,
-    val description: String,
-    val emoji: String,
-    val reward: Double
+    val titulo: String,
+    val descripcion: String,
+    val recompensa: Double
 )
 
-// ================= COMMON =================
+// ================= RESULTADOS =================
 
-sealed class OperationResult {
+sealed class ResultadoOperacion {
 
-    data class Success(
-        val message: String,
-        val userData: UserData
-    ) : OperationResult()
+    data class Exito(
+        val mensaje: String,
+        val datosUsuario: DatosUsuario
+    ) : ResultadoOperacion()
 
     data class Error(
-        val message: String
-    ) : OperationResult()
+        val mensaje: String
+    ) : ResultadoOperacion()
 }

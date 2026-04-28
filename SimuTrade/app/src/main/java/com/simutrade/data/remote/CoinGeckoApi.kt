@@ -4,73 +4,92 @@ import com.google.gson.annotations.SerializedName
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
-import retrofit2.http.Path
 import retrofit2.http.Query
 
 // ================= DTO (RESPUESTAS API) =================
 
-data class CoinGeckoItemDto(
+data class MonedaCoinGeckoDto(
     val id: String,
-    val symbol: String,
-    val name: String,
-    @SerializedName("current_price") val currentPrice: Double,
-    @SerializedName("price_change_24h") val priceChange24h: Double,
-    @SerializedName("price_change_percentage_24h") val priceChangePercentage24h: Double
+
+    @SerializedName("symbol")
+    val simbolo: String,
+
+    @SerializedName("name")
+    val nombre: String,
+
+    @SerializedName("current_price")
+    val precioActual: Double,
+
+    @SerializedName("price_change_24h")
+    val cambioPrecio24h: Double?,
+
+    @SerializedName("price_change_percentage_24h")
+    val cambioPorcentaje24h: Double?
 )
 
-data class CoinGeckoSearchResponseDto(
-    val coins: List<CoinGeckoSearchItemDto>
+data class RespuestaBusquedaCoinGeckoDto(
+
+    @SerializedName("coins")
+    val monedas: List<ItemBusquedaCoinGeckoDto>
 )
 
-data class CoinGeckoSearchItemDto(
+data class ItemBusquedaCoinGeckoDto(
     val id: String,
-    val symbol: String,
-    val name: String
-)
 
-data class CoinGeckoMarketChartDto(
-    val prices: List<List<Double>>
+    @SerializedName("symbol")
+    val simbolo: String,
+
+    @SerializedName("name")
+    val nombre: String
 )
 
 // ================= API =================
 
-interface CoinGeckoApi {
+interface ApiCoinGecko {
 
     @GET("coins/markets")
-    suspend fun getTopCoins(
-        @Query("vs_currency") currency: String = "eur",
-        @Query("order") order: String = "market_cap_desc",
-        @Query("per_page") perPage: Int = 10,
-        @Query("page") page: Int = 1,
-        @Query("sparkline") sparkline: Boolean = false
-    ): List<CoinGeckoItemDto>
+    suspend fun obtenerMonedasPrincipales(
+
+        @Query("vs_currency")
+        moneda: String = "eur",
+
+        @Query("order")
+        orden: String = "market_cap_desc",
+
+        @Query("per_page")
+        cantidadPorPagina: Int = 10,
+
+        @Query("page")
+        pagina: Int = 1,
+
+        @Query("sparkline")
+        incluirSparkline: Boolean = false
+
+    ): List<MonedaCoinGeckoDto>
 
     @GET("search")
-    suspend fun searchCoins(
-        @Query("query") query: String
-    ): CoinGeckoSearchResponseDto
+    suspend fun buscarMonedas(
 
-    @GET("coins/{id}/market_chart")
-    suspend fun getCoinMarketChart(
-        @Path("id") coinId: String,
-        @Query("vs_currency") currency: String = "eur",
-        @Query("days") days: Int = 7,
-        @Query("interval") interval: String = "daily"
-    ): CoinGeckoMarketChartDto
+        @Query("query")
+        consulta: String
 
+    ): RespuestaBusquedaCoinGeckoDto
 }
 
-// ================= CLIENT =================
+// ================= CLIENTE =================
 
-object CoinGeckoClient {
+object ClienteCoinGecko {
 
-    private const val BASE_URL = "https://api.coingecko.com/api/v3/"
+    private const val URL_BASE =
+        "https://api.coingecko.com/api/v3/"
 
-    val api: CoinGeckoApi by lazy {
+    val api: ApiCoinGecko by lazy {
         Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
+            .baseUrl(URL_BASE)
+            .addConverterFactory(
+                GsonConverterFactory.create()
+            )
             .build()
-            .create(CoinGeckoApi::class.java)
+            .create(ApiCoinGecko::class.java)
     }
 }

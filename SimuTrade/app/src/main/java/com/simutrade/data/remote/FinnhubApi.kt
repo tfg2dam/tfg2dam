@@ -8,69 +8,79 @@ import retrofit2.http.Query
 
 // ================= DTO =================
 
-data class FinnhubQuoteDto(
-    @SerializedName("c") val currentPrice: Double,
-    @SerializedName("d") val priceChange: Double,
-    @SerializedName("dp") val priceChangePercentage: Double
+data class CotizacionFinnhubDto(
+
+    @SerializedName("c")
+    val precioActual: Double?,
+
+    @SerializedName("d")
+    val cambioPrecio: Double?,
+
+    @SerializedName("dp")
+    val cambioPorcentaje: Double?
 )
 
-data class FinnhubSearchResponseDto(
-    val result: List<FinnhubSearchItemDto>
+data class RespuestaBusquedaFinnhubDto(
+
+    @SerializedName("result")
+    val resultados: List<ItemBusquedaFinnhubDto>
 )
 
-data class FinnhubSearchItemDto(
-    val symbol: String,
-    val description: String
-)
+data class ItemBusquedaFinnhubDto(
 
-data class FinnhubCandleDto(
-    @SerializedName("c") val closePrices: List<Double>,
-    @SerializedName("t") val timestamps: List<Long>,
-    @SerializedName("s") val status: String
+    @SerializedName("symbol")
+    val simbolo: String,
+
+    @SerializedName("description")
+    val descripcion: String
 )
 
 // ================= API =================
 
-interface FinnhubApi {
+interface ApiFinnhub {
 
     @GET("quote")
-    suspend fun getQuote(
-        @Query("symbol") symbol: String,
-        @Query("token") token: String = FinnhubClient.API_KEY
-    ): FinnhubQuoteDto
+    suspend fun obtenerCotizacion(
+
+        @Query("symbol")
+        simbolo: String,
+
+        @Query("token")
+        token: String = ClienteFinnhub.API_KEY
+
+    ): CotizacionFinnhubDto
 
     @GET("search")
-    suspend fun searchSymbols(
-        @Query("q") query: String,
-        @Query("token") token: String = FinnhubClient.API_KEY
-    ): FinnhubSearchResponseDto
+    suspend fun buscarSimbolos(
 
-    @GET("stock/candle")
-    suspend fun getStockCandles(
-        @Query("symbol") symbol: String,
-        @Query("resolution") resolution: String = "D",
-        @Query("from") from: Long,
-        @Query("to") to: Long,
-        @Query("token") token: String = FinnhubClient.API_KEY
-    ): FinnhubCandleDto
+        @Query("q")
+        consulta: String,
 
+        @Query("token")
+        token: String = ClienteFinnhub.API_KEY
+
+    ): RespuestaBusquedaFinnhubDto
 }
 
-// ================= CLIENT =================
+// ================= CLIENTE =================
 
-object FinnhubClient {
+object ClienteFinnhub {
 
-    private const val BASE_URL = "https://finnhub.io/api/v1/"
+    private const val URL_BASE =
+        "https://finnhub.io/api/v1/"
 
-    // NOTA: esto debería ir en local.properties o BuildConfig
-    const val API_KEY = "d7dsf8pr01qmm59ebt6gd7dsf8pr01qmm59ebt70"
+    // NOTA:
+    // esto debería ir en local.properties o BuildConfig
+    const val API_KEY =
+        "d7dsf8pr01qmm59ebt6gd7dsf8pr01qmm59ebt70"
 
-    val api: FinnhubApi by lazy {
+    val api: ApiFinnhub by lazy {
         Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
+            .baseUrl(URL_BASE)
+            .addConverterFactory(
+                GsonConverterFactory.create()
+            )
             .build()
-            .create(FinnhubApi::class.java)
+            .create(ApiFinnhub::class.java)
     }
-
 }

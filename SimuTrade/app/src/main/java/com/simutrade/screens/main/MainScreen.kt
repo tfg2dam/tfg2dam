@@ -1,10 +1,30 @@
 package com.simutrade.screens.main
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -26,30 +46,62 @@ fun MainScreen(
     authViewModel: AuthViewModel = viewModel()
 ) {
 
-    val currentPage by mainViewModel.currentPage.collectAsState()
+    // ================= ESTADO PRINCIPAL =================
 
-    val userData by userViewModel.userData.collectAsStateWithLifecycle()
-    val currentRank by userViewModel.currentRank.collectAsStateWithLifecycle()
+    val mainUiState by mainViewModel.uiState.collectAsStateWithLifecycle()
 
-    var showProfileDialog by remember { mutableStateOf(false) }
+    val pantallaActual =
+        mainUiState.pantallaActual
 
-    val navigationItems = listOf(
-        NavigationItem(Screen.Dashboard, "Panel", Icons.Default.Dashboard),
-        NavigationItem(Screen.Market, "Mercado", Icons.Default.TrendingUp),
-        NavigationItem(Screen.Rankings, "Ranking", Icons.Default.EmojiEvents),
-        NavigationItem(Screen.Challenges, "Retos", Icons.Default.Star)
+    // ================= ESTADO USUARIO =================
+
+    val userUiState by userViewModel.uiState.collectAsStateWithLifecycle()
+
+    val usuario =
+        userUiState.usuario
+
+    val rangoActual =
+        userUiState.rangoActual
+
+    var mostrarDialogoPerfil by remember {
+        mutableStateOf(false)
+    }
+
+    val itemsNavegacion = listOf(
+        ItemNavegacion(
+            Pantalla.Inicio,
+            "Panel",
+            Icons.Default.Dashboard
+        ),
+        ItemNavegacion(
+            Pantalla.Mercado,
+            "Mercado",
+            Icons.AutoMirrored.Filled.TrendingUp
+        ),
+        ItemNavegacion(
+            Pantalla.Rankings,
+            "Ranking",
+            Icons.Default.EmojiEvents
+        ),
+        ItemNavegacion(
+            Pantalla.Retos,
+            "Retos",
+            Icons.Default.Star
+        )
     )
 
     // ================= PERFIL =================
 
-    if (showProfileDialog) {
+    if (mostrarDialogoPerfil) {
         ProfileDialog(
-            userData = userData,
-            currentRank = currentRank,
-            onDismiss = { showProfileDialog = false },
+            datosUsuario = usuario,
+            rangoActual = rangoActual,
+            onDismiss = {
+                mostrarDialogoPerfil = false
+            },
             onLogout = {
-                showProfileDialog = false
-                authViewModel.logout()
+                mostrarDialogoPerfil = false
+                authViewModel.cerrarSesion()
                 onLogout()
             }
         )
@@ -62,20 +114,39 @@ fun MainScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("SimuTrade", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            text = "SimuTrade",
+                            style =
+                                MaterialTheme.typography.titleLarge
+                        )
 
                         Text(
-                            "€${"%.2f".format(userData.balance)} • ${
-                                currentRank?.name ?: ""
-                            }",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text =
+                                "€${"%.2f".format(usuario.saldo)} • ${rangoActual?.nombre ?: ""}",
+
+                            style =
+                                MaterialTheme.typography.bodySmall,
+
+                            color =
+                                MaterialTheme.colorScheme
+                                    .onSurfaceVariant
                         )
                     }
                 },
+
                 actions = {
-                    IconButton(onClick = { showProfileDialog = true }) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = "Perfil")
+                    IconButton(
+                        onClick = {
+                            mostrarDialogoPerfil = true
+                        }
+                    ) {
+                        Icon(
+                            imageVector =
+                                Icons.Default.AccountCircle,
+
+                            contentDescription =
+                                "Perfil"
+                        )
                     }
                 }
             )
@@ -83,12 +154,27 @@ fun MainScreen(
 
         bottomBar = {
             NavigationBar {
-                navigationItems.forEach { item ->
+                itemsNavegacion.forEach { item ->
                     NavigationBarItem(
-                        icon = { Icon(item.icon, contentDescription = item.label) },
-                        label = { Text(item.label) },
-                        selected = currentPage == item.screen,
-                        onClick = { mainViewModel.navigateTo(item.screen) }
+                        icon = {
+                            Icon(
+                                imageVector = item.icono,
+                                contentDescription = item.etiqueta
+                            )
+                        },
+
+                        label = {
+                            Text(item.etiqueta)
+                        },
+
+                        selected =
+                            pantallaActual == item.pantalla,
+
+                        onClick = {
+                            mainViewModel.navegarA(
+                                item.pantalla
+                            )
+                        }
                     )
                 }
             }
@@ -101,31 +187,48 @@ fun MainScreen(
                 .padding(paddingValues)
         ) {
 
-            when (currentPage) {
+            when (pantallaActual) {
 
-                Screen.Dashboard -> DashboardScreen()
+                Pantalla.Inicio -> {
+                    DashboardScreen()
+                }
 
-                Screen.Market -> MarketScreen(mainViewModel)
+                Pantalla.Mercado -> {
+                    MarketScreen(
+                        mainViewModel = mainViewModel
+                    )
+                }
 
-                Screen.Trading -> TradingScreen(mainViewModel)
+                Pantalla.Trading -> {
+                    TradingScreen(
+                        mainViewModel = mainViewModel
+                    )
+                }
 
-                Screen.Rankings -> RankingsScreen()
+                Pantalla.Rankings -> {
+                    RankingsScreen()
+                }
 
-                Screen.Challenges -> {
+                Pantalla.Retos -> {
                     LaunchedEffect(Unit) {
-                        userViewModel.loadData()
+                        userViewModel.cargarDatos()
                     }
-                    ChallengesScreen(userViewModel = userViewModel)
+
+                    ChallengesScreen(
+                        userViewModel = userViewModel
+                    )
                 }
             }
         }
     }
 }
 
-// ================= NAV ITEM =================
+//////////////////////////////////////////////////////
+// ITEM NAVEGACIÓN
+//////////////////////////////////////////////////////
 
-data class NavigationItem(
-    val screen: Screen,
-    val label: String,
-    val icon: ImageVector
+data class ItemNavegacion(
+    val pantalla: Pantalla,
+    val etiqueta: String,
+    val icono: ImageVector
 )

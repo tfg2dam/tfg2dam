@@ -3,333 +3,506 @@ package com.simutrade.screens.challenges
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.simutrade.data.model.*
-import com.simutrade.data.repository.UserRepository
-import kotlinx.coroutines.flow.*
+import com.simutrade.data.model.DatosRetos
+import com.simutrade.data.model.Reto
+import com.simutrade.data.model.TipoActivo
+import com.simutrade.data.repository.RepositorioUsuario
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.TimeZone
 
-data class ChallengeValidation(
-    val completed: Boolean,
-    val message: String
+data class ValidacionReto(
+    val completado: Boolean,
+    val mensaje: String
 )
 
 class ChallengesViewModel : ViewModel() {
 
-    private val repository = UserRepository()
+    private val repositorio = RepositorioUsuario()
 
-    private val _challengesData = MutableStateFlow(ChallengesData())
-    val challengesData: StateFlow<ChallengesData> = _challengesData.asStateFlow()
+    private val _datosRetos = MutableStateFlow(
+        DatosRetos()
+    )
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    val datosRetos: StateFlow<DatosRetos> =
+        _datosRetos.asStateFlow()
 
-    private val _millisUntilReset = MutableStateFlow(0L)
-    val millisUntilReset: StateFlow<Long> = _millisUntilReset.asStateFlow()
+    private val _cargando = MutableStateFlow(false)
 
-    fun loadChallenges() {
+    val cargando: StateFlow<Boolean> =
+        _cargando.asStateFlow()
+
+    private val _milisegundosHastaReset =
+        MutableStateFlow(0L)
+
+    val milisegundosHastaReset: StateFlow<Long> =
+        _milisegundosHastaReset.asStateFlow()
+
+    init {
+        cargarRetos()
+    }
+
+    // ================= CARGAR =================
+
+    fun cargarRetos() {
         viewModelScope.launch {
-            _isLoading.value = true
+
+            _cargando.value = true
+
             try {
-                val data = repository.getChallengesData()
-                val updated = checkDailyReset(data)
-                _challengesData.value = updated
-                calculateResetTime()
+                val datosGuardados =
+                    repositorio.obtenerDatosRetos()
+
+                val datosSeguros =
+                    if (datosGuardados.diaActual == 0L) {
+
+                        val inicioHoy =
+                            obtenerInicioDelDia()
+
+                        val datosIniciales =
+                            datosGuardados.copy(
+                                diaActual = inicioHoy,
+                                retosDelDia = generarRetosAleatorios()
+                            )
+
+                        repositorio.guardarDatosRetos(
+                            datosIniciales
+                        )
+
+                        datosIniciales
+
+                    } else {
+                        datosGuardados
+                    }
+
+                val datosActualizados =
+                    verificarResetDiario(
+                        datosSeguros
+                    )
+
+                _datosRetos.value =
+                    datosActualizados
+
+                calcularTiempoReset()
+
             } catch (e: Exception) {
-                Log.e("ChallengesVM", "Error en retos", e)
+                Log.e(
+                    "ChallengesViewModel",
+                    "Error cargando retos",
+                    e
+                )
             } finally {
-                _isLoading.value = false
+                _cargando.value = false
             }
         }
     }
 
     // ================= RESET DIARIO =================
 
-    private suspend fun checkDailyReset(data: ChallengesData): ChallengesData {
+    private suspend fun verificarResetDiario(
+        datos: DatosRetos
+    ): DatosRetos {
 
-        val todayStart = Calendar.getInstance(TimeZone.getDefault()).apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+        val inicioHoy =
+            obtenerInicioDelDia()
 
-        if (data.currentDay == 0L) {
-            val initial = data.copy(
-                currentDay = todayStart,
-                dailyChallenges = generateRandomChallenges()
-            )
-            repository.saveChallengesData(initial)
-            return initial
-        }
+        if (datos.diaActual != inicioHoy) {
 
-        if (data.currentDay != todayStart) {
+            val ayer =
+                inicioHoy - (24 * 60 * 60 * 1000)
 
-            val yesterday = todayStart - (24 * 60 * 60 * 1000)
-
-            // 🔥 IMPORTANTE: ya NO sumamos aquí
-            val newStreak =
-                if (data.currentDay == yesterday && allChallengesCompleted(data))
-                    data.currentStreak
-                else
+            val nuevaRacha =
+                if (
+                    datos.diaActual == ayer &&
+                    todosLosRetosCompletados(datos)
+                ) {
+                    datos.rachaActual + 1
+                } else {
                     0
+                }
 
-            val reset = data.copy(
-                currentStreak = newStreak,
-                maxStreak = maxOf(data.maxStreak, newStreak),
-                completedChallenges = emptyList(),
-                dailyChallenges = generateRandomChallenges(),
-                currentDay = todayStart
+            val datosReiniciados =
+                datos.copy(
+                    rachaActual = nuevaRacha,
+                    rachaMaxima = maxOf(
+                        datos.rachaMaxima,
+                        nuevaRacha
+                    ),
+                    retosCompletados = emptyList(),
+                    retosDelDia = generarRetosAleatorios(),
+                    diaActual = inicioHoy,
+                    ultimaVez = System.currentTimeMillis()
+                )
+
+            repositorio.guardarDatosRetos(
+                datosReiniciados
             )
 
-            repository.saveChallengesData(reset)
-            return reset
+            return datosReiniciados
         }
 
-        return data
+        return datos
     }
 
-    private fun calculateResetTime() {
-        val now = Calendar.getInstance(TimeZone.getDefault())
+    private fun obtenerInicioDelDia(): Long {
+        return Calendar
+            .getInstance(TimeZone.getDefault())
+            .apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            .timeInMillis
+    }
 
-        val tomorrow = (now.clone() as Calendar).apply {
-            add(Calendar.DAY_OF_YEAR, 1)
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
+    private fun calcularTiempoReset() {
+        val ahora =
+            Calendar.getInstance(
+                TimeZone.getDefault()
+            )
 
-        _millisUntilReset.value = tomorrow.timeInMillis - now.timeInMillis
+        val manana =
+            (ahora.clone() as Calendar).apply {
+                add(Calendar.DAY_OF_YEAR, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+        _milisegundosHastaReset.value =
+            manana.timeInMillis - ahora.timeInMillis
     }
 
     // ================= GENERADOR =================
 
-    private fun generateRandomChallenges(): List<String> {
-        val pool = listOf(
-            "operation",
-            "diversify",
+    private fun generarRetosAleatorios(): List<String> {
+        return listOf(
+            "operacion",
+            "diversificar",
             "trader",
-            "multimarket",
-            "profit"
-        )
-        return pool.shuffled().take(3)
+            "multimercado",
+            "beneficio"
+        ).shuffled().take(3)
     }
 
     // ================= RETOS DEL DÍA =================
 
-    fun getChallengesOfDay(): List<Challenge> {
+    fun obtenerRetosDelDia(): List<Reto> {
 
-        val data = _challengesData.value
+        val datos =
+            _datosRetos.value
 
-        return data.dailyChallenges.mapIndexed { index, type ->
+        return datos.retosDelDia.mapIndexed { index, tipo ->
 
-            val id = "challenge_${type}_${data.currentDay}_${index + 1}"
+            val id =
+                "reto_${tipo}_${datos.diaActual}_${index + 1}"
 
-            when (type) {
+            when (tipo) {
 
-                "operation" -> Challenge(
-                    id,
-                    "Haz tu primera operación",
-                    "Compra o vende cualquier activo hoy",
-                    "operation",
-                    1.0
+                "operacion" -> Reto(
+                    id = id,
+                    titulo = "Haz tu primera operación",
+                    descripcion = "Compra o vende cualquier activo hoy",
+                    recompensa = 1.0
                 )
 
-                "diversify" -> Challenge(
-                    id,
-                    "Diversifica tu cartera",
-                    "Ten al menos 2 inversiones diferentes",
-                    "diversify",
-                    1.5
+                "diversificar" -> Reto(
+                    id = id,
+                    titulo = "Diversifica tu cartera",
+                    descripcion = "Ten al menos 2 inversiones diferentes",
+                    recompensa = 1.5
                 )
 
-                "multimarket" -> Challenge(
-                    id,
-                    "Invierte en varios mercados",
-                    "Invierte en acciones y criptomonedas",
-                    "multimarket",
-                    2.0
+                "multimercado" -> Reto(
+                    id = id,
+                    titulo = "Invierte en varios mercados",
+                    descripcion = "Invierte en acciones y criptomonedas",
+                    recompensa = 2.0
                 )
 
-                "trader" -> Challenge(
-                    id,
-                    "Actividad alta",
-                    "Realiza 3 operaciones hoy",
-                    "trader",
-                    2.5
+                "trader" -> Reto(
+                    id = id,
+                    titulo = "Actividad alta",
+                    descripcion = "Realiza 3 operaciones hoy",
+                    recompensa = 2.5
                 )
 
-                "profit" -> Challenge(
-                    id,
-                    "Consigue beneficios",
-                    "Haz que tu cartera esté en positivo",
-                    "profit",
-                    3.0
+                "beneficio" -> Reto(
+                    id = id,
+                    titulo = "Consigue beneficios",
+                    descripcion = "Haz que tu cartera esté en positivo",
+                    recompensa = 3.0
                 )
 
-                else -> Challenge(
-                    "error",
-                    "Error",
-                    "No se pudo cargar el reto",
-                    "error",
-                    0.0
+                else -> Reto(
+                    id = "error",
+                    titulo = "Error",
+                    descripcion = "No se pudo cargar el reto",
+                    recompensa = 0.0
                 )
             }
         }
     }
 
-    private fun allChallengesCompleted(data: ChallengesData): Boolean {
-        val ids = data.dailyChallenges.mapIndexed { index, type ->
-            "challenge_${type}_${data.currentDay}_${index + 1}"
+    private fun todosLosRetosCompletados(
+        datos: DatosRetos
+    ): Boolean {
+
+        val idsRetos =
+            datos.retosDelDia.mapIndexed { index, tipo ->
+                "reto_${tipo}_${datos.diaActual}_${index + 1}"
+            }
+
+        return idsRetos.all {
+            it in datos.retosCompletados
         }
-        return ids.all { it in data.completedChallenges }
     }
 
     // ================= VALIDACIÓN =================
 
-    suspend fun validateChallenge(id: String): ChallengeValidation {
+    suspend fun validarReto(
+        id: String
+    ): ValidacionReto = coroutineScope {
 
-        val type = getTypeFromId(id)
+        val tipo =
+            obtenerTipoDesdeId(id)
 
-        val portfolio = repository.getPortfolio()
-        val transactions = repository.getTransactions()
-        val user = repository.getUserData()
-
-        val todayStart = Calendar.getInstance(TimeZone.getDefault()).apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-
-        val todayTx = transactions.filter { it.date >= todayStart }
-
-        return when (type) {
-
-            "operation" ->
-                if (todayTx.isNotEmpty())
-                    ChallengeValidation(true, "Ya has hecho una operación hoy")
-                else
-                    ChallengeValidation(false, "Haz una compra o una venta")
-
-            "trader" -> {
-                val remaining = 3 - todayTx.size
-                if (todayTx.size >= 3)
-                    ChallengeValidation(true, "Has completado las 3 operaciones")
-                else
-                    ChallengeValidation(false, "Te faltan $remaining operaciones")
+        val carteraDeferred =
+            async {
+                repositorio.obtenerCartera()
             }
 
-            "diversify" -> {
-                val distinct = portfolio.map { it.assetId }.distinct().size
-                val remaining = 2 - distinct
-
-                if (distinct >= 2)
-                    ChallengeValidation(true, "Ya tienes varias inversiones")
-                else
-                    ChallengeValidation(false, "Te falta ${remaining} inversión más")
+        val transaccionesDeferred =
+            async {
+                repositorio.obtenerTransacciones()
             }
 
-            "multimarket" -> {
-                val stock = portfolio.any { it.type == AssetType.STOCK }
-                val crypto = portfolio.any { it.type == AssetType.CRYPTO }
+        val usuarioDeferred =
+            async {
+                repositorio.obtenerDatosUsuario()
+            }
 
-                when {
-                    stock && crypto ->
-                        ChallengeValidation(true, "Ya inviertes en ambos mercados")
+        val cartera =
+            carteraDeferred.await()
 
-                    !stock && !crypto ->
-                        ChallengeValidation(false, "Empieza invirtiendo en cualquier activo")
+        val transacciones =
+            transaccionesDeferred.await()
 
-                    !stock ->
-                        ChallengeValidation(false, "Te falta invertir en acciones")
+        val usuario =
+            usuarioDeferred.await()
 
-                    else ->
-                        ChallengeValidation(false, "Te falta invertir en criptomonedas")
+        val inicioHoy =
+            obtenerInicioDelDia()
+
+        val transaccionesHoy =
+            transacciones.filter {
+                it.fecha >= inicioHoy
+            }
+
+        when (tipo) {
+
+            "operacion" -> {
+                if (transaccionesHoy.isNotEmpty()) {
+                    ValidacionReto(
+                        true,
+                        "Ya has hecho una operación hoy"
+                    )
+                } else {
+                    ValidacionReto(
+                        false,
+                        "Haz una compra o una venta"
+                    )
                 }
             }
 
-            "profit" -> {
-                val portfolioValue = repository.calculatePortfolioValue(portfolio)
-                val total = repository.calculateTotalValue(user.balance, portfolioValue)
-                val profit = repository.calculateProfit(total, user.initialBalance)
+            "trader" -> {
+                val restantes =
+                    3 - transaccionesHoy.size
 
-                if (profit > 0)
-                    ChallengeValidation(true, "Vas ganando €${"%.2f".format(profit)}")
-                else
-                    ChallengeValidation(false, "Tu cartera aún no está en positivo")
+                if (transaccionesHoy.size >= 3) {
+                    ValidacionReto(
+                        true,
+                        "Has completado las 3 operaciones"
+                    )
+                } else {
+                    ValidacionReto(
+                        false,
+                        "Te faltan $restantes operaciones"
+                    )
+                }
             }
 
-            else -> ChallengeValidation(false, "Reto desconocido")
+            "diversificar" -> {
+                val activosDistintos =
+                    cartera.map {
+                        it.idActivo
+                    }.distinct().size
+
+                if (activosDistintos >= 2) {
+                    ValidacionReto(
+                        true,
+                        "Ya tienes varias inversiones"
+                    )
+                } else {
+                    ValidacionReto(
+                        false,
+                        "Te falta ${2 - activosDistintos} inversión más"
+                    )
+                }
+            }
+
+            "multimercado" -> {
+                val tieneAcciones =
+                    cartera.any {
+                        it.tipo == TipoActivo.ACCION
+                    }
+
+                val tieneCripto =
+                    cartera.any {
+                        it.tipo == TipoActivo.CRIPTO
+                    }
+
+                when {
+                    tieneAcciones && tieneCripto ->
+                        ValidacionReto(
+                            true,
+                            "Ya inviertes en ambos mercados"
+                        )
+
+                    !tieneAcciones && !tieneCripto ->
+                        ValidacionReto(
+                            false,
+                            "Empieza invirtiendo en cualquier activo"
+                        )
+
+                    !tieneAcciones ->
+                        ValidacionReto(
+                            false,
+                            "Te falta invertir en acciones"
+                        )
+
+                    else ->
+                        ValidacionReto(
+                            false,
+                            "Te falta invertir en criptomonedas"
+                        )
+                }
+            }
+
+            "beneficio" -> {
+                val valorCartera =
+                    repositorio.calcularValorCartera(
+                        cartera
+                    )
+
+                val valorTotal =
+                    repositorio.calcularValorTotal(
+                        usuario.saldo,
+                        valorCartera
+                    )
+
+                val beneficio =
+                    repositorio.calcularBeneficio(
+                        valorTotal,
+                        usuario.saldoInicial
+                    )
+
+                if (beneficio > 0) {
+                    ValidacionReto(
+                        true,
+                        "Vas ganando €${"%.2f".format(beneficio)}"
+                    )
+                } else {
+                    ValidacionReto(
+                        false,
+                        "Tu cartera aún no está en positivo"
+                    )
+                }
+            }
+
+            else -> {
+                ValidacionReto(
+                    false,
+                    "Reto desconocido"
+                )
+            }
         }
     }
 
-    private fun getTypeFromId(id: String): String {
+    private fun obtenerTipoDesdeId(
+        id: String
+    ): String {
         return when {
-            id.contains("operation") -> "operation"
-            id.contains("diversify") -> "diversify"
+            id.contains("operacion") -> "operacion"
+            id.contains("diversificar") -> "diversificar"
             id.contains("trader") -> "trader"
-            id.contains("multimarket") -> "multimarket"
-            id.contains("profit") -> "profit"
+            id.contains("multimercado") -> "multimercado"
+            id.contains("beneficio") -> "beneficio"
             else -> ""
         }
     }
 
-    // ================= COMPLETAR (🔥 NUEVO SISTEMA) =================
+    // ================= COMPLETAR =================
 
-    fun completeChallenge(
+    fun completarReto(
         id: String,
-        reward: Double,
+        recompensa: Double,
         onResult: (Boolean, String) -> Unit
     ) {
         viewModelScope.launch {
 
-            val validation = validateChallenge(id)
+            val validacion =
+                validarReto(id)
 
-            if (!validation.completed) {
-                onResult(false, validation.message)
+            if (!validacion.completado) {
+                onResult(
+                    false,
+                    validacion.mensaje
+                )
                 return@launch
             }
 
-            val data = _challengesData.value
+            val datosActuales =
+                _datosRetos.value
 
-            if (id in data.completedChallenges) {
-                onResult(false, "Ya has completado este reto")
+            if (id in datosActuales.retosCompletados) {
+                onResult(
+                    false,
+                    "Ya has completado este reto"
+                )
                 return@launch
             }
 
-            val alreadyCompleted = data.completedChallenges
-            val totalChallenges = data.dailyChallenges.size
-
-            // 🔥 detectar último reto
-            val willCompleteAll = (alreadyCompleted.size + 1) == totalChallenges
-
-            val newStreak =
-                if (willCompleteAll) data.currentStreak + 1
-                else data.currentStreak
-
-            repository.updateBonusBalance(reward)
-
-            val updated = data.copy(
-                completedChallenges = data.completedChallenges + id,
-                currentStreak = newStreak,
-                maxStreak = maxOf(data.maxStreak, newStreak)
+            repositorio.actualizarSaldoBonus(
+                recompensa
             )
 
-            repository.saveChallengesData(updated)
-            _challengesData.value = updated
+            val nuevosDatos =
+                datosActuales.copy(
+                    retosCompletados =
+                        datosActuales.retosCompletados + id
+                )
 
-            calculateResetTime()
+            repositorio.guardarDatosRetos(
+                nuevosDatos
+            )
 
-            val message =
-                if (willCompleteAll)
-                    "🔥 Racha +1 · +${"%.2f".format(reward)}€"
-                else
-                    "+${"%.2f".format(reward)}€ añadidos"
+            _datosRetos.value =
+                nuevosDatos
 
-            onResult(true, message)
+            calcularTiempoReset()
+
+            onResult(
+                true,
+                "+${"%.2f".format(recompensa)}€ añadidos"
+            )
         }
     }
 }

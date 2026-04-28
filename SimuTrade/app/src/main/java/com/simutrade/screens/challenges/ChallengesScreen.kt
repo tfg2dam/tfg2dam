@@ -2,22 +2,47 @@ package com.simutrade.screens.challenges
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.simutrade.data.model.Challenge
+import com.simutrade.data.model.Reto
 import com.simutrade.screens.theme.positive
 import com.simutrade.screens.theme.positiveContainer
 import com.simutrade.screens.user.UserViewModel
@@ -29,61 +54,100 @@ fun ChallengesScreen(
     userViewModel: UserViewModel = viewModel()
 ) {
 
-    val challengesData by viewModel.challengesData.collectAsStateWithLifecycle()
-    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-    val millisUntilReset by viewModel.millisUntilReset.collectAsStateWithLifecycle()
+    val datosRetos by viewModel.datosRetos.collectAsStateWithLifecycle()
+    val cargando by viewModel.cargando.collectAsStateWithLifecycle()
+    val milisegundosHastaReset by
+    viewModel.milisegundosHastaReset.collectAsStateWithLifecycle()
 
-    val challenges = viewModel.getChallengesOfDay()
+    val retos = remember(datosRetos) {
+        viewModel.obtenerRetosDelDia()
+    }
 
-    val completed = challenges.count { it.id in challengesData.completedChallenges }
-    val total = challenges.size
-    val allCompleted = total > 0 && completed == total
+    val completados =
+        retos.count {
+            it.id in datosRetos.retosCompletados
+        }
 
-    var dialogMessage by remember { mutableStateOf<String?>(null) }
-    var dialogSuccess by remember { mutableStateOf(false) }
+    val total = retos.size
 
-    var remainingTime by remember { mutableStateOf(millisUntilReset) }
+    val todosCompletados =
+        total > 0 &&
+                completados == total
 
-    LaunchedEffect(millisUntilReset) {
-        remainingTime = millisUntilReset
-        while (remainingTime > 0) {
+    var mensajeDialogo by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    var dialogoExito by remember {
+        mutableStateOf(false)
+    }
+
+    // ✅ corregido warning: usar mutableLongStateOf
+    var tiempoRestante by remember {
+        mutableLongStateOf(milisegundosHastaReset)
+    }
+
+    // ================= TIMER =================
+
+    LaunchedEffect(milisegundosHastaReset) {
+        tiempoRestante = milisegundosHastaReset
+
+        while (tiempoRestante > 0) {
             delay(1000)
-            remainingTime -= 1000
+
+            tiempoRestante =
+                (tiempoRestante - 1000)
+                    .coerceAtLeast(0)
         }
     }
 
     LaunchedEffect(Unit) {
-        viewModel.loadChallenges()
-    }
-
-    fun formatTime(ms: Long): String {
-        if (ms <= 0) return "00:00:00"
-        val h = ms / (1000 * 60 * 60)
-        val m = (ms % (1000 * 60 * 60)) / (1000 * 60)
-        val s = (ms % (1000 * 60)) / 1000
-        return "%02d:%02d:%02d".format(h, m, s)
+        viewModel.cargarRetos()
     }
 
     // ================= DIALOG =================
 
-    dialogMessage?.let {
+    mensajeDialogo?.let { mensaje ->
+
         AlertDialog(
-            onDismissRequest = { dialogMessage = null },
-            title = {
-                Text(if (dialogSuccess) "Reto completado" else "No completado")
+            onDismissRequest = {
+                mensajeDialogo = null
             },
-            text = { Text(it, textAlign = TextAlign.Center) },
+
+            title = {
+                Text(
+                    text =
+                        if (dialogoExito)
+                            "Reto completado"
+                        else
+                            "No completado"
+                )
+            },
+
+            text = {
+                Text(
+                    text = mensaje,
+                    textAlign = TextAlign.Center
+                )
+            },
+
             confirmButton = {
                 Button(
-                    onClick = { dialogMessage = null },
+                    onClick = {
+                        mensajeDialogo = null
+                    },
+
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (dialogSuccess)
-                            MaterialTheme.colorScheme.positive
-                        else
-                            MaterialTheme.colorScheme.error
+                        containerColor =
+                            if (dialogoExito)
+                                MaterialTheme.colorScheme.positive
+                            else
+                                MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("Aceptar")
+                    Text(
+                        text = "Aceptar"
+                    )
                 }
             }
         )
@@ -95,84 +159,129 @@ fun ChallengesScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+
+        verticalArrangement =
+            Arrangement.spacedBy(16.dp)
     ) {
 
-        // ===== TÍTULO =====
         item {
             Text(
-                "Retos diarios",
-                style = MaterialTheme.typography.headlineMedium,
+                text = "Retos diarios",
+                style =
+                    MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        // ===== RACHA =====
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
+
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                    containerColor =
+                        MaterialTheme.colorScheme.primaryContainer
                 )
             ) {
                 Row(
-                    Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+
+                    horizontalArrangement =
+                        Arrangement.SpaceBetween,
+
+                    verticalAlignment =
+                        Alignment.CenterVertically
                 ) {
 
                     Column {
-                        Text("Racha", fontWeight = FontWeight.Bold)
-
-                        Text("${challengesData.currentStreak} días seguidos")
-
-                        Spacer(Modifier.height(6.dp))
 
                         Text(
-                            "Completa todos los retos para subir tu racha",
-                            style = MaterialTheme.typography.bodySmall
+                            text = "Racha",
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Text(
+                            text =
+                                "${datosRetos.rachaActual} días seguidos"
+                        )
+
+                        Spacer(
+                            modifier = Modifier.height(6.dp)
+                        )
+
+                        Text(
+                            text =
+                                "Completa todos los retos para subir tu racha",
+
+                            style =
+                                MaterialTheme.typography.bodySmall
                         )
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-
+                    Row(
+                        verticalAlignment =
+                            Alignment.CenterVertically
+                    ) {
                         Icon(
-                            Icons.Default.LocalFireDepartment,
+                            imageVector =
+                                Icons.Default.LocalFireDepartment,
+
                             contentDescription = null,
-                            tint = Color(0xFFFF9800)
+
+                            tint = Color(
+                                0xFFFF9800
+                            )
                         )
 
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(
+                            modifier = Modifier.width(6.dp)
+                        )
 
                         Text(
-                            "${challengesData.currentStreak}",
-                            fontWeight = FontWeight.Bold
+                            text =
+                                "${datosRetos.rachaActual}",
+
+                            fontWeight =
+                                FontWeight.Bold
                         )
                     }
                 }
             }
         }
 
-        // ===== PROGRESO =====
         item {
 
-            val progress by animateFloatAsState(
-                targetValue = if (total == 0) 0f else completed.toFloat() / total,
+            val progreso by animateFloatAsState(
+                targetValue =
+                    if (total == 0)
+                        0f
+                    else
+                        completados.toFloat() / total,
+
                 label = ""
             )
 
             Card {
-                Column(Modifier.padding(16.dp)) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
 
                     Text(
-                        "$completed de $total retos completados",
-                        fontWeight = FontWeight.SemiBold
+                        text =
+                            "$completados de $total retos completados",
+
+                        fontWeight =
+                            FontWeight.SemiBold
                     )
 
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(
+                        modifier = Modifier.height(8.dp)
+                    )
 
                     LinearProgressIndicator(
-                        progress = progress,
+                        progress = { progreso },
+
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(10.dp)
@@ -181,60 +290,91 @@ fun ChallengesScreen(
             }
         }
 
-        // ===== TODOS COMPLETADOS =====
-        if (allCompleted) {
+        if (todosCompletados) {
             item {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        containerColor =
+                            MaterialTheme.colorScheme.secondaryContainer
                     )
                 ) {
                     Column(
-                        Modifier.fillMaxWidth().padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+
+                        horizontalAlignment =
+                            Alignment.CenterHorizontally
                     ) {
-                        Text("Todos completados", fontWeight = FontWeight.Bold)
-
-                        Spacer(Modifier.height(6.dp))
-
-                        Text("Nuevos retos en")
 
                         Text(
-                            formatTime(remainingTime),
-                            style = MaterialTheme.typography.titleLarge,
+                            text = "Todos completados",
                             fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(
+                            modifier = Modifier.height(6.dp)
+                        )
+
+                        Text(
+                            text = "Nuevos retos en"
+                        )
+
+                        Text(
+                            text =
+                                formatearTiempo(
+                                    tiempoRestante
+                                ),
+
+                            style =
+                                MaterialTheme.typography.titleLarge,
+
+                            fontWeight =
+                                FontWeight.Bold
                         )
                     }
                 }
             }
         }
 
-        // ===== LISTA =====
-        if (isLoading) {
+        if (cargando) {
+
             item {
                 Box(
-                    Modifier.fillMaxWidth().padding(32.dp),
-                    contentAlignment = Alignment.Center
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+
+                    contentAlignment =
+                        Alignment.Center
                 ) {
                     CircularProgressIndicator()
                 }
             }
+
         } else {
-            items(challenges) { challenge ->
 
-                val isDone = challenge.id in challengesData.completedChallenges
+            items(retos) { reto ->
 
-                ChallengeCard(
-                    challenge = challenge,
-                    completed = isDone,
-                    onComplete = {
-                        viewModel.completeChallenge(
-                            challenge.id,
-                            challenge.reward
-                        ) { success, msg ->
-                            dialogSuccess = success
-                            dialogMessage = msg
-                            if (success) userViewModel.loadData()
+                val completado =
+                    reto.id in datosRetos.retosCompletados
+
+                TarjetaReto(
+                    reto = reto,
+                    completado = completado,
+
+                    onCompletar = {
+                        viewModel.completarReto(
+                            id = reto.id,
+                            recompensa = reto.recompensa
+                        ) { exito, mensaje ->
+
+                            dialogoExito = exito
+                            mensajeDialogo = mensaje
+
+                            if (exito) {
+                                userViewModel.cargarDatos()
+                            }
                         }
                     }
                 )
@@ -243,67 +383,149 @@ fun ChallengesScreen(
     }
 }
 
-//////////////////////////////////////////////////////
-// CARD
-//////////////////////////////////////////////////////
-
 @Composable
-fun ChallengeCard(
-    challenge: Challenge,
-    completed: Boolean,
-    onComplete: () -> Unit
+fun TarjetaReto(
+    reto: Reto,
+    completado: Boolean,
+    onCompletar: () -> Unit
 ) {
 
-    val bg by animateColorAsState(
-        if (completed)
-            MaterialTheme.colorScheme.positiveContainer
-        else
-            MaterialTheme.colorScheme.surface,
+    var procesando by remember {
+        mutableStateOf(false)
+    }
+
+    val colorFondo by animateColorAsState(
+        targetValue =
+            if (completado)
+                MaterialTheme.colorScheme.positiveContainer
+            else
+                MaterialTheme.colorScheme.surface,
+
+        label = ""
+    )
+
+    val escala by animateFloatAsState(
+        targetValue =
+            if (completado)
+                1.02f
+            else
+                1f,
+
         label = ""
     )
 
     Card(
-        Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = bg)
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = escala
+                scaleY = escala
+            },
+
+        colors = CardDefaults.cardColors(
+            containerColor = colorFondo
+        )
     ) {
         Column(
-            Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.padding(16.dp),
+
+            verticalArrangement =
+                Arrangement.spacedBy(6.dp)
         ) {
 
             Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier.fillMaxWidth(),
+
+                horizontalArrangement =
+                    Arrangement.SpaceBetween
             ) {
-                Text(challenge.title, fontWeight = FontWeight.Bold)
+                Text(
+                    text = reto.titulo,
+                    fontWeight = FontWeight.Bold
+                )
 
                 Text(
-                    "+${"%.2f".format(challenge.reward)}€",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.positive
+                    text =
+                        "+${"%.2f".format(reto.recompensa)}€",
+
+                    fontWeight =
+                        FontWeight.Bold,
+
+                    color =
+                        MaterialTheme.colorScheme.positive
                 )
             }
 
             Text(
-                challenge.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = reto.descripcion,
+
+                style =
+                    MaterialTheme.typography.bodySmall,
+
+                color =
+                    MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            if (completed) {
+            if (completado) {
+
                 Text(
-                    "Completado",
-                    color = MaterialTheme.colorScheme.positive,
-                    fontWeight = FontWeight.SemiBold
+                    text = "Completado",
+
+                    color =
+                        MaterialTheme.colorScheme.positive,
+
+                    fontWeight =
+                        FontWeight.SemiBold
                 )
+
             } else {
+
                 Button(
-                    onClick = onComplete,
+                    onClick = {
+                        if (procesando) {
+                            return@Button
+                        }
+
+                        procesando = true
+                        onCompletar()
+                        procesando = false
+                    },
+
+                    enabled = !procesando,
+
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Completar")
+                    Text(
+                        text = "Completar"
+                    )
                 }
             }
         }
     }
+}
+
+private fun formatearTiempo(
+    milisegundos: Long
+): String {
+
+    if (milisegundos <= 0) {
+        return "00:00:00"
+    }
+
+    val horas =
+        milisegundos / (1000 * 60 * 60)
+
+    val minutos =
+        (milisegundos % (1000 * 60 * 60)) /
+                (1000 * 60)
+
+    val segundos =
+        (milisegundos % (1000 * 60)) /
+                1000
+
+    return "%02d:%02d:%02d".format(
+        horas,
+        minutos,
+        segundos
+    )
 }

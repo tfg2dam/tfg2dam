@@ -1,80 +1,138 @@
 package com.simutrade.screens.main
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Diamond
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.MilitaryTech
+import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.vector.ImageVector
-import com.simutrade.data.model.UserData
-import com.simutrade.data.model.Rank
+import com.simutrade.data.model.DatosUsuario
+import com.simutrade.data.model.Rango
 
 @Composable
 fun ProfileDialog(
-    userData: UserData,
-    currentRank: Rank?,
+    datosUsuario: DatosUsuario,
+    rangoActual: Rango?,
     onDismiss: () -> Unit,
     onLogout: () -> Unit
 ) {
 
-    val username = userData.username
+    val nombreUsuario = datosUsuario.nombreUsuario
 
-    val initial = username
+    val inicial = nombreUsuario
         .trim()
         .firstOrNull()
         ?.uppercaseChar()
-        ?.toString() ?: "?"
+        ?.toString()
+        ?: "?"
 
-    val rango = currentRank?.name ?: "Bronce"
-    val rangoIcon = currentRank?.icon ?: "🥉"
+    val nombreRango =
+        rangoActual?.nombre ?: "Bronce"
 
-    var showLogoutConfirm by remember { mutableStateOf(false) }
+    val iconoRango =
+        obtenerIconoRango(nombreRango)
 
-    // ================= CONFIRM LOGOUT =================
+    val colorRango =
+        obtenerColorRango(nombreRango)
 
-    if (showLogoutConfirm) {
+    var mostrarConfirmacionSalir by remember {
+        mutableStateOf(false)
+    }
+
+    // ================= CONFIRMAR LOGOUT =================
+
+    if (mostrarConfirmacionSalir) {
         AlertDialog(
-            onDismissRequest = { showLogoutConfirm = false },
-            title = { Text("Cerrar sesión") },
-            text = { Text("¿Seguro que quieres salir?") },
+            onDismissRequest = {
+                mostrarConfirmacionSalir = false
+            },
+
+            title = {
+                Text("Cerrar sesión")
+            },
+
+            text = {
+                Text("¿Seguro que quieres salir?")
+            },
+
             confirmButton = {
                 Button(
                     onClick = {
-                        showLogoutConfirm = false
+                        mostrarConfirmacionSalir = false
                         onLogout()
                     },
+
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
+                        containerColor =
+                            MaterialTheme.colorScheme.error
                     )
                 ) {
                     Text("Salir")
                 }
             },
+
             dismissButton = {
-                TextButton(onClick = { showLogoutConfirm = false }) {
+                TextButton(
+                    onClick = {
+                        mostrarConfirmacionSalir = false
+                    }
+                ) {
                     Text("Cancelar")
                 }
             }
         )
     }
 
-    // ================= MAIN DIALOG =================
+    // ================= DIALOG PRINCIPAL =================
 
     AlertDialog(
         onDismissRequest = onDismiss,
 
-        // 🔥 HEADER + X
         title = {
-            Box(modifier = Modifier.fillMaxWidth()) {
-
+            Box(
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalAlignment =
+                        Alignment.CenterVertically,
+
+                    horizontalArrangement =
+                        Arrangement.spacedBy(12.dp)
                 ) {
 
                     Surface(
@@ -82,90 +140,156 @@ fun ProfileDialog(
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(48.dp)
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
+                        Box(
+                            contentAlignment =
+                                Alignment.Center
+                        ) {
                             Text(
-                                text = initial,
-                                style = MaterialTheme.typography.titleLarge,
+                                text = inicial,
+                                style =
+                                    MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary
+                                color =
+                                    MaterialTheme.colorScheme.onPrimary
                             )
                         }
                     }
 
                     Column {
                         Text(
-                            text = username.ifBlank { "Usuario" },
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            text =
+                                nombreUsuario.ifBlank {
+                                    "Usuario"
+                                },
+
+                            style =
+                                MaterialTheme.typography.titleMedium,
+
+                            fontWeight =
+                                FontWeight.Bold
                         )
+
                         Text(
-                            text = userData.email,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = datosUsuario.email,
+                            style =
+                                MaterialTheme.typography.bodySmall,
+
+                            color =
+                                MaterialTheme.colorScheme
+                                    .onSurfaceVariant
                         )
                     }
                 }
 
                 IconButton(
                     onClick = onDismiss,
-                    modifier = Modifier.align(Alignment.TopEnd)
+                    modifier =
+                        Modifier.align(
+                            Alignment.TopEnd
+                        )
                 ) {
                     Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Cerrar",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        imageVector =
+                            Icons.Default.Close,
+
+                        contentDescription =
+                            "Cerrar"
                     )
                 }
             }
         },
 
-        // 🔥 CONTENIDO MÁS COMPACTO
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp), // 🔥 menos espacio
-                modifier = Modifier.padding(top = 8.dp)
+                verticalArrangement =
+                    Arrangement.spacedBy(8.dp),
+
+                modifier =
+                    Modifier.padding(top = 8.dp)
             ) {
 
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                HorizontalDivider()
+
+                FilaPerfil(
+                    icono =
+                        Icons.Default.AccountBalanceWallet,
+
+                    etiqueta =
+                        "Saldo disponible",
+
+                    valor =
+                        "€${"%.2f".format(datosUsuario.saldo)}"
                 )
 
-                ProfileRow(
-                    icon = Icons.Default.AccountBalanceWallet,
-                    label = "Saldo disponible",
-                    value = "€${"%.2f".format(userData.balance)}"
+                FilaPerfil(
+                    icono =
+                        Icons.Default.Savings,
+
+                    etiqueta =
+                        "Saldo inicial",
+
+                    valor =
+                        "€${"%.2f".format(datosUsuario.saldoInicial)}"
                 )
 
-                ProfileRow(
-                    icon = Icons.Default.Savings,
-                    label = "Saldo inicial",
-                    value = "€${"%.2f".format(userData.initialBalance)}"
+                FilaPerfil(
+                    icono =
+                        Icons.Default.Star,
+
+                    etiqueta =
+                        "Bonus",
+
+                    valor =
+                        "€${"%.2f".format(datosUsuario.saldoBonus)}"
                 )
 
-                ProfileRow(
-                    icon = Icons.Default.EmojiEvents,
-                    label = "Rango actual",
-                    value = "rango"
+                FilaPerfilConIcono(
+                    icono =
+                        Icons.Default.EmojiEvents,
+
+                    etiqueta =
+                        "Rango actual",
+
+                    valor =
+                        nombreRango,
+
+                    iconoValor =
+                        iconoRango,
+
+                    colorValor =
+                        colorRango
                 )
 
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                )
+                HorizontalDivider()
 
-                // 🔥 LOGOUT MÁS INTEGRADO
                 TextButton(
-                    onClick = { showLogoutConfirm = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
+                    onClick = {
+                        mostrarConfirmacionSalir = true
+                    },
+
+                    modifier =
+                        Modifier.fillMaxWidth(),
+
+                    colors =
+                        ButtonDefaults.textButtonColors(
+                            contentColor =
+                                MaterialTheme.colorScheme.error
+                        )
                 ) {
                     Icon(
-                        Icons.Default.Logout,
+                        imageVector =
+                            Icons.AutoMirrored.Filled.Logout,
+
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier =
+                            Modifier.size(18.dp)
                     )
-                    Spacer(Modifier.width(8.dp))
+
+                    Spacer(
+                        modifier =
+                            Modifier.width(8.dp)
+                    )
+
                     Text("Cerrar sesión")
                 }
             }
@@ -175,42 +299,182 @@ fun ProfileDialog(
     )
 }
 
-// ================= ROW =================
+//////////////////////////////////////////////////////
+// FILA NORMAL
+//////////////////////////////////////////////////////
 
 @Composable
-fun ProfileRow(
-    icon: ImageVector,
-    label: String,
-    value: String
+fun FilaPerfil(
+    icono: ImageVector,
+    etiqueta: String,
+    valor: String
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        modifier =
+            Modifier.fillMaxWidth(),
+
+        horizontalArrangement =
+            Arrangement.SpaceBetween,
+
+        verticalAlignment =
+            Alignment.CenterVertically
     ) {
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp),
+
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = icon,
+                imageVector = icono,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint =
+                    MaterialTheme.colorScheme
+                        .onSurfaceVariant
             )
 
             Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = etiqueta,
+                color =
+                    MaterialTheme.colorScheme
+                        .onSurfaceVariant
             )
         }
 
         Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium // 🔥 más elegante
+            text = valor,
+            fontWeight =
+                FontWeight.Medium
         )
+    }
+}
+
+//////////////////////////////////////////////////////
+// FILA CON ICONO
+//////////////////////////////////////////////////////
+
+@Composable
+fun FilaPerfilConIcono(
+    icono: ImageVector,
+    etiqueta: String,
+    valor: String,
+    iconoValor: ImageVector,
+    colorValor: Color
+) {
+    Row(
+        modifier =
+            Modifier.fillMaxWidth(),
+
+        horizontalArrangement =
+            Arrangement.SpaceBetween,
+
+        verticalAlignment =
+            Alignment.CenterVertically
+    ) {
+
+        Row(
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp),
+
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icono,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint =
+                    MaterialTheme.colorScheme
+                        .onSurfaceVariant
+            )
+
+            Text(
+                text = etiqueta,
+                color =
+                    MaterialTheme.colorScheme
+                        .onSurfaceVariant
+            )
+        }
+
+        Row(
+            horizontalArrangement =
+                Arrangement.spacedBy(6.dp),
+
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = iconoValor,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = colorValor
+            )
+
+            Text(
+                text = valor,
+                fontWeight =
+                    FontWeight.Medium
+            )
+        }
+    }
+}
+
+//////////////////////////////////////////////////////
+// HELPERS
+//////////////////////////////////////////////////////
+
+fun obtenerIconoRango(
+    nombreRango: String
+): ImageVector {
+    return when (
+        nombreRango.lowercase()
+    ) {
+        "bronce" ->
+            Icons.Default.MilitaryTech
+
+        "plata" ->
+            Icons.Default.MilitaryTech
+
+        "oro" ->
+            Icons.Default.EmojiEvents
+
+        "platino" ->
+            Icons.Default.WorkspacePremium
+
+        "diamante" ->
+            Icons.Default.Diamond
+
+        else ->
+            Icons.Default.EmojiEvents
+    }
+}
+
+@Composable
+fun obtenerColorRango(
+    nombreRango: String
+): Color {
+    return when (
+        nombreRango.lowercase()
+    ) {
+        "bronce" ->
+            Color(0xFFCD7F32)
+
+        "plata" ->
+            Color(0xFFC0C0C0)
+
+        "oro" ->
+            Color(0xFFFFD700)
+
+        "platino" ->
+            Color(0xFFE5E4E2)
+
+        "diamante" ->
+            Color(0xFF00E5FF)
+
+        else ->
+            MaterialTheme.colorScheme.primary
     }
 }

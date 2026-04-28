@@ -1,19 +1,32 @@
 package com.simutrade.data.repository
 
-import com.simutrade.data.model.Asset
-import com.simutrade.data.model.AssetType
-import com.simutrade.data.remote.CoinGeckoClient
-import com.simutrade.data.remote.FinnhubClient
+import com.simutrade.data.model.Activo
+import com.simutrade.data.model.TipoActivo
+import com.simutrade.data.remote.ClienteCoinGecko
+import com.simutrade.data.remote.MonedaCoinGeckoDto
+import com.simutrade.data.remote.ClienteFinnhub
+import com.simutrade.data.remote.CotizacionFinnhubDto
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
-class MarketRepository {
+class RepositorioMercado {
 
     companion object {
-        private const val SEARCH_LIMIT = 5
+        private const val LIMITE_BUSQUEDA = 5
+        private const val TIEMPO_CACHE_MS = 60_000L
     }
 
-    // ================= DEFAULT STOCKS =================
+    // ================= CACHE =================
 
-    private val defaultStocks = listOf(
+    private var criptomonedasEnCache: List<Activo> = emptyList()
+    private var accionesEnCache: List<Activo> = emptyList()
+
+    private var ultimaCargaCriptomonedas = 0L
+    private var ultimaCargaAcciones = 0L
+
+    // ================= ACCIONES POR DEFECTO =================
+
+    private val accionesPorDefecto = listOf(
         "AAPL" to "Apple",
         "MSFT" to "Microsoft",
         "GOOGL" to "Alphabet",
@@ -26,214 +39,236 @@ class MarketRepository {
         "JPM" to "JPMorgan"
     )
 
-    // ================= GET TOP =================
+    // ================= TOP CRIPTOMONEDAS =================
 
-    suspend fun getTopCryptos(): List<Asset> {
+    suspend fun obtenerTopCriptomonedas(): List<Activo> {
+
+        val ahora = System.currentTimeMillis()
+
+        if (
+            criptomonedasEnCache.isNotEmpty() &&
+            ahora - ultimaCargaCriptomonedas < TIEMPO_CACHE_MS
+        ) {
+            return criptomonedasEnCache
+        }
+
         return try {
-            CoinGeckoClient.api.getTopCoins().map { it.toAsset() }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
+            val resultado = ClienteCoinGecko.api
+                .obtenerMonedasPrincipales()
+                .map { it.aActivo() }
+
+            criptomonedasEnCache = resultado
+            ultimaCargaCriptomonedas = ahora
+
+            resultado
+
+        } catch (_: Exception) {
+            criptomonedasEnCache
         }
     }
 
-    suspend fun getTopStocks(): List<Asset> {
-        return defaultStocks.mapNotNull { (symbol, name) ->
+    // ================= TOP ACCIONES =================
+
+    suspend fun obtenerTopAcciones(): List<Activo> =
+        coroutineScope {
+
+            val ahora = System.currentTimeMillis()
+
+            if (
+                accionesEnCache.isNotEmpty() &&
+                ahora - ultimaCargaAcciones < TIEMPO_CACHE_MS
+            ) {
+                return@coroutineScope accionesEnCache
+            }
+
+            val diferidos = accionesPorDefecto.map { (simbolo, nombre) ->
+                async {
+                    try {
+                        val cotizacion =
+                            ClienteFinnhub.api.obtenerCotizacion(
+                                simbolo = simbolo
+                            )
+
+                        if ((cotizacion.precioActual ?: 0.0) > 0) {
+                            cotizacion.aActivo(
+                                simbolo = simbolo,
+                                nombre = nombre
+                            )
+                        } else {
+                            null
+                        }
+
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+            }
+
+            val resultado =
+                diferidos.mapNotNull { it.await() }
+
+            accionesEnCache = resultado
+            ultimaCargaAcciones = ahora
+
+            resultado
+        }
+
+    // ================= PRECIO ACTUAL INDIVIDUAL =================
+
+    suspend fun obtenerPrecioActual(
+        idActivo: String,
+        simbolo: String,
+        tipo: TipoActivo
+    ): Double {
+
+        return try {
+
+            when (tipo) {
+
+                TipoActivo.ACCION -> {
+                    val cotizacion =
+                        ClienteFinnhub.api.obtenerCotizacion(
+                            simbolo = simbolo
+                        )
+
+                    cotizacion.precioActual ?: 0.0
+                }
+
+                TipoActivo.CRIPTO -> {
+                    val moneda =
+                        ClienteCoinGecko.api
+                            .obtenerMonedasPrincipales()
+                            .firstOrNull {
+                                it.id.equals(
+                                    idActivo,
+                                    ignoreCase = true
+                                )
+                            }
+
+                    moneda?.precioActual ?: 0.0
+                }
+            }
+
+        } catch (_: Exception) {
+            0.0
+        }
+    }
+
+    // ================= BÚSQUEDA =================
+
+    suspend fun buscarActivos(
+        textoBusqueda: String
+    ): List<Activo> = coroutineScope {
+
+        val resultados = mutableListOf<Activo>()
+
+        // ===== CRIPTOMONEDAS =====
+
+        val criptomonedasDiferidas = async {
             try {
-                val quote = FinnhubClient.api.getQuote(symbol)
-                if (quote.currentPrice > 0) {
-                    quote.toAsset(symbol, name)
-                } else null
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
-            }
-        }
-    }
-
-    // ================= SEARCH =================
-
-    suspend fun searchAssets(query: String): List<Asset> {
-        val results = mutableListOf<Asset>()
-
-        // CRYPTO
-        try {
-            val cryptoResults = CoinGeckoClient.api
-                .searchCoins(query)
-                .coins
-                .take(SEARCH_LIMIT)
-
-            cryptoResults.forEach {
-                results.add(
-                    Asset(
-                        id = it.id,
-                        symbol = it.symbol.uppercase(),
-                        name = it.name,
-                        type = AssetType.CRYPTO,
-                        currentPrice = 0.0,
-                        priceChange24h = 0.0,
-                        priceChangePercent24h = 0.0
+                ClienteCoinGecko.api
+                    .buscarMonedas(
+                        consulta = textoBusqueda
                     )
-                )
+                    .monedas
+                    .take(LIMITE_BUSQUEDA)
+                    .map { item ->
+                        Activo(
+                            id = item.id,
+                            simbolo = item.simbolo.uppercase(),
+                            nombre = item.nombre,
+                            tipo = TipoActivo.CRIPTO,
+                            precioActual = 0.0,
+                            cambioPrecio24h = 0.0,
+                            cambioPorcentaje24h = 0.0
+                        )
+                    }
+
+            } catch (_: Exception) {
+                emptyList()
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
 
-        // STOCKS
-        try {
-            val stockResults = FinnhubClient.api
-                .searchSymbols(query)
-                .result
-                .take(SEARCH_LIMIT)
+        // ===== ACCIONES =====
 
-            stockResults.forEach { item ->
-                val quote = try {
-                    FinnhubClient.api.getQuote(item.symbol)
-                } catch (e: Exception) {
-                    null
-                }
-
-                results.add(
-                    Asset(
-                        id = item.symbol,
-                        symbol = item.symbol,
-                        name = item.description,
-                        type = AssetType.STOCK,
-                        currentPrice = quote?.currentPrice ?: 0.0,
-                        priceChange24h = quote?.priceChange ?: 0.0,
-                        priceChangePercent24h = quote?.priceChangePercentage ?: 0.0
+        val accionesDiferidas = async {
+            try {
+                val elementos = ClienteFinnhub.api
+                    .buscarSimbolos(
+                        consulta = textoBusqueda
                     )
-                )
+                    .resultados
+                    .take(LIMITE_BUSQUEDA)
+
+                elementos.map { item ->
+                    async {
+
+                        val cotizacion = try {
+                            ClienteFinnhub.api
+                                .obtenerCotizacion(
+                                    simbolo = item.simbolo
+                                )
+                        } catch (_: Exception) {
+                            null
+                        }
+
+                        Activo(
+                            id = item.simbolo,
+                            simbolo = item.simbolo,
+                            nombre = item.descripcion,
+                            tipo = TipoActivo.ACCION,
+                            precioActual =
+                                cotizacion?.precioActual ?: 0.0,
+                            cambioPrecio24h =
+                                cotizacion?.cambioPrecio ?: 0.0,
+                            cambioPorcentaje24h =
+                                cotizacion?.cambioPorcentaje ?: 0.0
+                        )
+                    }
+                }.map { it.await() }
+
+            } catch (_: Exception) {
+                emptyList()
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
 
-        return results
-    }
+        resultados.addAll(
+            criptomonedasDiferidas.await()
+        )
 
-    // ================= HISTORY =================
+        resultados.addAll(
+            accionesDiferidas.await()
+        )
 
-    suspend fun getAssetHistory(
-        asset: Asset,
-        period: String = "7d"
-    ): List<Pair<Long, Double>> {
-        return try {
-
-            // CRYPTO (CoinGecko)
-            if (asset.type == AssetType.CRYPTO) {
-
-                val (days, interval) = when (period) {
-                    "1h"  -> 1 to "minute"
-                    "1d"  -> 1 to "hourly"
-                    "7d"  -> 7 to "daily"
-                    "30d" -> 30 to "daily"
-                    "1A"  -> 365 to "daily"
-                    else  -> 7 to "daily"
-                }
-
-                val history = CoinGeckoClient.api.getCoinMarketChart(
-                    coinId = asset.id,
-                    days = days,
-                    interval = interval
-                )
-
-                val prices = if (period == "1h") {
-                    history.prices.takeLast(60)
-                } else {
-                    history.prices
-                }
-
-                prices.map { it[0].toLong() to it[1] }
-            }
-
-            // STOCKS (Finnhub)
-            else {
-
-                val now = System.currentTimeMillis() / 1000
-
-                val (from, resolution) = when (period) {
-                    "1h"  -> now - 3600 to "1"
-                    "1d"  -> now - 86400 to "5"
-                    "7d"  -> now - 604800 to "15"
-                    "30d" -> now - 2592000 to "D"
-                    "1A"  -> now - 31536000 to "W"
-                    else  -> now - 604800 to "60"
-                }
-
-                val response = FinnhubClient.api.getStockCandles(
-                    symbol = asset.symbol,
-                    resolution = resolution,
-                    from = from,
-                    to = now
-                )
-
-                if (response.status == "ok") {
-                    response.timestamps.zip(response.closePrices)
-                } else {
-                    emptyList()
-                }
-            }
-
-        } catch (e: Exception) {
-            e.printStackTrace()
-            generateSimulatedHistory(asset.currentPrice, period)
-        }
+        resultados
     }
 
     // ================= MAPPERS =================
 
-    private fun com.simutrade.data.remote.CoinGeckoItemDto.toAsset(): Asset {
-        return Asset(
+    private fun MonedaCoinGeckoDto.aActivo(): Activo {
+        return Activo(
             id = id,
-            symbol = symbol.uppercase(),
-            name = name,
-            type = AssetType.CRYPTO,
-            currentPrice = currentPrice,
-            priceChange24h = priceChange24h,
-            priceChangePercent24h = priceChangePercentage24h
+            simbolo = simbolo.uppercase(),
+            nombre = nombre,
+            tipo = TipoActivo.CRIPTO,
+            precioActual = precioActual,
+            cambioPrecio24h = cambioPrecio24h ?: 0.0,
+            cambioPorcentaje24h = cambioPorcentaje24h ?: 0.0
         )
     }
 
-    private fun com.simutrade.data.remote.FinnhubQuoteDto.toAsset(
-        symbol: String,
-        name: String
-    ): Asset {
-        return Asset(
-            id = symbol,
-            symbol = symbol,
-            name = name,
-            type = AssetType.STOCK,
-            currentPrice = currentPrice,
-            priceChange24h = priceChange,
-            priceChangePercent24h = priceChangePercentage
+    private fun CotizacionFinnhubDto.aActivo(
+        simbolo: String,
+        nombre: String
+    ): Activo {
+        return Activo(
+            id = simbolo,
+            simbolo = simbolo,
+            nombre = nombre,
+            tipo = TipoActivo.ACCION,
+            precioActual = precioActual ?: 0.0,
+            cambioPrecio24h = cambioPrecio ?: 0.0,
+            cambioPorcentaje24h = cambioPorcentaje ?: 0.0
         )
-    }
-
-    // ================= FALLBACK =================
-
-    private fun generateSimulatedHistory(
-        currentPrice: Double,
-        period: String
-    ): List<Pair<Long, Double>> {
-
-        val now = System.currentTimeMillis()
-
-        val (points, intervalMs) = when (period) {
-            "1h"  -> 60 to 60_000L
-            "1d"  -> 24 to 3_600_000L
-            "7d"  -> 8 to 86_400_000L
-            "30d" -> 30 to 86_400_000L
-            "1A"  -> 52 to 604_800_000L
-            else  -> 8 to 86_400_000L
-        }
-
-        return (0 until points).map { i ->
-            val timestamp = now - (points - 1 - i) * intervalMs
-            val progress = i.toDouble() / (points - 1)
-            val price = currentPrice * (0.95 + 0.1 * progress)
-            timestamp to price
-        }
     }
 }

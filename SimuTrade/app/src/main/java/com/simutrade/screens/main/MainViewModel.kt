@@ -1,41 +1,79 @@
 package com.simutrade.screens.main
 
 import androidx.lifecycle.ViewModel
-import com.simutrade.data.model.Asset
+import com.simutrade.data.model.Activo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-// ================= SCREENS =================
+// ================= PANTALLAS =================
 
-sealed class Screen(val route: String) {
-    object Dashboard : Screen("dashboard")
-    object Market : Screen("market")
-    object Trading : Screen("trading")
-    object Rankings : Screen("rankings")
-    object Challenges : Screen("challenges")
+sealed class Pantalla {
+
+    object Inicio : Pantalla()
+    object Mercado : Pantalla()
+    object Trading : Pantalla()
+    object Rankings : Pantalla()
+    object Retos : Pantalla()
 }
+
+// ================= ESTADO =================
+
+data class EstadoUiPrincipal(
+    val pantallaActual: Pantalla = Pantalla.Inicio,
+    val activoSeleccionado: Activo? = null
+)
 
 // ================= VIEWMODEL =================
 
 class MainViewModel : ViewModel() {
 
-    private val _currentPage = MutableStateFlow<Screen>(Screen.Dashboard)
-    val currentPage: StateFlow<Screen> = _currentPage.asStateFlow()
+    private val _uiState = MutableStateFlow(
+        EstadoUiPrincipal()
+    )
 
-    private val _selectedAsset = MutableStateFlow<Asset?>(null)
-    val selectedAsset: StateFlow<Asset?> = _selectedAsset.asStateFlow()
+    val uiState: StateFlow<EstadoUiPrincipal> =
+        _uiState.asStateFlow()
 
-    fun navigateTo(screen: Screen) {
-        _currentPage.value = screen
+    // ================= NAVEGACIÓN =================
+
+    fun navegarA(
+        pantalla: Pantalla
+    ) {
+        val estadoActual = _uiState.value
+
+        // evitar navegación duplicada
+        if (estadoActual.pantallaActual == pantalla) {
+            return
+        }
+
+        _uiState.value = estadoActual.copy(
+            pantallaActual = pantalla,
+
+            // limpiar activo seleccionado si salimos de Trading
+            activoSeleccionado =
+                if (pantalla == Pantalla.Trading) {
+                    estadoActual.activoSeleccionado
+                } else {
+                    null
+                }
+        )
     }
 
-    fun selectAsset(asset: Asset) {
-        _selectedAsset.value = asset
-        navigateTo(Screen.Trading)
+    // ================= ACTIVO =================
+
+    fun seleccionarActivo(
+        activo: Activo
+    ) {
+        _uiState.value = _uiState.value.copy(
+            activoSeleccionado = activo,
+            pantallaActual = Pantalla.Trading
+        )
     }
 
-    fun clearSelectedAsset() {
-        _selectedAsset.value = null
+    fun limpiarActivoSeleccionado() {
+        _uiState.value = _uiState.value.copy(
+            activoSeleccionado = null
+        )
     }
 }

@@ -2,92 +2,179 @@ package com.simutrade.screens.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.simutrade.data.repository.AuthRepository
-import com.simutrade.data.repository.AuthResult
+import com.simutrade.data.repository.RepositorioAutenticacion
+import com.simutrade.data.repository.ResultadoAutenticacion
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class AuthUiState(
-    val isLoading: Boolean = false,
+data class EstadoUiAutenticacion(
+    val cargando: Boolean = false,
     val error: String? = null,
-    val isSuccess: Boolean = false
+    val exito: Boolean = false
 )
 
 class AuthViewModel : ViewModel() {
 
-    private val repository = AuthRepository()
+    private val repositorio = RepositorioAutenticacion()
 
-    private val _uiState = MutableStateFlow(AuthUiState())
-    val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
+    private val _uiState =
+        MutableStateFlow(EstadoUiAutenticacion())
 
-    // Helper para actualizar estado
-    private fun updateState(
-        isLoading: Boolean? = null,
+    val uiState: StateFlow<EstadoUiAutenticacion> =
+        _uiState.asStateFlow()
+
+    // ================= ESTADO =================
+
+    private fun actualizarEstado(
+        cargando: Boolean? = null,
         error: String? = null,
-        isSuccess: Boolean? = null
+        exito: Boolean? = null
     ) {
-        _uiState.value = _uiState.value.copy(
-            isLoading = isLoading ?: _uiState.value.isLoading,
-            error = error,
-            isSuccess = isSuccess ?: _uiState.value.isSuccess
-        )
+        _uiState.update { actual ->
+            actual.copy(
+                cargando = cargando ?: actual.cargando,
+                error = error,
+                exito = exito ?: actual.exito
+            )
+        }
     }
 
-    fun login(email: String, password: String) {
+    // ================= LOGIN =================
 
-        if (email.isBlank() || password.isBlank()) {
-            updateState(error = "Completa todos los campos")
+    fun iniciarSesion(
+        email: String,
+        password: String
+    ) {
+
+        if (_uiState.value.cargando) return
+
+        if (
+            email.isBlank() ||
+            password.isBlank()
+        ) {
+            actualizarEstado(
+                error = "Completa todos los campos"
+            )
             return
         }
 
         viewModelScope.launch {
-            updateState(isLoading = true, error = null, isSuccess = false)
 
-            when (val result = repository.login(email, password)) {
-                is AuthResult.Success -> {
-                    updateState(isLoading = false, isSuccess = true)
+            actualizarEstado(
+                cargando = true,
+                error = null,
+                exito = false
+            )
+
+            when (
+                val resultado = repositorio.iniciarSesion(
+                    email = email.trim(),
+                    password = password
+                )
+            ) {
+
+                is ResultadoAutenticacion.Exito -> {
+                    _uiState.value =
+                        EstadoUiAutenticacion(
+                            cargando = false,
+                            exito = true
+                        )
                 }
 
-                is AuthResult.Error -> {
-                    updateState(isLoading = false, error = result.message)
+                is ResultadoAutenticacion.Error -> {
+                    _uiState.value =
+                        EstadoUiAutenticacion(
+                            cargando = false,
+                            error = resultado.mensaje
+                        )
                 }
             }
         }
     }
 
-    fun register(email: String, password: String, username: String) {
+    // ================= REGISTRO =================
 
-        if (email.isBlank() || password.isBlank() || username.isBlank()) {
-            updateState(error = "Completa todos los campos")
+    fun registrarUsuario(
+        email: String,
+        password: String,
+        nombreUsuario: String
+    ) {
+
+        if (_uiState.value.cargando) return
+
+        if (
+            email.isBlank() ||
+            password.isBlank() ||
+            nombreUsuario.isBlank()
+        ) {
+            actualizarEstado(
+                error = "Completa todos los campos"
+            )
+            return
+        }
+
+        if (password.length < 6) {
+            actualizarEstado(
+                error = "La contraseña debe tener al menos 6 caracteres"
+            )
             return
         }
 
         viewModelScope.launch {
-            updateState(isLoading = true, error = null, isSuccess = false)
 
-            when (val result = repository.register(email, password, username)) {
-                is AuthResult.Success -> {
-                    updateState(isLoading = false, isSuccess = true)
+            actualizarEstado(
+                cargando = true,
+                error = null,
+                exito = false
+            )
+
+            when (
+                val resultado = repositorio.registrarUsuario(
+                    email = email.trim(),
+                    password = password,
+                    nombreUsuario = nombreUsuario.trim()
+                )
+            ) {
+
+                is ResultadoAutenticacion.Exito -> {
+                    _uiState.value =
+                        EstadoUiAutenticacion(
+                            cargando = false,
+                            exito = true
+                        )
                 }
 
-                is AuthResult.Error -> {
-                    updateState(isLoading = false, error = result.message)
+                is ResultadoAutenticacion.Error -> {
+                    _uiState.value =
+                        EstadoUiAutenticacion(
+                            cargando = false,
+                            error = resultado.mensaje
+                        )
                 }
             }
         }
     }
 
-    fun clearError() {
-        updateState(error = null)
+    // ================= HELPERS =================
+
+    fun limpiarError() {
+        _uiState.update {
+            it.copy(error = null)
+        }
     }
 
-    fun clearSuccess() {
-        updateState(isSuccess = false)
+    fun limpiarExito() {
+        _uiState.update {
+            it.copy(exito = false)
+        }
     }
 
-    fun logout() {
-        repository.logout()
+    fun cerrarSesion() {
+        repositorio.cerrarSesion()
+        _uiState.value =
+            EstadoUiAutenticacion()
     }
 }

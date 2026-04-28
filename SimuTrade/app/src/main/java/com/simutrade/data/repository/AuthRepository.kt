@@ -5,77 +5,186 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
-sealed class AuthResult {
-    data class Success(val user: FirebaseUser) : AuthResult()
-    data class Error(val message: String) : AuthResult()
+// ================= RESULTADO AUTENTICACIÓN =================
+
+sealed class ResultadoAutenticacion {
+
+    data class Exito(
+        val usuario: FirebaseUser
+    ) : ResultadoAutenticacion()
+
+    data class Error(
+        val mensaje: String
+    ) : ResultadoAutenticacion()
 }
 
-class AuthRepository {
+class RepositorioAutenticacion {
 
-    private val auth = FirebaseAuth.getInstance()
+    private val autenticacion = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
 
     companion object {
-        private const val INITIAL_BALANCE = 100.0
+        private const val SALDO_INICIAL = 100.0
+        private const val USUARIOS = "Usuarios"
+
+        // ================= DOCUMENTOS =================
+
+        private const val DOCUMENTO_INICIAL = "inicial"
+        private const val DOCUMENTO_RETOS = "datos"
+
+        // ================= SUBCOLECCIONES =================
+
+        private const val CARTERA = "cartera"
+        private const val TRANSACCIONES = "transacciones"
+        private const val RETOS = "retos"
     }
 
-    val currentUser: FirebaseUser?
-        get() = auth.currentUser
+    // Eliminado warning:
+    // val usuarioActual no se usaba en ningún sitio
 
-    suspend fun login(email: String, password: String): AuthResult {
+    // ================= LOGIN =================
+
+    suspend fun iniciarSesion(
+        email: String,
+        password: String
+    ): ResultadoAutenticacion {
+
         return try {
-            val result = auth.signInWithEmailAndPassword(email, password).await()
-            val user = result.user ?: return AuthResult.Error("Usuario no válido")
 
-            val now = System.currentTimeMillis()
-
-            firestore.collection("Usuarios")
-                .document(user.uid)
-                .update("ultimo_login", now)
+            val resultado = autenticacion
+                .signInWithEmailAndPassword(
+                    email,
+                    password
+                )
                 .await()
 
-            AuthResult.Success(user)
+            val usuario = resultado.user
+                ?: return ResultadoAutenticacion.Error(
+                    "Usuario no válido"
+                )
+
+            firestore
+                .collection(USUARIOS)
+                .document(usuario.uid)
+                .update(
+                    "ultimo_login",
+                    System.currentTimeMillis()
+                )
+                .await()
+
+            ResultadoAutenticacion.Exito(usuario)
 
         } catch (e: Exception) {
-            AuthResult.Error("Error al iniciar sesión. Inténtalo de nuevo")
+            ResultadoAutenticacion.Error(
+                e.message ?: "Error al iniciar sesión"
+            )
         }
     }
 
-    suspend fun register(email: String, password: String, username: String): AuthResult {
+    // ================= REGISTRO =================
+
+    suspend fun registrarUsuario(
+        email: String,
+        password: String,
+        nombreUsuario: String
+    ): ResultadoAutenticacion {
+
         return try {
-            val result = auth.createUserWithEmailAndPassword(email, password).await()
-            val user = result.user ?: return AuthResult.Error("Error al crear usuario")
 
-            val now = System.currentTimeMillis()
+            val resultado = autenticacion
+                .createUserWithEmailAndPassword(
+                    email,
+                    password
+                )
+                .await()
 
-            val userData = hashMapOf(
-                // 🔴 IMPORTANTE: NO CAMBIAR (Firestore depende de esto)
-                "id_usuario"      to user.uid,
-                "nombre_usuario"  to username,
-                "email"           to email,
-                "saldo"           to INITIAL_BALANCE,
-                "saldo_inicial"   to INITIAL_BALANCE,
-                "saldo_bonus"     to 0.0,
-                "id_rango"        to "bronce",
-                "creado_en"       to now,
-                "ultimo_login"    to now,
-                "portfolio_value" to INITIAL_BALANCE,
-                "profit"          to 0.0
+            val usuario = resultado.user
+                ?: return ResultadoAutenticacion.Error(
+                    "Error al crear usuario"
+                )
+
+            val ahora = System.currentTimeMillis()
+
+            val referenciaUsuario = firestore
+                .collection(USUARIOS)
+                .document(usuario.uid)
+
+            // ================= DATOS BASE =================
+
+            val datosUsuario = mapOf(
+                "nombre_usuario" to nombreUsuario,
+                "email" to email,
+
+                "saldo" to SALDO_INICIAL,
+                "saldo_inicial" to SALDO_INICIAL,
+                "saldo_bonus" to 0.0,
+
+                "id_rango" to "bronce",
+
+                "creado_en" to ahora,
+                "ultimo_login" to ahora,
+
+                "valor_cartera" to 0.0,
+                "beneficio" to 0.0
             )
 
-            firestore.collection("Usuarios")
-                .document(user.uid)
-                .set(userData)
+            referenciaUsuario
+                .set(datosUsuario)
                 .await()
 
-            AuthResult.Success(user)
+            // ================= CARTERA =================
+
+            referenciaUsuario
+                .collection(CARTERA)
+                .document(DOCUMENTO_INICIAL)
+                .set(
+                    mapOf(
+                        "inicial" to true
+                    )
+                )
+                .await()
+
+            // ================= TRANSACCIONES =================
+
+            referenciaUsuario
+                .collection(TRANSACCIONES)
+                .document(DOCUMENTO_INICIAL)
+                .set(
+                    mapOf(
+                        "inicial" to true
+                    )
+                )
+                .await()
+
+            // ================= RETOS =================
+
+            referenciaUsuario
+                .collection(RETOS)
+                .document(DOCUMENTO_RETOS)
+                .set(
+                    mapOf(
+                        "racha_actual" to 0,
+                        "racha_maxima" to 0,
+                        "ultima_vez" to 0L,
+                        "retos_completados" to emptyList<String>(),
+                        "retos_del_dia" to emptyList<String>(),
+                        "dia_actual" to 0L
+                    )
+                )
+                .await()
+
+            ResultadoAutenticacion.Exito(usuario)
 
         } catch (e: Exception) {
-            AuthResult.Error("Error al registrarse. Inténtalo de nuevo")
+            ResultadoAutenticacion.Error(
+                e.message ?: "Error al registrarse"
+            )
         }
     }
 
-    fun logout() {
-        auth.signOut()
+    // ================= LOGOUT =================
+
+    fun cerrarSesion() {
+        autenticacion.signOut()
     }
 }

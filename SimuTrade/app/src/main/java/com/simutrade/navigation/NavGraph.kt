@@ -1,83 +1,120 @@
 package com.simutrade.navigation
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.*
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import com.google.firebase.auth.FirebaseAuth
 import com.simutrade.screens.auth.LoginScreen
 import com.simutrade.screens.auth.RegisterScreen
 import com.simutrade.screens.main.MainScreen
 
-object Routes {
+object Rutas {
     const val LOGIN = "login"
-    const val REGISTER = "register"
-    const val MAIN = "main"
+    const val REGISTRO = "registro"
+    const val PRINCIPAL = "principal"
 }
 
 @Composable
-fun NavGraph(navController: NavHostController) {
+fun GrafoNavegacion(
+    controladorNavegacion: NavHostController
+) {
 
-    // 🔥 estado reactivo (no solo lectura puntual)
-    val auth = FirebaseAuth.getInstance()
-    var isLoggedIn by remember { mutableStateOf(auth.currentUser != null) }
+    // ================= AUTENTICACIÓN =================
 
-    // 🔁 listener de Firebase (clave)
+    val autenticacion = FirebaseAuth.getInstance()
+
+    var sesionIniciada by remember {
+        mutableStateOf(
+            autenticacion.currentUser != null
+        )
+    }
+
+    // ================= LISTENER FIREBASE =================
+
     DisposableEffect(Unit) {
-        val listener = FirebaseAuth.AuthStateListener {
-            isLoggedIn = it.currentUser != null
-        }
-        auth.addAuthStateListener(listener)
+        val listener =
+            FirebaseAuth.AuthStateListener {
+                sesionIniciada =
+                    it.currentUser != null
+            }
+
+        autenticacion.addAuthStateListener(
+            listener
+        )
 
         onDispose {
-            auth.removeAuthStateListener(listener)
+            autenticacion.removeAuthStateListener(
+                listener
+            )
         }
     }
 
-    val startDestination = if (isLoggedIn) Routes.MAIN else Routes.LOGIN
+    val destinoInicial =
+        if (sesionIniciada) {
+            Rutas.PRINCIPAL
+        } else {
+            Rutas.LOGIN
+        }
 
     NavHost(
-        navController = navController,
-        startDestination = startDestination
+        navController = controladorNavegacion,
+        startDestination = destinoInicial
     ) {
 
         // ================= LOGIN =================
 
-        composable(Routes.LOGIN) {
+        composable(Rutas.LOGIN) {
             LoginScreen(
                 onLoginSuccess = {
-                    navController.navigate(Routes.MAIN) {
-                        popUpTo(0) // 🔥 limpia TODO el backstack
-                    }
-                },
-                onNavigateToRegister = {
-                    navController.navigate(Routes.REGISTER)
-                }
-            )
-        }
-
-        // ================= REGISTER =================
-
-        composable(Routes.REGISTER) {
-            RegisterScreen(
-                onRegisterSuccess = {
-                    navController.navigate(Routes.MAIN) {
+                    controladorNavegacion.navigate(
+                        Rutas.PRINCIPAL
+                    ) {
                         popUpTo(0)
                     }
                 },
-                onNavigateToLogin = {
-                    navController.popBackStack()
+
+                onNavigateToRegister = {
+                    controladorNavegacion.navigate(
+                        Rutas.REGISTRO
+                    )
                 }
             )
         }
 
-        // ================= MAIN =================
+        // ================= REGISTRO =================
 
-        composable(Routes.MAIN) {
+        composable(Rutas.REGISTRO) {
+            RegisterScreen(
+                onRegisterSuccess = {
+                    controladorNavegacion.navigate(
+                        Rutas.PRINCIPAL
+                    ) {
+                        popUpTo(0)
+                    }
+                },
+
+                onNavigateToLogin = {
+                    controladorNavegacion.popBackStack()
+                }
+            )
+        }
+
+        // ================= PRINCIPAL =================
+
+        composable(Rutas.PRINCIPAL) {
             MainScreen(
                 onLogout = {
-                    auth.signOut()
+                    autenticacion.signOut()
 
-                    navController.navigate(Routes.LOGIN) {
+                    controladorNavegacion.navigate(
+                        Rutas.LOGIN
+                    ) {
                         popUpTo(0)
                     }
                 }

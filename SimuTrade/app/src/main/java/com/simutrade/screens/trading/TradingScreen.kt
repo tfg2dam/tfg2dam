@@ -1,14 +1,40 @@
 package com.simutrade.screens.trading
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.material3.SegmentedButtonDefaults.itemShape
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -16,344 +42,572 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.simutrade.data.model.*
+import com.simutrade.data.model.Activo
+import com.simutrade.data.model.ResultadoOperacion
 import com.simutrade.screens.main.MainViewModel
-import com.simutrade.screens.main.Screen
+import com.simutrade.screens.main.Pantalla
 import com.simutrade.screens.user.UserViewModel
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TradingScreen(
     mainViewModel: MainViewModel = viewModel(),
     userViewModel: UserViewModel = viewModel()
 ) {
 
-    val selectedAsset by mainViewModel.selectedAsset.collectAsStateWithLifecycle()
-    val userData by userViewModel.userData.collectAsStateWithLifecycle()
-    val portfolio by userViewModel.portfolio.collectAsStateWithLifecycle()
+    val mainUiState by
+    mainViewModel.uiState.collectAsStateWithLifecycle()
 
-    var selectedTab by remember { mutableStateOf(0) }
-    var quantity by remember { mutableStateOf("") }
+    val activoSeleccionado =
+        mainUiState.activoSeleccionado
 
-    val snackbarHostState = remember { SnackbarHostState() }
+    val uiState by
+    userViewModel.uiState.collectAsStateWithLifecycle()
+
+    var pestanaSeleccionada by remember {
+        mutableIntStateOf(0)
+    }
+
+    var cantidad by remember {
+        mutableStateOf("")
+    }
+
+    var procesando by remember {
+        mutableStateOf(false)
+    }
+
+    val snackbarHostState = remember {
+        SnackbarHostState()
+    }
+
     val scope = rememberCoroutineScope()
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = {
+            SnackbarHost(snackbarHostState)
+        }
     ) { padding ->
 
-        if (selectedAsset == null) {
+        if (activoSeleccionado == null) {
 
-            NoAssetSelected(
+            SinActivoSeleccionado(
                 modifier = Modifier.padding(padding),
-                onNavigateToMarket = {
-                    mainViewModel.clearSelectedAsset()
-                    mainViewModel.navigateTo(Screen.Market)
+                onIrMercado = {
+                    mainViewModel.limpiarActivoSeleccionado()
+                    mainViewModel.navegarA(Pantalla.Mercado)
                 }
             )
 
         } else {
 
-            val asset = selectedAsset ?: return@Scaffold
-            val currentHolding = portfolio.find { it.assetId == asset.id }
+            val activo = activoSeleccionado
 
-            val quantityDouble = parseQuantity(quantity)
-            val total = calculateTotal(asset.currentPrice, quantityDouble)
+            val activoEnCartera =
+                uiState.cartera.find {
+                    it.idActivo == activo.id
+                }
+
+            val cantidadDouble =
+                parsearCantidad(cantidad)
+
+            val total =
+                calcularTotal(
+                    activo.precioActual,
+                    cantidadDouble
+                )
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
                     .padding(16.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .verticalScroll(
+                        rememberScrollState()
+                    ),
+                verticalArrangement =
+                    Arrangement.spacedBy(16.dp)
             ) {
 
-                // ================= HEADER =================
                 Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        Arrangement.SpaceBetween,
+                    verticalAlignment =
+                        Alignment.CenterVertically
                 ) {
 
                     Column {
                         Text(
-                            "Operar",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold
+                            text = "Operar",
+                            style =
+                                MaterialTheme.typography
+                                    .headlineMedium
                         )
+
                         Text(
-                            "Compra y vende activos",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text =
+                                "Compra y vende activos",
+                            color =
+                                MaterialTheme.colorScheme
+                                    .onSurfaceVariant
                         )
                     }
 
-                    OutlinedButton(onClick = {
-                        mainViewModel.clearSelectedAsset()
-                        mainViewModel.navigateTo(Screen.Market)
-                    }) {
+                    OutlinedButton(
+                        onClick = {
+                            mainViewModel
+                                .limpiarActivoSeleccionado()
+
+                            mainViewModel.navegarA(
+                                Pantalla.Mercado
+                            )
+                        }
+                    ) {
                         Text("Volver")
                     }
                 }
 
-                // ================= INFO ACTIVO =================
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-
-                        Text(asset.symbol, fontWeight = FontWeight.Bold)
-                        Text(asset.name)
-
-                        Spacer(Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier =
+                            Modifier.padding(16.dp)
+                    ) {
 
                         Text(
-                            "€${"%.2f".format(asset.currentPrice)}",
-                            style = MaterialTheme.typography.headlineMedium
+                            text = activo.simbolo,
+                            fontWeight =
+                                FontWeight.Bold
                         )
 
-                        currentHolding?.let {
-                            Spacer(Modifier.height(8.dp))
-                            Text("Tienes: ${it.quantity}")
+                        Text(
+                            text = activo.nombre
+                        )
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(12.dp)
+                        )
+
+                        Text(
+                            text =
+                                "€${"%.2f".format(activo.precioActual)}",
+                            style =
+                                MaterialTheme.typography
+                                    .headlineMedium
+                        )
+
+                        activoEnCartera?.let {
+
+                            Spacer(
+                                modifier =
+                                    Modifier.height(8.dp)
+                            )
+
+                            val pnl =
+                                (
+                                        activo.precioActual -
+                                                it.precioPromedio
+                                        ) * it.cantidad
+
+                            Text(
+                                text =
+                                    "Tienes: ${it.cantidad}"
+                            )
+
+                            Text(
+                                text =
+                                    "P/L: €${"%.2f".format(pnl)}",
+                                color =
+                                    if (pnl >= 0) {
+                                        MaterialTheme
+                                            .colorScheme
+                                            .primary
+                                    } else {
+                                        MaterialTheme
+                                            .colorScheme
+                                            .error
+                                    }
+                            )
                         }
                     }
                 }
 
-                // ================= TABS =================
                 SingleChoiceSegmentedButtonRow(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier =
+                        Modifier.fillMaxWidth()
                 ) {
 
                     SegmentedButton(
-                        selected = selectedTab == 0,
+                        selected =
+                            pestanaSeleccionada == 0,
                         onClick = {
-                            selectedTab = 0
-                            quantity = ""
+                            pestanaSeleccionada = 0
+                            cantidad = ""
                         },
-                        shape = itemShape(0, 2)
+                        shape =
+                            SegmentedButtonDefaults
+                                .itemShape(
+                                    index = 0,
+                                    count = 2
+                                )
                     ) {
                         Text("Comprar")
                     }
 
                     SegmentedButton(
-                        selected = selectedTab == 1,
+                        selected =
+                            pestanaSeleccionada == 1,
                         onClick = {
-                            selectedTab = 1
-                            quantity = ""
+                            pestanaSeleccionada = 1
+                            cantidad = ""
                         },
-                        enabled = currentHolding != null,
-                        shape = itemShape(1, 2)
+                        enabled =
+                            activoEnCartera != null,
+                        shape =
+                            SegmentedButtonDefaults
+                                .itemShape(
+                                    index = 1,
+                                    count = 2
+                                )
                     ) {
                         Text("Vender")
                     }
                 }
 
-                // ================= FORMULARIOS =================
-                when (selectedTab) {
+                when (pestanaSeleccionada) {
 
-                    // ===== COMPRAR =====
-                    0 -> BuyForm(
-                        asset = asset,
-                        quantity = quantity,
-                        onQuantityChange = { quantity = it },
-                        total = total,
-                        balance = userData.balance,
-                        enabled = canBuy(quantityDouble, asset.currentPrice, userData.balance),
-                        onBuy = {
-                            if (quantityDouble <= 0) return@BuyForm
+                    0 -> {
+                        FormularioCompra(
+                            activo = activo,
+                            cantidad = cantidad,
+                            onCantidadChange = {
+                                cantidad = it
+                            },
+                            total = total,
+                            saldo =
+                                uiState.usuario.saldo,
+                            enabled =
+                                puedeComprar(
+                                    cantidadDouble,
+                                    activo.precioActual,
+                                    uiState.usuario.saldo
+                                ) && !procesando,
+                            onComprar = {
 
-                            userViewModel.buyAsset(asset, quantityDouble) { result ->
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        when (result) {
-                                            is OperationResult.Success -> "Compra realizada"
-                                            is OperationResult.Error -> result.message
-                                        }
-                                    )
-                                    quantity = ""
+                                if (procesando) {
+                                    return@FormularioCompra
                                 }
-                            }
-                        }
-                    )
 
-                    // ===== VENDER =====
-                    1 -> SellForm(
-                        asset = asset,
-                        quantity = quantity,
-                        onQuantityChange = { quantity = it },
-                        total = total,
-                        currentHolding = currentHolding,
-                        enabled = canSell(quantityDouble, currentHolding?.quantity),
-                        onSell = {
-                            if (quantityDouble <= 0) return@SellForm
+                                procesando = true
 
-                            userViewModel.sellAsset(
-                                asset.id,
-                                quantityDouble,
-                                asset.currentPrice
-                            ) { result ->
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        when (result) {
-                                            is OperationResult.Success -> "Venta realizada"
-                                            is OperationResult.Error -> result.message
+                                userViewModel
+                                    .comprarActivo(
+                                        activo,
+                                        cantidadDouble
+                                    ) { resultado ->
+
+                                        scope.launch {
+
+                                            val mensaje =
+                                                when (resultado) {
+                                                    is ResultadoOperacion.Exito ->
+                                                        "Compra realizada"
+
+                                                    is ResultadoOperacion.Error ->
+                                                        resultado.mensaje
+                                                }
+
+                                            snackbarHostState
+                                                .showSnackbar(
+                                                    mensaje
+                                                )
+
+                                            cantidad = ""
+                                            procesando = false
                                         }
-                                    )
-                                    quantity = ""
-                                }
+                                    }
                             }
-                        }
-                    )
+                        )
+                    }
+
+                    1 -> {
+                        FormularioVenta(
+                            activo = activo,
+                            cantidad = cantidad,
+                            onCantidadChange = {
+                                cantidad = it
+                            },
+                            total = total,
+                            enabled =
+                                puedeVender(
+                                    cantidadDouble,
+                                    activoEnCartera?.cantidad
+                                ) && !procesando,
+                            onVender = {
+
+                                if (procesando) {
+                                    return@FormularioVenta
+                                }
+
+                                procesando = true
+
+                                userViewModel
+                                    .venderActivo(
+                                        activo.id,
+                                        cantidadDouble,
+                                        activo.precioActual
+                                    ) { resultado ->
+
+                                        scope.launch {
+
+                                            val mensaje =
+                                                when (resultado) {
+                                                    is ResultadoOperacion.Exito ->
+                                                        "Venta realizada"
+
+                                                    is ResultadoOperacion.Error ->
+                                                        resultado.mensaje
+                                                }
+
+                                            snackbarHostState
+                                                .showSnackbar(
+                                                    mensaje
+                                                )
+
+                                            cantidad = ""
+                                            procesando = false
+                                        }
+                                    }
+                            }
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-//////////////////////////////////////////////////////
-// EMPTY
-//////////////////////////////////////////////////////
-
 @Composable
-fun NoAssetSelected(
+fun SinActivoSeleccionado(
     modifier: Modifier = Modifier,
-    onNavigateToMarket: () -> Unit
+    onIrMercado: () -> Unit
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment =
+            Alignment.CenterHorizontally,
+        verticalArrangement =
+            Arrangement.Center
     ) {
 
         Icon(
-            Icons.Default.TrendingUp,
+            imageVector =
+                Icons.AutoMirrored.Filled.TrendingUp,
             contentDescription = null,
-            modifier = Modifier.size(64.dp)
+            modifier =
+                Modifier.size(64.dp)
         )
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(
+            modifier =
+                Modifier.height(16.dp)
+        )
 
-        Text("Selecciona un activo", style = MaterialTheme.typography.titleLarge)
+        Text(
+            text = "Selecciona un activo"
+        )
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(
+            modifier =
+                Modifier.height(8.dp)
+        )
 
-        Text("Ve al mercado para empezar")
+        Text(
+            text =
+                "Ve al mercado para empezar"
+        )
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(
+            modifier =
+                Modifier.height(24.dp)
+        )
 
-        Button(onClick = onNavigateToMarket) {
+        Button(
+            onClick = onIrMercado
+        ) {
             Text("Ir al mercado")
         }
     }
 }
 
-//////////////////////////////////////////////////////
-// BUY
-//////////////////////////////////////////////////////
-
 @Composable
-fun BuyForm(
-    asset: Asset,
-    quantity: String,
-    onQuantityChange: (String) -> Unit,
+fun FormularioCompra(
+    activo: Activo,
+    cantidad: String,
+    onCantidadChange: (String) -> Unit,
     total: Double,
-    balance: Double,
+    saldo: Double,
     enabled: Boolean,
-    onBuy: () -> Unit
+    onComprar: () -> Unit
 ) {
-    val quantityDouble = parseQuantity(quantity)
+    val cantidadDouble =
+        parsearCantidad(cantidad)
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        verticalArrangement =
+            Arrangement.spacedBy(12.dp)
+    ) {
 
         OutlinedTextField(
-            value = quantity,
-            onValueChange = onQuantityChange,
-            label = { Text("Cantidad") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth(),
+            value = cantidad,
+            onValueChange = onCantidadChange,
+            label = {
+                Text("Cantidad")
+            },
+            keyboardOptions =
+                KeyboardOptions(
+                    keyboardType =
+                        KeyboardType.Decimal
+                ),
+            modifier =
+                Modifier.fillMaxWidth(),
             singleLine = true,
-            isError = quantity.isNotEmpty() && quantityDouble <= 0
+            isError =
+                cantidad.isNotEmpty() &&
+                        cantidadDouble <= 0
         )
 
         Text(
-            "Disponible: €${"%.2f".format(balance)}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text =
+                "Disponible: €${"%.2f".format(saldo)}"
         )
 
         Text(
-            "Total: €${"%.2f".format(total)}",
-            fontWeight = FontWeight.Bold
+            text =
+                "Total: €${"%.2f".format(total)}",
+            fontWeight =
+                FontWeight.Bold
         )
 
         Button(
-            onClick = onBuy,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = enabled && quantity.isNotBlank()
+            onClick = onComprar,
+            modifier =
+                Modifier.fillMaxWidth(),
+            enabled =
+                enabled &&
+                        cantidad.isNotBlank()
         ) {
-            Text("Comprar ${asset.symbol}")
+            Text(
+                text =
+                    "Comprar ${activo.simbolo}"
+            )
         }
     }
 }
 
-//////////////////////////////////////////////////////
-// SELL
-//////////////////////////////////////////////////////
-
 @Composable
-fun SellForm(
-    asset: Asset,
-    quantity: String,
-    onQuantityChange: (String) -> Unit,
+fun FormularioVenta(
+    activo: Activo,
+    cantidad: String,
+    onCantidadChange: (String) -> Unit,
     total: Double,
-    currentHolding: PortfolioHolding?,
     enabled: Boolean,
-    onSell: () -> Unit
+    onVender: () -> Unit
 ) {
-    val quantityDouble = parseQuantity(quantity)
+    val cantidadDouble =
+        parsearCantidad(cantidad)
 
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(
+        verticalArrangement =
+            Arrangement.spacedBy(12.dp)
+    ) {
 
         OutlinedTextField(
-            value = quantity,
-            onValueChange = onQuantityChange,
-            label = { Text("Cantidad") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth(),
+            value = cantidad,
+            onValueChange = onCantidadChange,
+            label = {
+                Text("Cantidad")
+            },
+            keyboardOptions =
+                KeyboardOptions(
+                    keyboardType =
+                        KeyboardType.Decimal
+                ),
+            modifier =
+                Modifier.fillMaxWidth(),
             singleLine = true,
-            isError = quantity.isNotEmpty() && quantityDouble <= 0
+            isError =
+                cantidad.isNotEmpty() &&
+                        cantidadDouble <= 0
         )
 
         Text(
-            "Recibirás: €${"%.2f".format(total)}",
-            fontWeight = FontWeight.Bold
+            text =
+                "Recibirás: €${"%.2f".format(total)}",
+            fontWeight =
+                FontWeight.Bold
         )
 
         Button(
-            onClick = onSell,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = enabled && quantity.isNotBlank()
+            onClick = onVender,
+            modifier =
+                Modifier.fillMaxWidth(),
+            enabled =
+                enabled &&
+                        cantidad.isNotBlank()
         ) {
-            Text("Vender ${asset.symbol}")
+            Text(
+                text =
+                    "Vender ${activo.simbolo}"
+            )
         }
     }
 }
 
-//////////////////////////////////////////////////////
-// HELPERS
-//////////////////////////////////////////////////////
-
-private fun parseQuantity(input: String): Double =
-    input
+private fun parsearCantidad(
+    input: String
+): Double {
+    return input
         .replace(",", ".")
-        .filter { it.isDigit() || it == '.' }
-        .toDoubleOrNull() ?: 0.0
+        .filter {
+            it.isDigit() || it == '.'
+        }
+        .toDoubleOrNull()
+        ?: 0.0
+}
 
-private fun calculateTotal(price: Double, quantity: Double): Double =
-    price * quantity
+private fun calcularTotal(
+    precio: Double,
+    cantidad: Double
+): Double {
+    return if (precio <= 0) {
+        0.0
+    } else {
+        precio * cantidad
+    }
+}
 
-private fun canBuy(quantity: Double, price: Double, balance: Double): Boolean =
-    quantity > 0 && (quantity * price) <= balance
+private fun puedeComprar(
+    cantidad: Double,
+    precio: Double,
+    saldo: Double
+): Boolean {
+    return cantidad > 0 &&
+            precio > 0 &&
+            (cantidad * precio) <= saldo
+}
 
-private fun canSell(quantity: Double, holdingQuantity: Double?): Boolean =
-    holdingQuantity != null && quantity > 0 && quantity <= holdingQuantity
+private fun puedeVender(
+    cantidad: Double,
+    cantidadDisponible: Double?
+): Boolean {
+    return cantidadDisponible != null &&
+            cantidad > 0 &&
+            cantidad <= cantidadDisponible
+}
