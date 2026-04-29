@@ -8,6 +8,8 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -29,9 +31,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.simutrade.screens.amigos.AmigosScreen
 import com.simutrade.screens.auth.AuthViewModel
 import com.simutrade.screens.challenges.ChallengesScreen
 import com.simutrade.screens.dashboard.DashboardScreen
+import com.simutrade.screens.ligas.LigasScreen
 import com.simutrade.screens.market.MarketScreen
 import com.simutrade.screens.rankings.RankingsScreen
 import com.simutrade.screens.trading.TradingScreen
@@ -46,59 +50,29 @@ fun MainScreen(
     authViewModel: AuthViewModel = viewModel()
 ) {
 
-    // ================= ESTADO PRINCIPAL =================
-
     val mainUiState by mainViewModel.uiState.collectAsStateWithLifecycle()
-
-    val pantallaActual =
-        mainUiState.pantallaActual
-
-    // ================= ESTADO USUARIO =================
+    val pantallaActual = mainUiState.pantallaActual
 
     val userUiState by userViewModel.uiState.collectAsStateWithLifecycle()
+    val usuario = userUiState.usuario
+    val rangoActual = userUiState.rangoActual
 
-    val usuario =
-        userUiState.usuario
-
-    val rangoActual =
-        userUiState.rangoActual
-
-    var mostrarDialogoPerfil by remember {
-        mutableStateOf(false)
-    }
+    var mostrarDialogoPerfil by remember { mutableStateOf(false) }
 
     val itemsNavegacion = listOf(
-        ItemNavegacion(
-            Pantalla.Inicio,
-            "Panel",
-            Icons.Default.Dashboard
-        ),
-        ItemNavegacion(
-            Pantalla.Mercado,
-            "Mercado",
-            Icons.AutoMirrored.Filled.TrendingUp
-        ),
-        ItemNavegacion(
-            Pantalla.Rankings,
-            "Ranking",
-            Icons.Default.EmojiEvents
-        ),
-        ItemNavegacion(
-            Pantalla.Retos,
-            "Retos",
-            Icons.Default.Star
-        )
+        ItemNavegacion(Pantalla.Inicio,   "Panel",   Icons.Default.Dashboard),
+        ItemNavegacion(Pantalla.Mercado,  "Mercado", Icons.AutoMirrored.Filled.TrendingUp),
+        ItemNavegacion(Pantalla.Rankings, "Ranking", Icons.Default.EmojiEvents),
+        ItemNavegacion(Pantalla.Retos,    "Retos",   Icons.Default.Star),
+        ItemNavegacion(Pantalla.Amigos,   "Amigos",  Icons.Default.People),
+        ItemNavegacion(Pantalla.Ligas,    "Ligas",   Icons.Default.Groups)
     )
-
-    // ================= PERFIL =================
 
     if (mostrarDialogoPerfil) {
         ProfileDialog(
             datosUsuario = usuario,
             rangoActual = rangoActual,
-            onDismiss = {
-                mostrarDialogoPerfil = false
-            },
+            onDismiss = { mostrarDialogoPerfil = false },
             onLogout = {
                 mostrarDialogoPerfil = false
                 authViewModel.cerrarSesion()
@@ -107,8 +81,6 @@ fun MainScreen(
         )
     }
 
-    // ================= UI =================
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -116,42 +88,25 @@ fun MainScreen(
                     Column {
                         Text(
                             text = "SimuTrade",
-                            style =
-                                MaterialTheme.typography.titleLarge
+                            style = MaterialTheme.typography.titleLarge
                         )
-
                         Text(
-                            text =
-                                "€${"%.2f".format(usuario.saldo)} • ${rangoActual?.nombre ?: ""}",
-
-                            style =
-                                MaterialTheme.typography.bodySmall,
-
-                            color =
-                                MaterialTheme.colorScheme
-                                    .onSurfaceVariant
+                            text = "€${"%.2f".format(usuario.saldo)} • ${rangoActual?.nombre ?: ""}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
-
                 actions = {
-                    IconButton(
-                        onClick = {
-                            mostrarDialogoPerfil = true
-                        }
-                    ) {
+                    IconButton(onClick = { mostrarDialogoPerfil = true }) {
                         Icon(
-                            imageVector =
-                                Icons.Default.AccountCircle,
-
-                            contentDescription =
-                                "Perfil"
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = "Perfil"
                         )
                     }
                 }
             )
         },
-
         bottomBar = {
             NavigationBar {
                 itemsNavegacion.forEach { item ->
@@ -162,19 +117,9 @@ fun MainScreen(
                                 contentDescription = item.etiqueta
                             )
                         },
-
-                        label = {
-                            Text(item.etiqueta)
-                        },
-
-                        selected =
-                            pantallaActual == item.pantalla,
-
-                        onClick = {
-                            mainViewModel.navegarA(
-                                item.pantalla
-                            )
-                        }
+                        label = { Text(item.etiqueta) },
+                        selected = pantallaActual == item.pantalla,
+                        onClick = { mainViewModel.navegarA(item.pantalla) }
                     )
                 }
             }
@@ -186,38 +131,26 @@ fun MainScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-
             when (pantallaActual) {
 
-                Pantalla.Inicio -> {
-                    DashboardScreen()
-                }
+                Pantalla.Inicio -> DashboardScreen()
 
-                Pantalla.Mercado -> {
-                    MarketScreen(
-                        mainViewModel = mainViewModel
-                    )
-                }
+                Pantalla.Mercado -> MarketScreen(mainViewModel = mainViewModel)
 
-                Pantalla.Trading -> {
-                    TradingScreen(
-                        mainViewModel = mainViewModel
-                    )
-                }
+                Pantalla.Trading -> TradingScreen(mainViewModel = mainViewModel)
 
-                Pantalla.Rankings -> {
-                    RankingsScreen()
-                }
+                Pantalla.Rankings -> RankingsScreen()
 
                 Pantalla.Retos -> {
                     LaunchedEffect(Unit) {
                         userViewModel.cargarDatos()
                     }
-
-                    ChallengesScreen(
-                        userViewModel = userViewModel
-                    )
+                    ChallengesScreen(userViewModel = userViewModel)
                 }
+
+                Pantalla.Amigos -> AmigosScreen()
+
+                Pantalla.Ligas -> LigasScreen()
             }
         }
     }

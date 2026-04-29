@@ -15,6 +15,8 @@ sealed class Pantalla {
     object Trading : Pantalla()
     object Rankings : Pantalla()
     object Retos : Pantalla()
+    object Amigos : Pantalla()
+    object Ligas : Pantalla()
 }
 
 // ================= ESTADO =================
@@ -28,43 +30,27 @@ data class EstadoUiPrincipal(
 
 class MainViewModel : ViewModel() {
 
-    private val _uiState = MutableStateFlow(
-        EstadoUiPrincipal()
-    )
-
-    val uiState: StateFlow<EstadoUiPrincipal> =
-        _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(EstadoUiPrincipal())
+    val uiState: StateFlow<EstadoUiPrincipal> = _uiState.asStateFlow()
 
     // ================= NAVEGACIÓN =================
 
-    fun navegarA(
-        pantalla: Pantalla
-    ) {
+    fun navegarA(pantalla: Pantalla) {
         val estadoActual = _uiState.value
 
-        // evitar navegación duplicada
-        if (estadoActual.pantallaActual == pantalla) {
-            return
-        }
+        if (estadoActual.pantallaActual == pantalla) return
 
         _uiState.value = estadoActual.copy(
             pantallaActual = pantalla,
-
-            // limpiar activo seleccionado si salimos de Trading
             activoSeleccionado =
-                if (pantalla == Pantalla.Trading) {
-                    estadoActual.activoSeleccionado
-                } else {
-                    null
-                }
+                if (pantalla == Pantalla.Trading) estadoActual.activoSeleccionado
+                else null
         )
     }
 
     // ================= ACTIVO =================
 
-    fun seleccionarActivo(
-        activo: Activo
-    ) {
+    fun seleccionarActivo(activo: Activo) {
         _uiState.value = _uiState.value.copy(
             activoSeleccionado = activo,
             pantallaActual = Pantalla.Trading
@@ -72,8 +58,6 @@ class MainViewModel : ViewModel() {
     }
 
     fun limpiarActivoSeleccionado() {
-        _uiState.value = _uiState.value.copy(
-            activoSeleccionado = null
-        )
+        _uiState.value = _uiState.value.copy(activoSeleccionado = null)
     }
 }

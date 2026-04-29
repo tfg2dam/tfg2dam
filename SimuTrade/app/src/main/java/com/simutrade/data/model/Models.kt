@@ -111,3 +111,43 @@ sealed class ResultadoOperacion {
         val mensaje: String
     ) : ResultadoOperacion()
 }
+
+// ================= AMIGOS =================
+
+data class Amigo(
+    val uid: String = "",
+    val nombreUsuario: String = "",
+    val codigoUsuario: String = "",
+    val idRango: String = "bronce"
+)
+
+data class SolicitudAmistad(
+    val uid: String = "",
+    val nombreUsuario: String = "",
+    val codigoUsuario: String = ""
+)
+
+// ================= LIGAS =================
+
+data class Liga(
+    val id: String = "",
+    val nombre: String = "",
+    val creadoPor: String = "",
+    val creadoEn: Long = 0L,
+    val miembros: List<MiembroLiga> = emptyList()
+)
+
+data class MiembroLiga(
+    val uid: String = "",
+    val nombreUsuario: String = "",
+    val codigoUsuario: String = "",
+    val estado: String = "pendiente",
+    val invitadoPor: String = ""
+)
+
+data class InvitacionLiga(
+    val ligaId: String = "",
+    val nombreLiga: String = "",
+    val invitadoPor: String = "",
+    val creadoEn: Long = 0L
+)
