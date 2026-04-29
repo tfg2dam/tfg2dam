@@ -17,6 +17,14 @@ private val Green100 = Color(0xFFD1FAE5)
 
 private val Red600 = Color(0xFFDC2626)
 
+// ================= COLORES DE RANGO =================
+
+val ColorBronce = Color(0xFFCD7F32)
+val ColorPlata = Color(0xFFC0C0C0)
+val ColorOro = Color(0xFFFFD700)
+val ColorPlatino = Color(0xFFE5E4E2)
+val ColorDiamante = Color(0xFF00E5FF)
+
 // ================= EXTENSIONES =================
 
 val ColorScheme.positive: Color

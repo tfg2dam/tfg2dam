@@ -23,6 +23,11 @@ class RepositorioAutenticacion {
     private val autenticacion = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
 
+    private fun generarCodigoUsuario(): String {
+        val caracteres = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        return (1..8).map { caracteres.random() }.joinToString("")
+    }
+
     companion object {
         private const val SALDO_INICIAL = 100.0
         private const val USUARIOS = "Usuarios"
@@ -103,6 +108,8 @@ class RepositorioAutenticacion {
                     "Error al crear usuario"
                 )
 
+            val codigoUsuario = generarCodigoUsuario()
+
             val ahora = System.currentTimeMillis()
 
             val referenciaUsuario = firestore
@@ -114,6 +121,7 @@ class RepositorioAutenticacion {
             val datosUsuario = mapOf(
                 "nombre_usuario" to nombreUsuario,
                 "email" to email,
+                "codigo_usuario" to codigoUsuario,
 
                 "saldo" to SALDO_INICIAL,
                 "saldo_inicial" to SALDO_INICIAL,

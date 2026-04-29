@@ -58,7 +58,8 @@ data class DatosUsuario(
     val saldoBonus: Double = 0.0,
     val idRango: String = "bronce",
     val creadoEn: Long = 0L,
-    val ultimoLogin: Long = 0L
+    val ultimoLogin: Long = 0L,
+    val codigoUsuario: String = ""
 )
 
 // ================= RANKING =================

@@ -73,7 +73,8 @@ class RepositorioUsuario {
                 saldoBonus = documento.getDouble("saldo_bonus") ?: 0.0,
                 idRango = documento.getString("id_rango") ?: "bronce",
                 creadoEn = documento.getLong("creado_en") ?: 0L,
-                ultimoLogin = documento.getLong("ultimo_login") ?: 0L
+                ultimoLogin = documento.getLong("ultimo_login") ?: 0L,
+                codigoUsuario = documento.getString("codigo_usuario") ?: "",
             )
 
         } catch (e: Exception) {
