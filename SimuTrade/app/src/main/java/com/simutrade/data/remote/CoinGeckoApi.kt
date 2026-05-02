@@ -1,10 +1,16 @@
 package com.simutrade.data.remote
 
 import com.google.gson.annotations.SerializedName
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Query
+import java.util.concurrent.TimeUnit
+
+// ================= CONSTANTES =================
+
+private const val MONEDAS_POR_PAGINA = 10
 
 // ================= DTO (RESPUESTAS API) =================
 
@@ -28,7 +34,6 @@ data class MonedaCoinGeckoDto(
 )
 
 data class RespuestaBusquedaCoinGeckoDto(
-
     @SerializedName("coins")
     val monedas: List<ItemBusquedaCoinGeckoDto>
 )
@@ -53,17 +58,8 @@ interface ApiCoinGecko {
         @Query("vs_currency")
         moneda: String = "eur",
 
-        @Query("order")
-        orden: String = "market_cap_desc",
-
         @Query("per_page")
-        cantidadPorPagina: Int = 10,
-
-        @Query("page")
-        pagina: Int = 1,
-
-        @Query("sparkline")
-        incluirSparkline: Boolean = false
+        cantidadPorPagina: Int = MONEDAS_POR_PAGINA
 
     ): List<MonedaCoinGeckoDto>
 
@@ -80,15 +76,20 @@ interface ApiCoinGecko {
 
 object ClienteCoinGecko {
 
-    private const val URL_BASE =
-        "https://api.coingecko.com/api/v3/"
+    private const val URL_BASE = "https://api.coingecko.com/api/v3/"
+    private const val TIMEOUT_SEGUNDOS = 10L
+
+    private val clienteHttp = OkHttpClient.Builder()
+        .connectTimeout(TIMEOUT_SEGUNDOS, TimeUnit.SECONDS)
+        .readTimeout(TIMEOUT_SEGUNDOS, TimeUnit.SECONDS)
+        .writeTimeout(TIMEOUT_SEGUNDOS, TimeUnit.SECONDS)
+        .build()
 
     val api: ApiCoinGecko by lazy {
         Retrofit.Builder()
             .baseUrl(URL_BASE)
-            .addConverterFactory(
-                GsonConverterFactory.create()
-            )
+            .client(clienteHttp)
+            .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(ApiCoinGecko::class.java)
     }

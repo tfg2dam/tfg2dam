@@ -2,15 +2,17 @@ package com.simutrade.screens.ligas
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
+import com.simutrade.data.model.Amigo
 import com.simutrade.data.model.EntradaRanking
 import com.simutrade.data.model.InvitacionLiga
 import com.simutrade.data.model.Liga
 import com.simutrade.data.repository.AmigosRepository
 import com.simutrade.data.repository.LigasRepository
-import com.simutrade.data.model.Amigo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class LigasUiState(
@@ -19,134 +21,186 @@ data class LigasUiState(
     val ligaSeleccionada: Liga? = null,
     val rankingLiga: List<EntradaRanking> = emptyList(),
     val misAmigos: List<Amigo> = emptyList(),
-    val isLoading: Boolean = false,
-    val isLoadingRanking: Boolean = false,
+    val miUid: String = "",
+    val cargando: Boolean = false,
+    val cargandoRanking: Boolean = false,
     val error: String? = null,
     val mensaje: String? = null
 )
 
 class LigasViewModel : ViewModel() {
 
-    private val repository = LigasRepository()
-    private val amigosRepository = AmigosRepository()
+    private val repositorio = LigasRepository()
+    private val repositorioAmigos = AmigosRepository()
 
     private val _uiState = MutableStateFlow(LigasUiState())
     val uiState: StateFlow<LigasUiState> = _uiState.asStateFlow()
 
     init {
+        _uiState.update {
+            it.copy(miUid = FirebaseAuth.getInstance().currentUser?.uid ?: "")
+        }
         cargarDatos()
     }
 
+    // ================= CARGAR =================
+
     fun cargarDatos() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            _uiState.update { it.copy(cargando = true, error = null) }
             try {
-                val ligas = repository.getMisLigas()
-                val invitaciones = repository.getInvitaciones()
-                val amigos = amigosRepository.getAmigos()
-
-                _uiState.value = _uiState.value.copy(
-                    misLigas = ligas,
-                    invitaciones = invitaciones,
-                    misAmigos = amigos,
-                    isLoading = false
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = "Error al cargar ligas"
-                )
+                val ligas = repositorio.obtenerMisLigas()
+                val invitaciones = repositorio.obtenerInvitaciones()
+                val amigos = repositorioAmigos.obtenerAmigos()
+                _uiState.update {
+                    it.copy(
+                        misLigas = ligas,
+                        invitaciones = invitaciones,
+                        misAmigos = amigos,
+                        cargando = false
+                    )
+                }
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(cargando = false, error = "Error al cargar ligas")
+                }
             }
         }
     }
+
+    // ================= CREAR =================
 
     fun crearLiga(nombre: String) {
         if (nombre.isBlank()) {
-            _uiState.value = _uiState.value.copy(error = "El nombre no puede estar vacio")
+            _uiState.update { it.copy(error = "El nombre no puede estar vacío") }
             return
         }
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            val ligaId = repository.crearLiga(nombre)
+            _uiState.update { it.copy(cargando = true) }
+            val ligaId = repositorio.crearLiga(nombre)
             if (ligaId != null) {
-                _uiState.value = _uiState.value.copy(mensaje = "Liga creada")
                 cargarDatos()
+                _uiState.update { it.copy(mensaje = "Liga creada") }
             } else {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = "Error al crear la liga"
+                _uiState.update {
+                    it.copy(cargando = false, error = "Error al crear la liga")
+                }
+            }
+        }
+    }
+
+    // ================= INVITAR =================
+
+    fun invitarAmigo(ligaId: String, amigoUid: String) {
+        viewModelScope.launch {
+            // ✅ Comprobar si ya es miembro antes de invitar
+            val yaEsMiembro = _uiState.value.ligaSeleccionada
+                ?.miembros?.any { it.uid == amigoUid } == true
+
+            if (yaEsMiembro) {
+                _uiState.update { it.copy(mensaje = "Este usuario ya está en la liga") }
+                return@launch
+            }
+
+            val exito = repositorio.invitarAmigo(ligaId, amigoUid)
+            _uiState.update {
+                it.copy(
+                    mensaje = if (exito) "Invitación enviada" else null,
+                    error = if (!exito) "Error al enviar la invitación" else null
                 )
             }
         }
     }
 
-    fun invitarAmigo(ligaId: String, amigoUid: String) {
-        viewModelScope.launch {
-            val exito = repository.invitarAmigo(ligaId, amigoUid)
-            _uiState.value = _uiState.value.copy(
-                mensaje = if (exito) "Invitacion enviada" else "Error al invitar"
-            )
-        }
-    }
+    // ================= ACEPTAR / RECHAZAR =================
 
     fun aceptarInvitacion(ligaId: String) {
         viewModelScope.launch {
-            val exito = repository.aceptarInvitacion(ligaId)
+            val exito = repositorio.aceptarInvitacion(ligaId)
             if (exito) {
-                _uiState.value = _uiState.value.copy(mensaje = "Te has unido a la liga")
+                _uiState.update { estado ->
+                    estado.copy(
+                        invitaciones = estado.invitaciones.filter { it.ligaId != ligaId },
+                        mensaje = "Te has unido a la liga"
+                    )
+                }
                 cargarDatos()
             } else {
-                _uiState.value = _uiState.value.copy(error = "Error al aceptar invitacion")
+                _uiState.update { it.copy(error = "Error al aceptar la invitación") }
             }
         }
     }
 
     fun rechazarInvitacion(ligaId: String) {
         viewModelScope.launch {
-            repository.rechazarInvitacion(ligaId)
-            cargarDatos()
-        }
-    }
-
-    fun salirDeLiga(ligaId: String) {
-        viewModelScope.launch {
-            val exito = repository.salirDeLiga(ligaId)
+            val exito = repositorio.rechazarInvitacion(ligaId)
             if (exito) {
-                _uiState.value = _uiState.value.copy(
-                    mensaje = "Has salido de la liga",
-                    ligaSeleccionada = null
-                )
-                cargarDatos()
+                _uiState.update { estado ->
+                    estado.copy(
+                        invitaciones = estado.invitaciones.filter { it.ligaId != ligaId }
+                    )
+                }
             } else {
-                _uiState.value = _uiState.value.copy(error = "Error al salir de la liga")
+                _uiState.update { it.copy(error = "Error al rechazar la invitación") }
             }
         }
     }
 
+    // ================= SALIR =================
+
+    fun salirDeLiga(ligaId: String) {
+        viewModelScope.launch {
+            val exito = repositorio.salirDeLiga(ligaId)
+            if (exito) {
+                _uiState.update { estado ->
+                    estado.copy(
+                        misLigas = estado.misLigas.filter { it.id != ligaId },
+                        ligaSeleccionada = null,
+                        rankingLiga = emptyList(),
+                        mensaje = "Has salido de la liga"
+                    )
+                }
+            } else {
+                _uiState.update { it.copy(error = "Error al salir de la liga") }
+            }
+        }
+    }
+
+    // ================= SELECCIÓN =================
+
     fun seleccionarLiga(liga: Liga) {
-        _uiState.value = _uiState.value.copy(ligaSeleccionada = liga)
+        _uiState.update { it.copy(ligaSeleccionada = liga) }
         cargarRankingLiga(liga.id)
     }
 
     fun deseleccionarLiga() {
-        _uiState.value = _uiState.value.copy(
-            ligaSeleccionada = null,
-            rankingLiga = emptyList()
-        )
+        _uiState.update {
+            it.copy(ligaSeleccionada = null, rankingLiga = emptyList())
+        }
     }
 
     private fun cargarRankingLiga(ligaId: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoadingRanking = true)
-            val ranking = repository.getRankingLiga(ligaId)
-            _uiState.value = _uiState.value.copy(
-                rankingLiga = ranking,
-                isLoadingRanking = false
-            )
+            _uiState.update { it.copy(cargandoRanking = true) }
+            try {
+                val ranking = repositorio.obtenerRankingLiga(ligaId)
+                _uiState.update {
+                    it.copy(rankingLiga = ranking, cargandoRanking = false)
+                }
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(
+                        cargandoRanking = false,
+                        error = "Error al cargar el ranking de la liga"
+                    )
+                }
+            }
         }
     }
 
+    // ================= HELPERS =================
+
     fun limpiarMensaje() {
-        _uiState.value = _uiState.value.copy(mensaje = null, error = null)
+        _uiState.update { it.copy(mensaje = null, error = null) }
     }
 }

@@ -21,12 +21,8 @@ class RankingsViewModel : ViewModel() {
 
     private val repositorio = RepositorioUsuario()
 
-    private val _uiState = MutableStateFlow(
-        EstadoUiRankings()
-    )
-
-    val uiState: StateFlow<EstadoUiRankings> =
-        _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(EstadoUiRankings())
+    val uiState: StateFlow<EstadoUiRankings> = _uiState.asStateFlow()
 
     private var trabajoCarga: Job? = null
 
@@ -37,7 +33,6 @@ class RankingsViewModel : ViewModel() {
     // ================= CARGAR =================
 
     fun cargarRanking() {
-
         if (_uiState.value.cargando) return
 
         trabajoCarga?.cancel()
@@ -45,68 +40,38 @@ class RankingsViewModel : ViewModel() {
         trabajoCarga = viewModelScope.launch {
 
             _uiState.update {
-                it.copy(
-                    cargando = true,
-                    error = null
-                )
+                it.copy(cargando = true, error = null)
             }
 
             try {
-                val datosRanking =
-                    repositorio.obtenerRanking()
+                val datosRanking = repositorio.obtenerRanking()
 
                 _uiState.update {
                     it.copy(
-                        ranking = datosRanking
-                            .sortedByDescending { entrada ->
-                                entrada.beneficio
-                            },
+                        ranking = datosRanking,
                         cargando = false,
                         error = null
                     )
                 }
 
-            } catch (e: Exception) {
-
+            } catch (_: Exception) {
                 _uiState.update {
                     it.copy(
                         cargando = false,
-                        error = e.message
-                            ?: "Error cargando ranking"
+                        error = "No se pudo cargar el ranking. Inténtalo de nuevo"
                     )
                 }
             }
         }
     }
 
-    // ================= RECARGAR =================
-
-    fun recargar() {
-        cargarRanking()
-    }
-
     // ================= HELPERS =================
 
-    fun obtenerPosicionUsuario(
-        idUsuario: String
-    ): Int {
-
-        val indice =
-            _uiState.value.ranking.indexOfFirst {
-                it.id == idUsuario
-            }
-
-        return if (indice != -1) {
-            indice + 1
-        } else {
-            -1
-        }
-    }
-
-    // ================= LIMPIEZA =================
-
-    override fun onCleared() {
-        super.onCleared()
-        trabajoCarga?.cancel()
+    fun obtenerPosicionUsuario(idUsuario: String): Int {
+        return _uiState.value.ranking
+            .indexOfFirst { it.id == idUsuario }
+            .takeIf { it != -1 }
+            ?.plus(1)
+            ?: -1
     }
 }

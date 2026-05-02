@@ -8,15 +8,15 @@ import com.simutrade.data.remote.ClienteFinnhub
 import com.simutrade.data.remote.CotizacionFinnhubDto
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeout
 
-class RepositorioMercado {
+object RepositorioMercado {
 
-    companion object {
-        private const val LIMITE_BUSQUEDA = 5
-        private const val TIEMPO_CACHE_MS = 60_000L
-    }
+    private const val LIMITE_BUSQUEDA = 5
+    private const val TIEMPO_CACHE_MS = 120_000L
+    private const val TIMEOUT_BUSQUEDA_MS = 8_000L
 
-    // ================= CACHE =================
+    // ================= CACHÉ =================
 
     private var criptomonedasEnCache: List<Activo> = emptyList()
     private var accionesEnCache: List<Activo> = emptyList()
@@ -42,7 +42,6 @@ class RepositorioMercado {
     // ================= TOP CRIPTOMONEDAS =================
 
     suspend fun obtenerTopCriptomonedas(): List<Activo> {
-
         val ahora = System.currentTimeMillis()
 
         if (
@@ -71,7 +70,6 @@ class RepositorioMercado {
 
     suspend fun obtenerTopAcciones(): List<Activo> =
         coroutineScope {
-
             val ahora = System.currentTimeMillis()
 
             if (
@@ -84,16 +82,11 @@ class RepositorioMercado {
             val diferidos = accionesPorDefecto.map { (simbolo, nombre) ->
                 async {
                     try {
-                        val cotizacion =
-                            ClienteFinnhub.api.obtenerCotizacion(
-                                simbolo = simbolo
-                            )
+                        val cotizacion = ClienteFinnhub.api
+                            .obtenerCotizacion(simbolo = simbolo)
 
                         if ((cotizacion.precioActual ?: 0.0) > 0) {
-                            cotizacion.aActivo(
-                                simbolo = simbolo,
-                                nombre = nombre
-                            )
+                            cotizacion.aActivo(simbolo = simbolo, nombre = nombre)
                         } else {
                             null
                         }
@@ -104,55 +97,13 @@ class RepositorioMercado {
                 }
             }
 
-            val resultado =
-                diferidos.mapNotNull { it.await() }
+            val resultado = diferidos.mapNotNull { it.await() }
 
             accionesEnCache = resultado
             ultimaCargaAcciones = ahora
 
             resultado
         }
-
-    // ================= PRECIO ACTUAL INDIVIDUAL =================
-
-    suspend fun obtenerPrecioActual(
-        idActivo: String,
-        simbolo: String,
-        tipo: TipoActivo
-    ): Double {
-
-        return try {
-
-            when (tipo) {
-
-                TipoActivo.ACCION -> {
-                    val cotizacion =
-                        ClienteFinnhub.api.obtenerCotizacion(
-                            simbolo = simbolo
-                        )
-
-                    cotizacion.precioActual ?: 0.0
-                }
-
-                TipoActivo.CRIPTO -> {
-                    val moneda =
-                        ClienteCoinGecko.api
-                            .obtenerMonedasPrincipales()
-                            .firstOrNull {
-                                it.id.equals(
-                                    idActivo,
-                                    ignoreCase = true
-                                )
-                            }
-
-                    moneda?.precioActual ?: 0.0
-                }
-            }
-
-        } catch (_: Exception) {
-            0.0
-        }
-    }
 
     // ================= BÚSQUEDA =================
 
@@ -166,24 +117,25 @@ class RepositorioMercado {
 
         val criptomonedasDiferidas = async {
             try {
-                ClienteCoinGecko.api
-                    .buscarMonedas(
-                        consulta = textoBusqueda
-                    )
-                    .monedas
-                    .take(LIMITE_BUSQUEDA)
-                    .map { item ->
-                        Activo(
-                            id = item.id,
-                            simbolo = item.simbolo.uppercase(),
-                            nombre = item.nombre,
-                            tipo = TipoActivo.CRIPTO,
-                            precioActual = 0.0,
-                            cambioPrecio24h = 0.0,
-                            cambioPorcentaje24h = 0.0
-                        )
-                    }
-
+                withTimeout(TIMEOUT_BUSQUEDA_MS) {
+                    ClienteCoinGecko.api
+                        .buscarMonedas(consulta = textoBusqueda)
+                        .monedas
+                        .take(LIMITE_BUSQUEDA)
+                        .map { item ->
+                            criptomonedasEnCache.firstOrNull {
+                                it.id.equals(item.id, ignoreCase = true)
+                            } ?: Activo(
+                                id = item.id,
+                                simbolo = item.simbolo.uppercase(),
+                                nombre = item.nombre,
+                                tipo = TipoActivo.CRIPTO,
+                                precioActual = 0.0,
+                                cambioPrecio24h = 0.0,
+                                cambioPorcentaje24h = 0.0
+                            )
+                        }
+                }
             } catch (_: Exception) {
                 emptyList()
             }
@@ -193,52 +145,44 @@ class RepositorioMercado {
 
         val accionesDiferidas = async {
             try {
-                val elementos = ClienteFinnhub.api
-                    .buscarSimbolos(
-                        consulta = textoBusqueda
-                    )
-                    .resultados
-                    .take(LIMITE_BUSQUEDA)
+                withTimeout(TIMEOUT_BUSQUEDA_MS) {
+                    val elementos = ClienteFinnhub.api
+                        .buscarSimbolos(consulta = textoBusqueda)
+                        .resultados
+                        .take(LIMITE_BUSQUEDA)
 
-                elementos.map { item ->
-                    async {
+                    elementos.map { item ->
+                        async {
+                            accionesEnCache.firstOrNull {
+                                it.simbolo.equals(item.simbolo, ignoreCase = true)
+                            } ?: run {
+                                val cotizacion = try {
+                                    ClienteFinnhub.api
+                                        .obtenerCotizacion(simbolo = item.simbolo)
+                                } catch (_: Exception) {
+                                    null
+                                }
 
-                        val cotizacion = try {
-                            ClienteFinnhub.api
-                                .obtenerCotizacion(
-                                    simbolo = item.simbolo
+                                Activo(
+                                    id = item.simbolo,
+                                    simbolo = item.simbolo,
+                                    nombre = item.descripcion,
+                                    tipo = TipoActivo.ACCION,
+                                    precioActual = cotizacion?.precioActual ?: 0.0,
+                                    cambioPrecio24h = cotizacion?.cambioPrecio ?: 0.0,
+                                    cambioPorcentaje24h = cotizacion?.cambioPorcentaje ?: 0.0
                                 )
-                        } catch (_: Exception) {
-                            null
+                            }
                         }
-
-                        Activo(
-                            id = item.simbolo,
-                            simbolo = item.simbolo,
-                            nombre = item.descripcion,
-                            tipo = TipoActivo.ACCION,
-                            precioActual =
-                                cotizacion?.precioActual ?: 0.0,
-                            cambioPrecio24h =
-                                cotizacion?.cambioPrecio ?: 0.0,
-                            cambioPorcentaje24h =
-                                cotizacion?.cambioPorcentaje ?: 0.0
-                        )
-                    }
-                }.map { it.await() }
-
+                    }.map { it.await() }
+                }
             } catch (_: Exception) {
                 emptyList()
             }
         }
 
-        resultados.addAll(
-            criptomonedasDiferidas.await()
-        )
-
-        resultados.addAll(
-            accionesDiferidas.await()
-        )
+        resultados.addAll(criptomonedasDiferidas.await())
+        resultados.addAll(accionesDiferidas.await())
 
         resultados
     }

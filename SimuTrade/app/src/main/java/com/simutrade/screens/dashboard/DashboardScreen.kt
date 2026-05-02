@@ -24,7 +24,9 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -38,6 +40,7 @@ import com.simutrade.data.model.Rango
 import com.simutrade.data.model.TipoTransaccion
 import com.simutrade.data.model.Transaccion
 import com.simutrade.screens.main.MainViewModel
+import com.simutrade.screens.rankings.RankUtils
 import com.simutrade.screens.theme.positive
 import com.simutrade.screens.user.UserViewModel
 import java.text.SimpleDateFormat
@@ -52,32 +55,30 @@ fun DashboardScreen(
 ) {
     val uiState by userViewModel.uiState.collectAsStateWithLifecycle()
 
+    // ✅ Recarga al entrar al Dashboard
+    LaunchedEffect(Unit) {
+        userViewModel.cargarDatos()
+    }
+
     val usuario = uiState.usuario
     val cartera = uiState.cartera
     val transacciones = uiState.transacciones
     val rangoActual = uiState.rangoActual
 
-    val valorCartera = cartera.sumOf {
-        it.cantidad * it.precioActual
-    }
-
+    // ✅ Usando propiedades calculadas de ActivoEnCartera
+    val valorCartera = cartera.sumOf { it.valorActual }
     val valorTotal = usuario.saldo + valorCartera
-
     val beneficio = valorTotal - usuario.saldoInicial
 
-    val porcentajeBeneficio =
-        if (usuario.saldoInicial > 0) {
-            (beneficio / usuario.saldoInicial) * 100
-        } else {
-            0.0
-        }
+    val porcentajeBeneficio = if (usuario.saldoInicial > 0)
+        (beneficio / usuario.saldoInicial) * 100
+    else 0.0
 
-    val porcentajeEfectivo =
-        if (valorTotal > 0) {
-            (usuario.saldo / valorTotal) * 100
-        } else {
-            0.0
-        }
+    val porcentajeEfectivo = if (valorTotal > 0)
+        (usuario.saldo / valorTotal) * 100
+    else 0.0
+
+    val siguienteRango = RankUtils.obtenerSiguienteRango(beneficio)
 
     LazyColumn(
         modifier = Modifier
@@ -94,6 +95,8 @@ fun DashboardScreen(
             )
         }
 
+        // ================= TARJETAS RESUMEN =================
+
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -102,12 +105,10 @@ fun DashboardScreen(
                 TarjetaResumen(
                     titulo = "Total",
                     valor = "€${"%.2f".format(valorTotal)}",
-                    subtitulo =
-                        "Ganancia " +
-                                if (beneficio >= 0) "+" else "-" +
-                                        "€${"%.2f".format(abs(beneficio))} (" +
-                                        "%.0f".format(porcentajeBeneficio) +
-                                        "%)",
+                    subtitulo = "Ganancia " +
+                            (if (beneficio >= 0) "+" else "-") +
+                            "€${"%.2f".format(abs(beneficio))} (" +
+                            "%.0f".format(porcentajeBeneficio) + "%)",
                     icono = Icons.Default.AccountBalance,
                     modifier = Modifier.weight(1f)
                 )
@@ -115,10 +116,7 @@ fun DashboardScreen(
                 TarjetaResumen(
                     titulo = "Efectivo",
                     valor = "€${"%.2f".format(usuario.saldo)}",
-                    subtitulo =
-                        "Disponible (" +
-                                "%.0f".format(porcentajeEfectivo) +
-                                "%)",
+                    subtitulo = "Disponible (${"%.0f".format(porcentajeEfectivo)}%)",
                     icono = Icons.Default.AccountBalanceWallet,
                     modifier = Modifier.weight(1f)
                 )
@@ -138,17 +136,38 @@ fun DashboardScreen(
                     modifier = Modifier.weight(1f)
                 )
 
-                rangoActual?.let {
+                if (rangoActual != null) {
                     TarjetaResumen(
                         titulo = "Rango",
-                        valor = it.nombre,
+                        valor = rangoActual.nombre,
                         subtitulo = "Nivel actual",
                         icono = Icons.Default.EmojiEvents,
                         modifier = Modifier.weight(1f)
                     )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }
+
+        // ================= PROGRESO RANGO =================
+
+        if (siguienteRango != null && rangoActual != null) {
+            item {
+                val progreso = ((beneficio - rangoActual.beneficioMinimo) /
+                        (siguienteRango.beneficioMinimo - rangoActual.beneficioMinimo))
+                    .toFloat()
+                    .coerceIn(0f, 1f)
+
+                TarjetaProgresoRango(
+                    siguienteRango = siguienteRango,
+                    beneficioActual = beneficio,
+                    progreso = progreso
+                )
+            }
+        }
+
+        // ================= MI CARTERA =================
 
         item {
             Text(
@@ -159,23 +178,17 @@ fun DashboardScreen(
         }
 
         if (cartera.isEmpty()) {
-            item {
-                TarjetaVacia(
-                    texto = "Aún no tienes inversiones"
-                )
-            }
+            item { TarjetaVacia(texto = "Aún no tienes inversiones") }
         } else {
             items(cartera) { activo ->
                 TarjetaActivoCartera(
                     activo = activo,
-                    onClick = {
-                        mainViewModel.seleccionarActivo(
-                            activo.toActivo()
-                        )
-                    }
+                    onClick = { mainViewModel.seleccionarActivo(activo.toActivo()) }
                 )
             }
         }
+
+        // ================= TRANSACCIONES =================
 
         item {
             Text(
@@ -186,90 +199,54 @@ fun DashboardScreen(
         }
 
         if (transacciones.isEmpty()) {
-            item {
-                TarjetaVacia(
-                    texto = "Aún no hay movimientos"
-                )
-            }
+            item { TarjetaVacia(texto = "Aún no hay movimientos") }
         } else {
             items(transacciones.take(10)) { transaccion ->
-                TarjetaTransaccion(
-                    transaccion = transaccion
-                )
+                TarjetaTransaccion(transaccion = transaccion)
             }
         }
     }
 }
+
+// ================= TARJETA ACTIVO CARTERA =================
 
 @Composable
 fun TarjetaActivoCartera(
     activo: ActivoEnCartera,
     onClick: () -> Unit
 ) {
-    val valorActual =
-        activo.cantidad * activo.precioActual
-
-    val invertido =
-        activo.cantidad * activo.precioPromedio
-
-    val beneficio =
-        valorActual - invertido
-
-    val porcentaje =
-        if (invertido > 0) {
-            (beneficio / invertido) * 100
-        } else {
-            0.0
-        }
-
-    val color =
-        if (beneficio >= 0) {
-            MaterialTheme.colorScheme.positive
-        } else {
-            MaterialTheme.colorScheme.error
-        }
+    val color = if (activo.beneficio >= 0)
+        MaterialTheme.colorScheme.positive
+    else
+        MaterialTheme.colorScheme.error
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = activo.simbolo,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = "€${"%.2f".format(valorActual)}"
-                )
+                Text(text = activo.simbolo, fontWeight = FontWeight.Bold)
+                Text(text = "€${"%.2f".format(activo.valorActual)}")
             }
 
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
+            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Invertido: €${"%.2f".format(invertido)}",
+                text = "Invertido: €${"%.2f".format(activo.valorInvertido)}",
                 style = MaterialTheme.typography.bodySmall
             )
 
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
+            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text =
-                    (if (beneficio >= 0) "+" else "-") +
-                            "€${"%.2f".format(abs(beneficio))} (" +
-                            "%.2f".format(porcentaje) +
-                            "%)",
+                text = (if (activo.beneficio >= 0) "+" else "-") +
+                        "€${"%.2f".format(abs(activo.beneficio))} (" +
+                        "%.2f".format(activo.porcentajeBeneficio) + "%)",
                 color = color,
                 fontWeight = FontWeight.Bold
             )
@@ -277,65 +254,49 @@ fun TarjetaActivoCartera(
     }
 }
 
+// ================= TARJETA TRANSACCIÓN =================
+
 @Composable
-fun TarjetaTransaccion(
-    transaccion: Transaccion
-) {
-    val esCompra =
-        transaccion.tipo == TipoTransaccion.COMPRA
+fun TarjetaTransaccion(transaccion: Transaccion) {
+    val esCompra = transaccion.tipo == TipoTransaccion.COMPRA
 
-    val color =
-        if (esCompra) {
-            MaterialTheme.colorScheme.error
-        } else {
-            MaterialTheme.colorScheme.positive
-        }
+    val color = if (esCompra)
+        MaterialTheme.colorScheme.error
+    else
+        MaterialTheme.colorScheme.positive
 
-    val formatoFecha = SimpleDateFormat(
-        "dd MMM · HH:mm",
-        Locale.getDefault()
-    )
+    // ✅ Con remember para no crear el objeto en cada recomposición
+    val formatoFecha = remember {
+        SimpleDateFormat("dd MMM · HH:mm", Locale.getDefault())
+    }
 
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                Text(text = transaccion.simbolo, fontWeight = FontWeight.Bold)
                 Text(
-                    text = transaccion.simbolo,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text =
-                        (if (esCompra) "-" else "+") +
-                                "€${"%.2f".format(transaccion.total)}",
+                    text = (if (esCompra) "-" else "+") +
+                            "€${"%.2f".format(transaccion.total)}",
                     color = color,
                     fontWeight = FontWeight.Bold
                 )
             }
 
-            Spacer(
-                modifier = Modifier.height(6.dp)
-            )
+            Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text =
-                    (if (esCompra) "Compra" else "Venta") +
-                            " · " +
-                            formatoFecha.format(
-                                Date(transaccion.fecha)
-                            ),
+                text = (if (esCompra) "Compra" else "Venta") +
+                        " · " + formatoFecha.format(Date(transaccion.fecha)),
                 style = MaterialTheme.typography.bodySmall
             )
         }
     }
 }
+
+// ================= EXTENSIÓN =================
 
 fun ActivoEnCartera.toActivo(): Activo {
     return Activo(
@@ -349,13 +310,11 @@ fun ActivoEnCartera.toActivo(): Activo {
     )
 }
 
+// ================= TARJETA VACÍA =================
+
 @Composable
-fun TarjetaVacia(
-    texto: String
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+fun TarjetaVacia(texto: String) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -367,6 +326,8 @@ fun TarjetaVacia(
     }
 }
 
+// ================= TARJETA RESUMEN =================
+
 @Composable
 fun TarjetaResumen(
     titulo: String,
@@ -375,38 +336,23 @@ fun TarjetaResumen(
     icono: ImageVector,
     modifier: Modifier
 ) {
-    Card(
-        modifier = modifier
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
+    Card(modifier = modifier) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(titulo)
-
-                Icon(
-                    imageVector = icono,
-                    contentDescription = null
-                )
+                Icon(imageVector = icono, contentDescription = null)
             }
-
-            Text(
-                text = valor,
-                fontWeight = FontWeight.Bold
-            )
-
-            Text(
-                text = subtitulo,
-                style = MaterialTheme.typography.bodySmall
-            )
+            Text(text = valor, fontWeight = FontWeight.Bold)
+            Text(text = subtitulo, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
 
-@Suppress("unused")
+// ================= TARJETA PROGRESO RANGO =================
+
 @Composable
 fun TarjetaProgresoRango(
     siguienteRango: Rango,
@@ -418,24 +364,17 @@ fun TarjetaProgresoRango(
         label = ""
     )
 
-    val restante =
-        (siguienteRango.beneficioMinimo - beneficioActual)
-            .coerceAtLeast(0.0)
+    val restante = (siguienteRango.beneficioMinimo - beneficioActual)
+        .coerceAtLeast(0.0)
 
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = "Siguiente rango: ${siguienteRango.nombre}",
                 fontWeight = FontWeight.Bold
             )
 
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
+            Spacer(modifier = Modifier.height(8.dp))
 
             LinearProgressIndicator(
                 progress = { progresoAnimado },
@@ -444,9 +383,7 @@ fun TarjetaProgresoRango(
                     .height(10.dp)
             )
 
-            Spacer(
-                modifier = Modifier.height(6.dp)
-            )
+            Spacer(modifier = Modifier.height(6.dp))
 
             Text(
                 text = "Te faltan €${"%.2f".format(restante)}",

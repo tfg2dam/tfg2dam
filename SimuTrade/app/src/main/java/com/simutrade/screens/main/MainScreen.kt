@@ -22,7 +22,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,7 +48,6 @@ fun MainScreen(
     userViewModel: UserViewModel = viewModel(),
     authViewModel: AuthViewModel = viewModel()
 ) {
-
     val mainUiState by mainViewModel.uiState.collectAsStateWithLifecycle()
     val pantallaActual = mainUiState.pantallaActual
 
@@ -91,7 +89,10 @@ fun MainScreen(
                             style = MaterialTheme.typography.titleLarge
                         )
                         Text(
-                            text = "€${"%.2f".format(usuario.saldo)} • ${rangoActual?.nombre ?: ""}",
+                            text = if (userUiState.cargando && rangoActual == null)
+                                "Cargando..."
+                            else
+                                "€${"%.2f".format(usuario.saldo)} • ${rangoActual?.nombre ?: ""}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -133,32 +134,35 @@ fun MainScreen(
         ) {
             when (pantallaActual) {
 
-                Pantalla.Inicio -> DashboardScreen()
+                Pantalla.Inicio ->
+                    DashboardScreen(userViewModel = userViewModel)
 
-                Pantalla.Mercado -> MarketScreen(mainViewModel = mainViewModel)
+                Pantalla.Mercado ->
+                    MarketScreen(mainViewModel = mainViewModel)
 
-                Pantalla.Trading -> TradingScreen(mainViewModel = mainViewModel)
+                Pantalla.Trading ->
+                    TradingScreen(
+                        mainViewModel = mainViewModel,
+                        userViewModel = userViewModel
+                    )
 
-                Pantalla.Rankings -> RankingsScreen()
+                Pantalla.Rankings ->
+                    RankingsScreen(userViewModel = userViewModel)
 
-                Pantalla.Retos -> {
-                    LaunchedEffect(Unit) {
-                        userViewModel.cargarDatos()
-                    }
+                Pantalla.Retos ->
                     ChallengesScreen(userViewModel = userViewModel)
-                }
 
-                Pantalla.Amigos -> AmigosScreen()
+                Pantalla.Amigos ->
+                    AmigosScreen()
 
-                Pantalla.Ligas -> LigasScreen()
+                Pantalla.Ligas ->
+                    LigasScreen(userViewModel = userViewModel)
             }
         }
     }
 }
 
-//////////////////////////////////////////////////////
-// ITEM NAVEGACIÓN
-//////////////////////////////////////////////////////
+// ================= ITEM NAVEGACIÓN =================
 
 data class ItemNavegacion(
     val pantalla: Pantalla,

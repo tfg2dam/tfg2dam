@@ -41,9 +41,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.simutrade.screens.theme.*
 import com.simutrade.data.model.DatosUsuario
 import com.simutrade.data.model.Rango
+import com.simutrade.screens.theme.ColorBronce
+import com.simutrade.screens.theme.ColorDiamante
+import com.simutrade.screens.theme.ColorOro
+import com.simutrade.screens.theme.ColorPlata
+import com.simutrade.screens.theme.ColorPlatino
 
 @Composable
 fun ProfileDialog(
@@ -52,7 +56,6 @@ fun ProfileDialog(
     onDismiss: () -> Unit,
     onLogout: () -> Unit
 ) {
-
     val nombreUsuario = datosUsuario.nombreUsuario
 
     val inicial = nombreUsuario
@@ -62,9 +65,9 @@ fun ProfileDialog(
         ?.toString()
         ?: "?"
 
-    val nombreRango = rangoActual?.nombre ?: "Bronce"
-    val iconoRango = obtenerIconoRango(nombreRango)
-    val colorRango = obtenerColorRango(nombreRango)
+    val nombreRango = rangoActual?.nombre ?: ""
+    val iconoRango = if (rangoActual != null) obtenerIconoRango(nombreRango) else null
+    val colorRango = if (rangoActual != null) obtenerColorRango(nombreRango) else null
 
     var mostrarConfirmacionSalir by remember { mutableStateOf(false) }
 
@@ -127,14 +130,11 @@ fun ProfileDialog(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
-
                         Text(
                             text = datosUsuario.email,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-
-                        // ← ID del usuario
                         if (datosUsuario.codigoUsuario.isNotBlank()) {
                             Text(
                                 text = "#${datosUsuario.codigoUsuario}",
@@ -159,7 +159,6 @@ fun ProfileDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(top = 8.dp)
             ) {
-
                 HorizontalDivider()
 
                 FilaPerfil(
@@ -180,13 +179,15 @@ fun ProfileDialog(
                     valor = "€${"%.2f".format(datosUsuario.saldoBonus)}"
                 )
 
-                FilaPerfilConIcono(
-                    icono = Icons.Default.EmojiEvents,
-                    etiqueta = "Rango actual",
-                    valor = nombreRango,
-                    iconoValor = iconoRango,
-                    colorValor = colorRango
-                )
+                if (rangoActual != null && iconoRango != null && colorRango != null) {
+                    FilaPerfilConIcono(
+                        icono = Icons.Default.EmojiEvents,
+                        etiqueta = "Rango actual",
+                        valor = nombreRango,
+                        iconoValor = iconoRango,
+                        colorValor = colorRango
+                    )
+                }
 
                 HorizontalDivider()
 
@@ -211,9 +212,7 @@ fun ProfileDialog(
     )
 }
 
-//////////////////////////////////////////////////////
-// FILA NORMAL
-//////////////////////////////////////////////////////
+// ================= FILA NORMAL =================
 
 @Composable
 fun FilaPerfil(
@@ -242,9 +241,7 @@ fun FilaPerfil(
     }
 }
 
-//////////////////////////////////////////////////////
-// FILA CON ICONO
-//////////////////////////////////////////////////////
+// ================= FILA CON ICONO =================
 
 @Composable
 fun FilaPerfilConIcono(
@@ -287,29 +284,27 @@ fun FilaPerfilConIcono(
     }
 }
 
-//////////////////////////////////////////////////////
-// HELPERS
-//////////////////////////////////////////////////////
+// ================= HELPERS =================
 
 fun obtenerIconoRango(nombreRango: String): ImageVector {
     return when (nombreRango.lowercase()) {
-        "bronce"   -> Icons.Default.MilitaryTech
-        "plata"    -> Icons.Default.MilitaryTech
-        "oro"      -> Icons.Default.EmojiEvents
-        "platino"  -> Icons.Default.WorkspacePremium
+        "bronce" -> Icons.Default.MilitaryTech
+        "plata" -> Icons.Default.MilitaryTech
+        "oro" -> Icons.Default.EmojiEvents
+        "platino" -> Icons.Default.WorkspacePremium
         "diamante" -> Icons.Default.Diamond
-        else       -> Icons.Default.EmojiEvents
+        else -> Icons.Default.EmojiEvents
     }
 }
 
 @Composable
 fun obtenerColorRango(nombreRango: String): Color {
     return when (nombreRango.lowercase()) {
-        "bronce"   -> ColorBronce
-        "plata"    -> ColorPlata
-        "oro"      -> ColorOro
-        "platino"  -> ColorPlatino
+        "bronce" -> ColorBronce
+        "plata" -> ColorPlata
+        "oro" -> ColorOro
+        "platino" -> ColorPlatino
         "diamante" -> ColorDiamante
-        else       -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.primary
     }
 }

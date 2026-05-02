@@ -53,51 +53,32 @@ fun ChallengesScreen(
     viewModel: ChallengesViewModel = viewModel(),
     userViewModel: UserViewModel = viewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    val datosRetos by viewModel.datosRetos.collectAsStateWithLifecycle()
-    val cargando by viewModel.cargando.collectAsStateWithLifecycle()
-    val milisegundosHastaReset by
-    viewModel.milisegundosHastaReset.collectAsStateWithLifecycle()
+    val retos = uiState.retosDelDia
+    val datosRetos = uiState.datosRetos
 
-    val retos = remember(datosRetos) {
-        viewModel.obtenerRetosDelDia()
-    }
-
-    val completados =
-        retos.count {
-            it.id in datosRetos.retosCompletados
-        }
-
+    val completados = retos.count { it.id in datosRetos.retosCompletados }
     val total = retos.size
+    val todosCompletados = total > 0 && completados == total
 
-    val todosCompletados =
-        total > 0 &&
-                completados == total
+    // ✅ Opción 3 — muestra racha + 1 visualmente cuando todos completados
+    val rachaVisual = if (todosCompletados)
+        datosRetos.rachaActual + 1
+    else
+        datosRetos.rachaActual
 
-    var mensajeDialogo by remember {
-        mutableStateOf<String?>(null)
-    }
-
-    var dialogoExito by remember {
-        mutableStateOf(false)
-    }
-
-    // ✅ corregido warning: usar mutableLongStateOf
-    var tiempoRestante by remember {
-        mutableLongStateOf(milisegundosHastaReset)
-    }
+    var mensajeDialogo by remember { mutableStateOf<String?>(null) }
+    var dialogoExito by remember { mutableStateOf(false) }
+    var tiempoRestante by remember { mutableLongStateOf(uiState.milisegundosHastaReset) }
 
     // ================= TIMER =================
 
-    LaunchedEffect(milisegundosHastaReset) {
-        tiempoRestante = milisegundosHastaReset
-
+    LaunchedEffect(uiState.milisegundosHastaReset) {
+        tiempoRestante = uiState.milisegundosHastaReset
         while (tiempoRestante > 0) {
             delay(1000)
-
-            tiempoRestante =
-                (tiempoRestante - 1000)
-                    .coerceAtLeast(0)
+            tiempoRestante = (tiempoRestante - 1000).coerceAtLeast(0)
         }
     }
 
@@ -105,49 +86,28 @@ fun ChallengesScreen(
         viewModel.cargarRetos()
     }
 
-    // ================= DIALOG =================
+    // ================= DIÁLOGO =================
 
     mensajeDialogo?.let { mensaje ->
-
         AlertDialog(
-            onDismissRequest = {
-                mensajeDialogo = null
-            },
-
+            onDismissRequest = { mensajeDialogo = null },
             title = {
-                Text(
-                    text =
-                        if (dialogoExito)
-                            "Reto completado"
-                        else
-                            "No completado"
-                )
+                Text(if (dialogoExito) "Reto completado" else "No completado")
             },
-
             text = {
-                Text(
-                    text = mensaje,
-                    textAlign = TextAlign.Center
-                )
+                Text(text = mensaje, textAlign = TextAlign.Center)
             },
-
             confirmButton = {
                 Button(
-                    onClick = {
-                        mensajeDialogo = null
-                    },
-
+                    onClick = { mensajeDialogo = null },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor =
-                            if (dialogoExito)
-                                MaterialTheme.colorScheme.positive
-                            else
-                                MaterialTheme.colorScheme.error
+                        containerColor = if (dialogoExito)
+                            MaterialTheme.colorScheme.positive
+                        else
+                            MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text(
-                        text = "Aceptar"
-                    )
+                    Text("Aceptar")
                 }
             }
         )
@@ -159,129 +119,80 @@ fun ChallengesScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-
-        verticalArrangement =
-            Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+
+        // ================= TÍTULO =================
 
         item {
             Text(
                 text = "Retos diarios",
-                style =
-                    MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
         }
 
+        // ================= RACHA =================
+
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-
                 colors = CardDefaults.cardColors(
-                    containerColor =
-                        MaterialTheme.colorScheme.primaryContainer
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-
-                    horizontalArrangement =
-                        Arrangement.SpaceBetween,
-
-                    verticalAlignment =
-                        Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-
                     Column {
-
+                        Text(text = "Racha", fontWeight = FontWeight.Bold)
+                        // ✅ rachaVisual en vez de rachaActual
+                        Text(text = "$rachaVisual días seguidos")
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Racha",
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Text(
-                            text =
-                                "${datosRetos.rachaActual} días seguidos"
-                        )
-
-                        Spacer(
-                            modifier = Modifier.height(6.dp)
-                        )
-
-                        Text(
-                            text =
-                                "Completa todos los retos para subir tu racha",
-
-                            style =
-                                MaterialTheme.typography.bodySmall
+                            text = "Completa todos los retos para subir tu racha",
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
 
-                    Row(
-                        verticalAlignment =
-                            Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector =
-                                Icons.Default.LocalFireDepartment,
-
+                            imageVector = Icons.Default.LocalFireDepartment,
                             contentDescription = null,
-
-                            tint = Color(
-                                0xFFFF9800
-                            )
+                            tint = Color(0xFFFF9800)
                         )
-
-                        Spacer(
-                            modifier = Modifier.width(6.dp)
-                        )
-
+                        Spacer(modifier = Modifier.width(6.dp))
+                        // ✅ rachaVisual en vez de rachaActual
                         Text(
-                            text =
-                                "${datosRetos.rachaActual}",
-
-                            fontWeight =
-                                FontWeight.Bold
+                            text = "$rachaVisual",
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
         }
 
+        // ================= PROGRESO =================
+
         item {
-
             val progreso by animateFloatAsState(
-                targetValue =
-                    if (total == 0)
-                        0f
-                    else
-                        completados.toFloat() / total,
-
+                targetValue = if (total == 0) 0f else completados.toFloat() / total,
                 label = ""
             )
 
             Card {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text =
-                            "$completados de $total retos completados",
-
-                        fontWeight =
-                            FontWeight.SemiBold
+                        text = "$completados de $total retos completados",
+                        fontWeight = FontWeight.SemiBold
                     )
-
-                    Spacer(
-                        modifier = Modifier.height(8.dp)
-                    )
-
+                    Spacer(modifier = Modifier.height(8.dp))
                     LinearProgressIndicator(
                         progress = { progreso },
-
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(10.dp)
@@ -290,91 +201,63 @@ fun ChallengesScreen(
             }
         }
 
+        // ================= TODOS COMPLETADOS =================
+
         if (todosCompletados) {
             item {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor =
-                            MaterialTheme.colorScheme.secondaryContainer
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
                     )
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(20.dp),
-
-                        horizontalAlignment =
-                            Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-
+                        Text(text = "¡Todos completados!", fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(text = "Nuevos retos en")
                         Text(
-                            text = "Todos completados",
+                            text = formatearTiempo(tiempoRestante),
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
-                        )
-
-                        Spacer(
-                            modifier = Modifier.height(6.dp)
-                        )
-
-                        Text(
-                            text = "Nuevos retos en"
-                        )
-
-                        Text(
-                            text =
-                                formatearTiempo(
-                                    tiempoRestante
-                                ),
-
-                            style =
-                                MaterialTheme.typography.titleLarge,
-
-                            fontWeight =
-                                FontWeight.Bold
                         )
                     }
                 }
             }
         }
 
-        if (cargando) {
+        // ================= RETOS =================
 
+        if (uiState.cargando) {
             item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(32.dp),
-
-                    contentAlignment =
-                        Alignment.Center
+                    contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
                 }
             }
-
         } else {
-
             items(retos) { reto ->
-
-                val completado =
-                    reto.id in datosRetos.retosCompletados
+                val completado = reto.id in datosRetos.retosCompletados
 
                 TarjetaReto(
                     reto = reto,
                     completado = completado,
-
-                    onCompletar = {
+                    onCompletar = { done ->
                         viewModel.completarReto(
                             id = reto.id,
                             recompensa = reto.recompensa
                         ) { exito, mensaje ->
-
                             dialogoExito = exito
                             mensajeDialogo = mensaje
-
-                            if (exito) {
-                                userViewModel.cargarDatos()
-                            }
+                            if (exito) userViewModel.cargarDatos()
+                            done()
                         }
                     }
                 )
@@ -383,149 +266,88 @@ fun ChallengesScreen(
     }
 }
 
+// ================= TARJETA RETO =================
+
 @Composable
 fun TarjetaReto(
     reto: Reto,
     completado: Boolean,
-    onCompletar: () -> Unit
+    onCompletar: (() -> Unit) -> Unit
 ) {
-
-    var procesando by remember {
-        mutableStateOf(false)
-    }
+    var procesando by remember { mutableStateOf(false) }
 
     val colorFondo by animateColorAsState(
-        targetValue =
-            if (completado)
-                MaterialTheme.colorScheme.positiveContainer
-            else
-                MaterialTheme.colorScheme.surface,
-
+        targetValue = if (completado)
+            MaterialTheme.colorScheme.positiveContainer
+        else
+            MaterialTheme.colorScheme.surface,
         label = ""
     )
 
     val escala by animateFloatAsState(
-        targetValue =
-            if (completado)
-                1.02f
-            else
-                1f,
-
+        targetValue = if (completado) 1.02f else 1f,
         label = ""
     )
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                scaleX = escala
-                scaleY = escala
-            },
-
-        colors = CardDefaults.cardColors(
-            containerColor = colorFondo
-        )
+            .graphicsLayer { scaleX = escala; scaleY = escala },
+        colors = CardDefaults.cardColors(containerColor = colorFondo)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-
-            verticalArrangement =
-                Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                Text(text = reto.titulo, fontWeight = FontWeight.Bold)
                 Text(
-                    text = reto.titulo,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text =
-                        "+${"%.2f".format(reto.recompensa)}€",
-
-                    fontWeight =
-                        FontWeight.Bold,
-
-                    color =
-                        MaterialTheme.colorScheme.positive
+                    text = "+${"%.2f".format(reto.recompensa)}€",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.positive
                 )
             }
 
             Text(
                 text = reto.descripcion,
-
-                style =
-                    MaterialTheme.typography.bodySmall,
-
-                color =
-                    MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             if (completado) {
-
                 Text(
                     text = "Completado",
-
-                    color =
-                        MaterialTheme.colorScheme.positive,
-
-                    fontWeight =
-                        FontWeight.SemiBold
+                    color = MaterialTheme.colorScheme.positive,
+                    fontWeight = FontWeight.SemiBold
                 )
-
             } else {
-
                 Button(
                     onClick = {
-                        if (procesando) {
-                            return@Button
-                        }
-
+                        if (procesando) return@Button
                         procesando = true
-                        onCompletar()
-                        procesando = false
+                        onCompletar { procesando = false }
                     },
-
                     enabled = !procesando,
-
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "Completar"
-                    )
+                    Text("Completar")
                 }
             }
         }
     }
 }
 
-private fun formatearTiempo(
-    milisegundos: Long
-): String {
+// ================= FORMATO TIEMPO =================
 
-    if (milisegundos <= 0) {
-        return "00:00:00"
-    }
+private fun formatearTiempo(milisegundos: Long): String {
+    if (milisegundos <= 0) return "00:00:00"
 
-    val horas =
-        milisegundos / (1000 * 60 * 60)
+    val horas = milisegundos / (1000 * 60 * 60)
+    val minutos = (milisegundos % (1000 * 60 * 60)) / (1000 * 60)
+    val segundos = (milisegundos % (1000 * 60)) / 1000
 
-    val minutos =
-        (milisegundos % (1000 * 60 * 60)) /
-                (1000 * 60)
-
-    val segundos =
-        (milisegundos % (1000 * 60)) /
-                1000
-
-    return "%02d:%02d:%02d".format(
-        horas,
-        minutos,
-        segundos
-    )
+    return "%02d:%02d:%02d".format(horas, minutos, segundos)
 }

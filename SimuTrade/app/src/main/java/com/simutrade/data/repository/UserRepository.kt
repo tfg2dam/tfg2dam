@@ -2,6 +2,7 @@ package com.simutrade.data.repository
 
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.simutrade.data.model.ActivoEnCartera
@@ -31,10 +32,6 @@ class RepositorioUsuario {
         private const val CARTERA = "cartera"
         private const val TRANSACCIONES = "transacciones"
         private const val RETOS = "retos"
-
-        // ================= DOCUMENTOS =================
-
-        private const val DOCUMENTO_INICIAL = "inicial"
         private const val DOCUMENTO_RETOS = "datos"
     }
 
@@ -49,9 +46,7 @@ class RepositorioUsuario {
 
     // ================= UTILIDADES =================
 
-    private fun redondear2(
-        valor: Double
-    ): Double {
+    private fun redondear2(valor: Double): Double {
         return round(valor * 100) / 100
     }
 
@@ -71,10 +66,9 @@ class RepositorioUsuario {
                 saldo = documento.getDouble("saldo") ?: 100.0,
                 saldoInicial = documento.getDouble("saldo_inicial") ?: 100.0,
                 saldoBonus = documento.getDouble("saldo_bonus") ?: 0.0,
-                idRango = documento.getString("id_rango") ?: "bronce",
                 creadoEn = documento.getLong("creado_en") ?: 0L,
                 ultimoLogin = documento.getLong("ultimo_login") ?: 0L,
-                codigoUsuario = documento.getString("codigo_usuario") ?: "",
+                codigoUsuario = documento.getString("codigo_usuario") ?: ""
             )
 
         } catch (e: Exception) {
@@ -83,43 +77,26 @@ class RepositorioUsuario {
         }
     }
 
-    suspend fun actualizarSaldo(
-        nuevoSaldo: Double
-    ) {
+    suspend fun actualizarSaldo(nuevoSaldo: Double) {
         val referencia = referenciaUsuarioONulo() ?: return
-
         try {
             referencia.update(
-                "saldo",
-                redondear2(nuevoSaldo)
+                "saldo", redondear2(nuevoSaldo)
             ).await()
-
         } catch (e: Exception) {
             Log.e(TAG, "actualizarSaldo", e)
         }
     }
 
-    suspend fun actualizarSaldoBonus(
-        incremento: Double
-    ) {
+    suspend fun actualizarSaldoBonus(incremento: Double) {
         val referencia = referenciaUsuarioONulo() ?: return
-
         try {
-            val documento = referencia.get().await()
-
-            val saldoActual =
-                documento.getDouble("saldo") ?: 0.0
-
-            val bonusActual =
-                documento.getDouble("saldo_bonus") ?: 0.0
-
             referencia.update(
                 mapOf(
-                    "saldo" to redondear2(saldoActual + incremento),
-                    "saldo_bonus" to redondear2(bonusActual + incremento)
+                    "saldo" to FieldValue.increment(incremento),
+                    "saldo_bonus" to FieldValue.increment(incremento)
                 )
             ).await()
-
         } catch (e: Exception) {
             Log.e(TAG, "actualizarSaldoBonus", e)
         }
@@ -130,7 +107,6 @@ class RepositorioUsuario {
         beneficio: Double
     ) {
         val referencia = referenciaUsuarioONulo() ?: return
-
         try {
             referencia.update(
                 mapOf(
@@ -138,7 +114,6 @@ class RepositorioUsuario {
                     "beneficio" to redondear2(beneficio)
                 )
             ).await()
-
         } catch (e: Exception) {
             Log.e(TAG, "actualizarEstadisticasUsuario", e)
         }
@@ -156,22 +131,19 @@ class RepositorioUsuario {
                 .get()
                 .await()
 
-            snapshot.documents
-                .filter { it.id != DOCUMENTO_INICIAL }
-                .map { documento ->
-
-                    ActivoEnCartera(
-                        idActivo = documento.id,
-                        simbolo = documento.getString("simbolo") ?: "",
-                        nombre = documento.getString("nombre") ?: "",
-                        tipo = TipoActivo.valueOf(
-                            documento.getString("tipo") ?: "ACCION"
-                        ),
-                        cantidad = documento.getDouble("cantidad") ?: 0.0,
-                        precioPromedio = documento.getDouble("precio_promedio") ?: 0.0,
-                        precioActual = documento.getDouble("precio_actual") ?: 0.0
-                    )
-                }
+            snapshot.documents.map { documento ->
+                ActivoEnCartera(
+                    idActivo = documento.id,
+                    simbolo = documento.getString("simbolo") ?: "",
+                    nombre = documento.getString("nombre") ?: "",
+                    tipo = TipoActivo.valueOf(
+                        documento.getString("tipo") ?: "ACCION"
+                    ),
+                    cantidad = documento.getDouble("cantidad") ?: 0.0,
+                    precioPromedio = documento.getDouble("precio_promedio") ?: 0.0,
+                    precioActual = documento.getDouble("precio_actual") ?: 0.0
+                )
+            }
 
         } catch (e: Exception) {
             Log.e(TAG, "obtenerCartera", e)
@@ -179,11 +151,8 @@ class RepositorioUsuario {
         }
     }
 
-    suspend fun guardarActivoEnCartera(
-        activo: ActivoEnCartera
-    ) {
+    suspend fun guardarActivoEnCartera(activo: ActivoEnCartera) {
         val referencia = referenciaUsuarioONulo() ?: return
-
         try {
             referencia
                 .collection(CARTERA)
@@ -195,29 +164,23 @@ class RepositorioUsuario {
                         "tipo" to activo.tipo.name,
                         "cantidad" to activo.cantidad,
                         "precio_promedio" to activo.precioPromedio,
-                        "precio_actual" to activo.precioActual,
-                        "actualizado_en" to System.currentTimeMillis()
+                        "precio_actual" to activo.precioActual
                     )
                 )
                 .await()
-
         } catch (e: Exception) {
             Log.e(TAG, "guardarActivoEnCartera", e)
         }
     }
 
-    suspend fun eliminarActivoDeCartera(
-        idActivo: String
-    ) {
+    suspend fun eliminarActivoDeCartera(idActivo: String) {
         val referencia = referenciaUsuarioONulo() ?: return
-
         try {
             referencia
                 .collection(CARTERA)
                 .document(idActivo)
                 .delete()
                 .await()
-
         } catch (e: Exception) {
             Log.e(TAG, "eliminarActivoDeCartera", e)
         }
@@ -232,30 +195,24 @@ class RepositorioUsuario {
         return try {
             val snapshot = referencia
                 .collection(TRANSACCIONES)
-                .orderBy(
-                    "ejecutado_en",
-                    Query.Direction.DESCENDING
-                )
+                .orderBy("ejecutado_en", Query.Direction.DESCENDING)
                 .get()
                 .await()
 
-            snapshot.documents
-                .filter { it.id != DOCUMENTO_INICIAL }
-                .map { documento ->
-
-                    Transaccion(
-                        id = documento.id,
-                        fecha = documento.getLong("ejecutado_en") ?: 0L,
-                        tipo = TipoTransaccion.valueOf(
-                            documento.getString("tipo") ?: "COMPRA"
-                        ),
-                        idActivo = documento.getString("id_activo") ?: "",
-                        simbolo = documento.getString("simbolo") ?: "",
-                        cantidad = documento.getDouble("cantidad") ?: 0.0,
-                        precio = documento.getDouble("precio") ?: 0.0,
-                        total = documento.getDouble("total") ?: 0.0
-                    )
-                }
+            snapshot.documents.map { documento ->
+                Transaccion(
+                    id = documento.id,
+                    fecha = documento.getLong("ejecutado_en") ?: 0L,
+                    tipo = TipoTransaccion.valueOf(
+                        documento.getString("tipo") ?: "COMPRA"
+                    ),
+                    idActivo = documento.getString("id_activo") ?: "",
+                    simbolo = documento.getString("simbolo") ?: "",
+                    cantidad = documento.getDouble("cantidad") ?: 0.0,
+                    precio = documento.getDouble("precio") ?: 0.0,
+                    total = documento.getDouble("total") ?: 0.0
+                )
+            }
 
         } catch (e: Exception) {
             Log.e(TAG, "obtenerTransacciones", e)
@@ -263,11 +220,8 @@ class RepositorioUsuario {
         }
     }
 
-    suspend fun guardarTransaccion(
-        transaccion: Transaccion
-    ) {
+    suspend fun guardarTransaccion(transaccion: Transaccion) {
         val referencia = referenciaUsuarioONulo() ?: return
-
         try {
             referencia
                 .collection(TRANSACCIONES)
@@ -283,7 +237,6 @@ class RepositorioUsuario {
                     )
                 )
                 .await()
-
         } catch (e: Exception) {
             Log.e(TAG, "guardarTransaccion", e)
         }
@@ -295,60 +248,31 @@ class RepositorioUsuario {
         return try {
             val snapshot = firestore
                 .collection(USUARIOS)
-                .orderBy(
-                    "beneficio",
-                    Query.Direction.DESCENDING
-                )
+                .orderBy("beneficio", Query.Direction.DESCENDING)
                 .get()
                 .await()
 
             snapshot.documents.mapNotNull { documento ->
-
                 val nombreUsuario =
                     documento.getString("nombre_usuario")
                         ?: return@mapNotNull null
 
-                val saldo =
-                    documento.getDouble("saldo") ?: 0.0
-
-                val saldoInicial =
-                    documento.getDouble("saldo_inicial") ?: 100.0
-
-                val snapshotCartera =
-                    firestore
-                        .collection(USUARIOS)
-                        .document(documento.id)
-                        .collection(CARTERA)
-                        .get()
-                        .await()
-
-                val valorCartera =
-                    snapshotCartera.documents
-                        .filter { it.id != DOCUMENTO_INICIAL }
-                        .sumOf { activo ->
-
-                            val cantidad =
-                                activo.getDouble("cantidad") ?: 0.0
-
-                            val precioActual =
-                                activo.getDouble("precio_actual") ?: 0.0
-
-                            cantidad * precioActual
-                        }
-
-                val valorTotal =
-                    saldo + valorCartera
-
-                val beneficio =
-                    valorTotal - saldoInicial
-
                 EntradaRanking(
                     id = documento.id,
                     nombreUsuario = nombreUsuario,
-                    beneficio = redondear2(beneficio),
-                    valorTotal = redondear2(valorTotal),
-                    valorCartera = redondear2(valorCartera),
-                    saldo = redondear2(saldo)
+                    beneficio = redondear2(
+                        documento.getDouble("beneficio") ?: 0.0
+                    ),
+                    valorCartera = redondear2(
+                        documento.getDouble("valor_cartera") ?: 0.0
+                    ),
+                    saldo = redondear2(
+                        documento.getDouble("saldo") ?: 0.0
+                    ),
+                    valorTotal = redondear2(
+                        (documento.getDouble("saldo") ?: 0.0) +
+                                (documento.getDouble("valor_cartera") ?: 0.0)
+                    )
                 )
             }
 
@@ -375,17 +299,14 @@ class RepositorioUsuario {
                 rachaActual = documento.getLong("racha_actual")?.toInt() ?: 0,
                 rachaMaxima = documento.getLong("racha_maxima")?.toInt() ?: 0,
                 ultimaVez = documento.getLong("ultima_vez") ?: 0L,
-
                 retosCompletados =
                     (documento.get("retos_completados") as? List<*>)
                         ?.filterIsInstance<String>()
                         ?: emptyList(),
-
                 retosDelDia =
                     (documento.get("retos_del_dia") as? List<*>)
                         ?.filterIsInstance<String>()
                         ?: emptyList(),
-
                 diaActual = documento.getLong("dia_actual") ?: 0L
             )
 
@@ -395,11 +316,8 @@ class RepositorioUsuario {
         }
     }
 
-    suspend fun guardarDatosRetos(
-        datos: DatosRetos
-    ) {
+    suspend fun guardarDatosRetos(datos: DatosRetos) {
         val referencia = referenciaUsuarioONulo() ?: return
-
         try {
             referencia
                 .collection(RETOS)
@@ -415,33 +333,8 @@ class RepositorioUsuario {
                     )
                 )
                 .await()
-
         } catch (e: Exception) {
             Log.e(TAG, "guardarDatosRetos", e)
         }
-    }
-
-    // ================= CÁLCULOS =================
-
-    fun calcularValorCartera(
-        cartera: List<ActivoEnCartera>
-    ): Double {
-        return cartera.sumOf {
-            it.cantidad * it.precioActual
-        }
-    }
-
-    fun calcularValorTotal(
-        saldo: Double,
-        valorCartera: Double
-    ): Double {
-        return saldo + valorCartera
-    }
-
-    fun calcularBeneficio(
-        total: Double,
-        inicial: Double
-    ): Double {
-        return total - inicial
     }
 }

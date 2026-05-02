@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -45,11 +46,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.simutrade.data.model.Activo
-import com.simutrade.data.model.TipoActivo
 import com.simutrade.screens.main.MainViewModel
 import com.simutrade.screens.theme.positive
 import kotlinx.coroutines.delay
@@ -61,19 +62,11 @@ fun MarketScreen(
 ) {
     val uiState by marketViewModel.uiState.collectAsStateWithLifecycle()
 
-    var textoBusqueda by remember {
-        mutableStateOf("")
-    }
+    var textoBusqueda by remember { mutableStateOf("") }
+    var filtroSeleccionado by remember { mutableStateOf("Todos") }
+    var tiempoActual by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
-    var filtroSeleccionado by remember {
-        mutableStateOf("Todos")
-    }
-
-    var tiempoActual by remember {
-        mutableLongStateOf(System.currentTimeMillis())
-    }
-
-    // ================= TIEMPO ACTUALIZACION =================
+    // ================= TIMER ACTUALIZACIÓN =================
 
     LaunchedEffect(uiState.ultimaActualizacion) {
         if (uiState.ultimaActualizacion > 0) {
@@ -84,51 +77,27 @@ fun MarketScreen(
         }
     }
 
-    val filtros = listOf(
-        "Todos",
-        "Acciones",
-        "Cripto"
-    )
-
-    val buscando =
-        textoBusqueda.isNotEmpty()
+    val filtros = listOf("Todos", "Acciones", "Criptomonedas")
+    val buscando = textoBusqueda.isNotEmpty()
 
     val activosMostrados = when {
-        buscando ->
-            uiState.resultadosBusqueda
-
-        filtroSeleccionado == "Acciones" ->
-            uiState.acciones
-
-        filtroSeleccionado == "Cripto" ->
-            uiState.criptomonedas
-
-        else ->
-            uiState.acciones + uiState.criptomonedas
+        buscando -> uiState.resultadosBusqueda
+        filtroSeleccionado == "Acciones" -> uiState.acciones
+        filtroSeleccionado == "Criptomonedas" -> uiState.criptomonedas
+        else -> uiState.acciones + uiState.criptomonedas
     }
 
-    val hayDatos =
-        uiState.acciones.isNotEmpty() ||
-                uiState.criptomonedas.isNotEmpty()
+    val hayDatos = uiState.acciones.isNotEmpty() || uiState.criptomonedas.isNotEmpty()
 
     val puedeRefrescar =
-        (tiempoActual - uiState.ultimaActualizacion) >=
-                MarketViewModel.MINIMO_REFRESH_MS ||
+        (tiempoActual - uiState.ultimaActualizacion) >= MarketViewModel.MINIMO_REFRESH_MS ||
                 uiState.ultimaActualizacion == 0L
 
-    val transicionInfinita =
-        rememberInfiniteTransition(
-            label = "refresh"
-        )
-
-    val rotacion by transicionInfinita.animateFloat(
+    val rotacion by rememberInfiniteTransition(label = "refresh").animateFloat(
         initialValue = 0f,
-        targetValue = 360f,
+        targetValue = if (uiState.actualizando) 360f else 0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = 800,
-                easing = LinearEasing
-            )
+            animation = tween(durationMillis = 800, easing = LinearEasing)
         ),
         label = "rotation"
     )
@@ -143,120 +112,83 @@ fun MarketScreen(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement =
-                Arrangement.SpaceBetween,
-            verticalAlignment =
-                Alignment.CenterVertically
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "Mercado",
-                style =
-                    MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
 
-            Row(
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 if (uiState.ultimaActualizacion > 0) {
-                    val segundos =
-                        (
-                                (tiempoActual -
-                                        uiState.ultimaActualizacion) / 1000
-                                ).toInt()
+                    val segundos = ((tiempoActual - uiState.ultimaActualizacion) / 1000)
+                        .toInt()
+                        .coerceAtLeast(0)
 
                     Text(
-                        text = "Hace ${segundos}s",
-                        style =
-                            MaterialTheme.typography.bodySmall,
-                        color =
-                            MaterialTheme.colorScheme
-                                .onSurfaceVariant
+                        text = if (segundos < 10) "Actualizado" else "Hace ${segundos}s",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    Spacer(
-                        modifier = Modifier.width(6.dp)
-                    )
+                    Spacer(modifier = Modifier.width(6.dp))
                 }
 
                 IconButton(
-                    onClick = {
-                        marketViewModel.cargarDatosMercado(
-                            forzar = true
-                        )
-                    },
-                    enabled = puedeRefrescar
+                    onClick = { marketViewModel.cargarDatosMercado(forzar = true) },
+                    enabled = puedeRefrescar && !uiState.actualizando
                 ) {
                     Icon(
-                        imageVector =
-                            Icons.Default.Refresh,
-                        contentDescription = null,
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Actualizar mercado",
                         modifier = Modifier.rotate(
-                            if (uiState.actualizando) {
-                                rotacion
-                            } else {
-                                0f
-                            }
+                            if (uiState.actualizando) rotacion else 0f
                         ),
-                        tint =
-                            if (puedeRefrescar) {
-                                MaterialTheme.colorScheme
-                                    .onSurface
-                            } else {
-                                MaterialTheme.colorScheme
-                                    .onSurface
-                                    .copy(alpha = 0.3f)
-                            }
+                        tint = if (puedeRefrescar && !uiState.actualizando)
+                            MaterialTheme.colorScheme.onSurface
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                     )
                 }
             }
         }
 
-        Spacer(
-            modifier = Modifier.height(12.dp)
-        )
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // ================= BUSQUEDA =================
+        // ================= BÚSQUEDA =================
 
         OutlinedTextField(
             value = textoBusqueda,
             onValueChange = {
                 textoBusqueda = it
                 marketViewModel.buscar(it)
+                if (it.isEmpty()) filtroSeleccionado = "Todos"
             },
-            placeholder = {
-                Text("Buscar activos...")
-            },
+            placeholder = { Text("Buscar activos...") },
             leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null
-                )
+                Icon(imageVector = Icons.Default.Search, contentDescription = null)
             },
             trailingIcon = {
                 when {
-                    uiState.buscando -> {
-                        CircularProgressIndicator(
-                            modifier =
-                                Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                    }
-
                     textoBusqueda.isNotEmpty() -> {
-                        IconButton(
-                            onClick = {
-                                textoBusqueda = ""
-                                marketViewModel.buscar("")
-                            }
-                        ) {
-                            Icon(
-                                imageVector =
-                                    Icons.Default.Clear,
-                                contentDescription = null
+                        if (uiState.buscando) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
                             )
+                        } else {
+                            IconButton(onClick = {
+                                textoBusqueda = ""
+                                filtroSeleccionado = "Todos"
+                                marketViewModel.buscar("")
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Borrar búsqueda"
+                                )
+                            }
                         }
                     }
                 }
@@ -265,106 +197,82 @@ fun MarketScreen(
             singleLine = true
         )
 
-        Spacer(
-            modifier = Modifier.height(12.dp)
-        )
+        Spacer(modifier = Modifier.height(12.dp))
 
         // ================= FILTROS =================
 
         if (!buscando) {
-            LazyRow(
-                horizontalArrangement =
-                    Arrangement.spacedBy(8.dp)
-            ) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(filtros) { filtro ->
                     FilterChip(
-                        selected =
-                            filtroSeleccionado == filtro,
-                        onClick = {
-                            filtroSeleccionado = filtro
-                        },
-                        label = {
-                            Text(filtro)
-                        }
+                        selected = filtroSeleccionado == filtro,
+                        onClick = { filtroSeleccionado = filtro },
+                        label = { Text(filtro) }
                     )
                 }
             }
-
-            Spacer(
-                modifier = Modifier.height(12.dp)
-            )
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
         // ================= CONTENIDO =================
 
-        Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             when {
-
-                uiState.cargandoInicial &&
-                        !hayDatos -> {
-
+                uiState.cargandoInicial && !hayDatos -> {
                     Box(
-                        modifier =
-                            Modifier.fillMaxSize(),
-                        contentAlignment =
-                            Alignment.Center
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator()
                     }
                 }
 
-                uiState.error != null &&
-                        !hayDatos -> {
-
+                uiState.error != null && !hayDatos -> {
                     Box(
-                        modifier =
-                            Modifier.fillMaxSize(),
-                        contentAlignment =
-                            Alignment.Center
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = uiState.error ?: "",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Button(
+                                onClick = {
+                                    marketViewModel.cargarDatosMercado(forzar = true)
+                                }
+                            ) {
+                                Text("Reintentar")
+                            }
+                        }
+                    }
+                }
+
+                activosMostrados.isEmpty() && buscando -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = uiState.error ?: "",
-                            color =
-                                MaterialTheme.colorScheme.error
+                            text = "No se encontraron activos para \"$textoBusqueda\"",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
                 else -> {
-                    LazyColumn(
-                        verticalArrangement =
-                            Arrangement.spacedBy(12.dp)
-                    ) {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(
                             items = activosMostrados,
                             key = { it.id }
                         ) { activo ->
-
                             TarjetaActivo(
                                 activo = activo,
-                                onClick = {
-                                    mainViewModel
-                                        .seleccionarActivo(
-                                            activo
-                                        )
-                                }
+                                onClick = { mainViewModel.seleccionarActivo(activo) }
                             )
-                        }
-
-                        if (uiState.actualizando) {
-                            item {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    horizontalArrangement =
-                                        Arrangement.Center
-                                ) {
-                                    CircularProgressIndicator()
-                                }
-                            }
                         }
                     }
                 }
@@ -373,79 +281,54 @@ fun MarketScreen(
     }
 }
 
+// ================= TARJETA ACTIVO =================
+
 @Composable
 fun TarjetaActivo(
     activo: Activo,
     onClick: () -> Unit
 ) {
-    val esPositivo =
-        activo.cambioPorcentaje24h >= 0
+    val esPositivo = activo.cambioPorcentaje24h >= 0
 
-    val colorCambio =
-        if (esPositivo) {
-            MaterialTheme.colorScheme.positive
-        } else {
-            MaterialTheme.colorScheme.error
-        }
+    val colorCambio = if (esPositivo)
+        MaterialTheme.colorScheme.positive
+    else
+        MaterialTheme.colorScheme.error
 
-    val textoCambio =
-        (if (esPositivo) "+" else "") +
-                "%.2f".format(activo.cambioPorcentaje24h) +
-                "%"
+    val textoCambio = (if (esPositivo) "+" else "") +
+            "%.2f".format(activo.cambioPorcentaje24h) + "%"
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {
-                onClick()
-            }
+            .clickable { onClick() }
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-
-            horizontalArrangement =
-                Arrangement.SpaceBetween,
-
-            verticalAlignment =
-                Alignment.CenterVertically
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-
             Row(
-                horizontalArrangement =
-                    Arrangement.spacedBy(12.dp),
-
-                verticalAlignment =
-                    Alignment.CenterVertically,
-
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-
                 Surface(
                     shape = CircleShape,
-                    color =
-                        if (activo.tipo == TipoActivo.ACCION) {
-                            MaterialTheme.colorScheme
-                                .primaryContainer
-                        } else {
-                            MaterialTheme.colorScheme
-                                .secondaryContainer
-                        },
+                    // ✅ Usa ambas propiedades — elimina el warning de esCripto
+                    color = when {
+                        activo.esAccion -> MaterialTheme.colorScheme.primaryContainer
+                        activo.esCripto -> MaterialTheme.colorScheme.secondaryContainer
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    },
                     modifier = Modifier.size(40.dp)
                 ) {
-                    Box(
-                        contentAlignment =
-                            Alignment.Center
-                    ) {
+                    Box(contentAlignment = Alignment.Center) {
                         Text(
-                            text =
-                                activo.simbolo
-                                    .firstOrNull()
-                                    ?.toString()
-                                    ?: "?",
-                            fontWeight =
-                                FontWeight.Bold
+                            text = activo.simbolo.firstOrNull()?.toString() ?: "?",
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -453,39 +336,27 @@ fun TarjetaActivo(
                 Column {
                     Text(
                         text = activo.simbolo,
-                        fontWeight =
-                            FontWeight.Bold
+                        fontWeight = FontWeight.Bold
                     )
-
                     Text(
                         text = activo.nombre,
-                        style =
-                            MaterialTheme.typography.bodySmall,
-                        color =
-                            MaterialTheme.colorScheme
-                                .onSurfaceVariant,
-                        maxLines = 1
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            Column(
-                horizontalAlignment =
-                    Alignment.End
-            ) {
-
+            Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text =
-                        "€${"%.2f".format(activo.precioActual)}",
-                    fontWeight =
-                        FontWeight.Bold
+                    text = "€${"%.2f".format(activo.precioActual)}",
+                    fontWeight = FontWeight.Bold
                 )
-
                 Text(
                     text = textoCambio,
                     color = colorCambio,
-                    style =
-                        MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
         }

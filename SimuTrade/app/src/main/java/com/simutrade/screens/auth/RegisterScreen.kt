@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
@@ -32,6 +35,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -50,52 +55,48 @@ fun RegisterScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
 
-    var nombreUsuario by remember {
-        mutableStateOf("")
-    }
+    // ✅ FocusRequesters para los 4 campos — el nombre no necesita uno propio
+    val emailFocusRequester = remember { FocusRequester() }
+    val passwordFocusRequester = remember { FocusRequester() }
+    val confirmarPasswordFocusRequester = remember { FocusRequester() }
 
-    var email by remember {
-        mutableStateOf("")
-    }
+    var nombreUsuario by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmarPassword by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var confirmarPasswordVisible by remember { mutableStateOf(false) }
 
-    var password by remember {
-        mutableStateOf("")
-    }
+    val nombreInvalido = nombreUsuario.isNotEmpty() &&
+            nombreUsuario.trim().length < 3
 
-    var confirmarPassword by remember {
-        mutableStateOf("")
-    }
+    val emailInvalido = email.isNotEmpty() &&
+            (!email.contains("@") || !email.contains("."))
 
-    var passwordVisible by remember {
-        mutableStateOf(false)
-    }
+    val passwordCorta = password.isNotEmpty() && password.length < 6
 
-    val contrasenasNoCoinciden =
-        password.isNotEmpty() &&
-                confirmarPassword.isNotEmpty() &&
-                password != confirmarPassword
+    val contrasenasNoCoinciden = password.isNotEmpty() &&
+            confirmarPassword.isNotEmpty() &&
+            password != confirmarPassword
 
     val formularioValido =
-        nombreUsuario.isNotBlank() &&
+        nombreUsuario.trim().length in 3..20 &&
                 email.isNotBlank() &&
-                password.isNotBlank() &&
+                !emailInvalido &&
+                password.length >= 6 &&
                 confirmarPassword.isNotBlank() &&
                 !contrasenasNoCoinciden
 
-    // ================= NAVEGACION =================
-
     LaunchedEffect(uiState.exito) {
-        if (uiState.exito) {
-            onRegisterSuccess()
-            viewModel.limpiarExito()
-        }
+        if (uiState.exito) onRegisterSuccess()
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
-
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -106,239 +107,214 @@ fun RegisterScreen(
             text = "Crear cuenta",
             style = MaterialTheme.typography.headlineMedium
         )
-
         Text(
             text = "Empieza con 100€ virtuales",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(
-            modifier = Modifier.height(32.dp)
-        )
+        Spacer(modifier = Modifier.height(32.dp))
 
         // ================= NOMBRE USUARIO =================
 
         OutlinedTextField(
             value = nombreUsuario,
-
             onValueChange = {
-                nombreUsuario = it
-                viewModel.limpiarError()
+                if (it.length <= 20) {
+                    nombreUsuario = it
+                    viewModel.limpiarError()
+                }
             },
-
-            label = {
-                Text("Nombre de usuario")
-            },
-
+            label = { Text("Nombre de usuario") },
             leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null
-                )
+                Icon(imageVector = Icons.Default.Person, contentDescription = null)
             },
-
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Next
+            supportingText = {
+                // ✅ nombreDemasiadoLargo eliminado — el campo bloquea en 20 chars
+                if (nombreInvalido) Text("Mínimo 3 caracteres")
+                else Text("${nombreUsuario.trim().length}/20")
+            },
+            isError = nombreInvalido,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+            keyboardActions = KeyboardActions(
+                onNext = { emailFocusRequester.requestFocus() }
             ),
-
+            // ✅ Sin focusRequester — es el primer campo, nadie le pasa el foco
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
 
-        Spacer(
-            modifier = Modifier.height(12.dp)
-        )
+        Spacer(modifier = Modifier.height(12.dp))
 
         // ================= EMAIL =================
 
         OutlinedTextField(
             value = email,
-
             onValueChange = {
                 email = it
                 viewModel.limpiarError()
             },
-
-            label = {
-                Text("Correo electronico")
-            },
-
+            label = { Text("Correo electrónico") },
             leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Email,
-                    contentDescription = null
-                )
+                Icon(imageVector = Icons.Default.Email, contentDescription = null)
             },
-
+            isError = emailInvalido,
+            supportingText = {
+                if (emailInvalido) Text("El email no es válido")
+            },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Email,
                 imeAction = ImeAction.Next
             ),
-
-            modifier = Modifier.fillMaxWidth(),
+            keyboardActions = KeyboardActions(
+                onNext = { passwordFocusRequester.requestFocus() }
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(emailFocusRequester),
             singleLine = true
         )
 
-        Spacer(
-            modifier = Modifier.height(12.dp)
-        )
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // ================= CONTRASENA =================
+        // ================= CONTRASEÑA =================
 
         OutlinedTextField(
             value = password,
-
             onValueChange = {
                 password = it
                 viewModel.limpiarError()
             },
-
-            label = {
-                Text("Contrasena")
-            },
-
+            label = { Text("Contraseña") },
             leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = null
-                )
+                Icon(imageVector = Icons.Default.Lock, contentDescription = null)
             },
-
             trailingIcon = {
-                IconButton(
-                    onClick = {
-                        passwordVisible = !passwordVisible
-                    }
-                ) {
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
                     Icon(
-                        imageVector =
-                            if (passwordVisible)
-                                Icons.Default.VisibilityOff
-                            else
-                                Icons.Default.Visibility,
-
-                        contentDescription = null
+                        imageVector = if (passwordVisible)
+                            Icons.Default.VisibilityOff
+                        else
+                            Icons.Default.Visibility,
+                        contentDescription = if (passwordVisible)
+                            "Ocultar contraseña"
+                        else
+                            "Mostrar contraseña"
                     )
                 }
             },
-
-            visualTransformation =
-                if (passwordVisible)
-                    VisualTransformation.None
-                else
-                    PasswordVisualTransformation(),
-
+            visualTransformation = if (passwordVisible)
+                VisualTransformation.None
+            else
+                PasswordVisualTransformation(),
+            isError = passwordCorta || contrasenasNoCoinciden,
+            supportingText = {
+                when {
+                    passwordCorta -> Text("Mínimo 6 caracteres")
+                    contrasenasNoCoinciden -> Text("Las contraseñas no coinciden")
+                }
+            },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.Next
             ),
-
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            isError = contrasenasNoCoinciden
+            keyboardActions = KeyboardActions(
+                onNext = { confirmarPasswordFocusRequester.requestFocus() }
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(passwordFocusRequester),
+            singleLine = true
         )
 
-        Spacer(
-            modifier = Modifier.height(12.dp)
-        )
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // ================= CONFIRMAR CONTRASENA =================
+        // ================= CONFIRMAR CONTRASEÑA =================
 
         OutlinedTextField(
             value = confirmarPassword,
-
             onValueChange = {
                 confirmarPassword = it
                 viewModel.limpiarError()
             },
-
-            label = {
-                Text("Confirmar contrasena")
-            },
-
+            label = { Text("Confirmar contraseña") },
             leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = null
-                )
+                Icon(imageVector = Icons.Default.Lock, contentDescription = null)
             },
-
-            visualTransformation =
+            trailingIcon = {
+                IconButton(onClick = { confirmarPasswordVisible = !confirmarPasswordVisible }) {
+                    Icon(
+                        imageVector = if (confirmarPasswordVisible)
+                            Icons.Default.VisibilityOff
+                        else
+                            Icons.Default.Visibility,
+                        contentDescription = if (confirmarPasswordVisible)
+                            "Ocultar contraseña"
+                        else
+                            "Mostrar contraseña"
+                    )
+                }
+            },
+            visualTransformation = if (confirmarPasswordVisible)
+                VisualTransformation.None
+            else
                 PasswordVisualTransformation(),
-
+            isError = contrasenasNoCoinciden,
+            supportingText = {
+                if (contrasenasNoCoinciden) Text("Las contraseñas no coinciden")
+            },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.Done
             ),
-
             keyboardActions = KeyboardActions(
                 onDone = {
                     focusManager.clearFocus()
-
-                    if (formularioValido) {
+                    if (formularioValido && !uiState.cargando) {
                         viewModel.registrarUsuario(
                             email = email,
                             password = password,
+                            confirmarPassword = confirmarPassword,
                             nombreUsuario = nombreUsuario
                         )
                     }
                 }
             ),
-
-            isError = contrasenasNoCoinciden,
-
-            supportingText = {
-                if (contrasenasNoCoinciden) {
-                    Text(
-                        "Las contrasenas no coinciden"
-                    )
-                }
-            },
-
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(confirmarPasswordFocusRequester),
             singleLine = true
         )
 
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
+        Spacer(modifier = Modifier.height(8.dp))
 
         // ================= ERROR =================
 
         uiState.error?.let { error ->
-
             Text(
                 text = error,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall
             )
-
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // ================= BOTON =================
+        // ================= BOTÓN =================
 
         Button(
             onClick = {
                 focusManager.clearFocus()
-
                 viewModel.registrarUsuario(
                     email = email,
                     password = password,
+                    confirmarPassword = confirmarPassword,
                     nombreUsuario = nombreUsuario
                 )
             },
-
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
-
-            enabled =
-                formularioValido &&
-                        !uiState.cargando
+            enabled = formularioValido && !uiState.cargando
         ) {
             if (uiState.cargando) {
                 CircularProgressIndicator(
@@ -346,22 +322,14 @@ fun RegisterScreen(
                     strokeWidth = 2.dp
                 )
             } else {
-                Text(
-                    text = "Crear cuenta"
-                )
+                Text("Crear cuenta")
             }
         }
 
-        Spacer(
-            modifier = Modifier.height(16.dp)
-        )
+        Spacer(modifier = Modifier.height(16.dp))
 
-        TextButton(
-            onClick = onNavigateToLogin
-        ) {
-            Text(
-                text = "¿Ya tienes cuenta? Inicia sesion"
-            )
+        TextButton(onClick = onNavigateToLogin) {
+            Text("¿Ya tienes cuenta? Inicia sesión")
         }
     }
 }

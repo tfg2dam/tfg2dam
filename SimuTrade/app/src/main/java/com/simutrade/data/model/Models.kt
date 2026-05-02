@@ -10,7 +10,10 @@ data class Activo(
     val precioActual: Double,
     val cambioPrecio24h: Double,
     val cambioPorcentaje24h: Double
-)
+) {
+    val esCripto: Boolean get() = tipo == TipoActivo.CRIPTO
+    val esAccion: Boolean get() = tipo == TipoActivo.ACCION
+}
 
 enum class TipoActivo {
     ACCION,
@@ -27,7 +30,12 @@ data class ActivoEnCartera(
     val cantidad: Double,
     val precioPromedio: Double,
     val precioActual: Double
-)
+) {
+    val valorActual: Double get() = cantidad * precioActual
+    val valorInvertido: Double get() = cantidad * precioPromedio
+    val beneficio: Double get() = valorActual - valorInvertido
+    val porcentajeBeneficio: Double get() = if (valorInvertido > 0) (beneficio / valorInvertido) * 100 else 0.0
+}
 
 // ================= TRANSACCIONES =================
 
@@ -56,7 +64,6 @@ data class DatosUsuario(
     val saldo: Double = 100.0,
     val saldoInicial: Double = 100.0,
     val saldoBonus: Double = 0.0,
-    val idRango: String = "bronce",
     val creadoEn: Long = 0L,
     val ultimoLogin: Long = 0L,
     val codigoUsuario: String = ""
@@ -66,9 +73,7 @@ data class DatosUsuario(
 
 data class Rango(
     val nombre: String,
-    val beneficioMinimo: Double,
-    val color: String,
-    val descripcion: String
+    val beneficioMinimo: Double
 )
 
 data class EntradaRanking(
@@ -101,15 +106,8 @@ data class Reto(
 // ================= RESULTADOS =================
 
 sealed class ResultadoOperacion {
-
-    data class Exito(
-        val mensaje: String,
-        val datosUsuario: DatosUsuario
-    ) : ResultadoOperacion()
-
-    data class Error(
-        val mensaje: String
-    ) : ResultadoOperacion()
+    data class Exito(val mensaje: String) : ResultadoOperacion()
+    data class Error(val mensaje: String) : ResultadoOperacion()
 }
 
 // ================= AMIGOS =================
@@ -117,8 +115,7 @@ sealed class ResultadoOperacion {
 data class Amigo(
     val uid: String = "",
     val nombreUsuario: String = "",
-    val codigoUsuario: String = "",
-    val idRango: String = "bronce"
+    val codigoUsuario: String = ""
 )
 
 data class SolicitudAmistad(
@@ -128,6 +125,10 @@ data class SolicitudAmistad(
 )
 
 // ================= LIGAS =================
+
+enum class EstadoMiembro {
+    PENDIENTE, ACEPTADO
+}
 
 data class Liga(
     val id: String = "",
@@ -141,7 +142,7 @@ data class MiembroLiga(
     val uid: String = "",
     val nombreUsuario: String = "",
     val codigoUsuario: String = "",
-    val estado: String = "pendiente",
+    val estado: EstadoMiembro = EstadoMiembro.PENDIENTE,
     val invitadoPor: String = ""
 )
 

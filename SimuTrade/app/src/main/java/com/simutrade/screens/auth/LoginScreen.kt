@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
@@ -31,6 +34,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -48,37 +53,30 @@ fun LoginScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
+    val passwordFocusRequester = remember { FocusRequester() }
 
-    var email by remember {
-        mutableStateOf("")
-    }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
 
-    var password by remember {
-        mutableStateOf("")
-    }
+    val emailInvalido = email.isNotEmpty() &&
+            (!email.contains("@") || !email.contains("."))
 
-    var passwordVisible by remember {
-        mutableStateOf(false)
-    }
+    val formularioValido = email.isNotBlank() &&
+            !emailInvalido &&
+            password.isNotBlank()
 
-    val formularioValido =
-        email.isNotBlank() &&
-                password.isNotBlank()
-
-    // ================= NAVEGACION =================
-
+    // ✅ Más seguro que collect manual
     LaunchedEffect(uiState.exito) {
-        if (uiState.exito) {
-            onLoginSuccess()
-            viewModel.limpiarExito()
-        }
+        if (uiState.exito) onLoginSuccess()
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
-
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -89,156 +87,115 @@ fun LoginScreen(
             text = "SimuTrade",
             style = MaterialTheme.typography.headlineLarge
         )
-
         Text(
             text = "Aprende a invertir sin riesgo",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(
-            modifier = Modifier.height(40.dp)
-        )
+        Spacer(modifier = Modifier.height(40.dp))
 
         // ================= EMAIL =================
 
         OutlinedTextField(
             value = email,
-
             onValueChange = {
                 email = it
                 viewModel.limpiarError()
             },
-
-            label = {
-                Text("Correo electronico")
-            },
-
+            label = { Text("Correo electrónico") },
             leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Email,
-                    contentDescription = null
-                )
+                Icon(imageVector = Icons.Default.Email, contentDescription = null)
             },
-
+            isError = emailInvalido,
+            supportingText = {
+                if (emailInvalido) Text("El email no es válido")
+            },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Email,
                 imeAction = ImeAction.Next
             ),
-
+            keyboardActions = KeyboardActions(
+                onNext = { passwordFocusRequester.requestFocus() }
+            ),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
 
-        Spacer(
-            modifier = Modifier.height(16.dp)
-        )
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // ================= CONTRASENA =================
+        // ================= CONTRASEÑA =================
 
         OutlinedTextField(
             value = password,
-
             onValueChange = {
                 password = it
                 viewModel.limpiarError()
             },
-
-            label = {
-                Text("Contrasena")
-            },
-
+            label = { Text("Contraseña") },
             leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = null
-                )
+                Icon(imageVector = Icons.Default.Lock, contentDescription = null)
             },
-
             trailingIcon = {
-                IconButton(
-                    onClick = {
-                        passwordVisible = !passwordVisible
-                    }
-                ) {
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
                     Icon(
-                        imageVector =
-                            if (passwordVisible)
-                                Icons.Default.VisibilityOff
-                            else
-                                Icons.Default.Visibility,
-
-                        contentDescription = null
+                        imageVector = if (passwordVisible)
+                            Icons.Default.VisibilityOff
+                        else
+                            Icons.Default.Visibility,
+                        contentDescription = if (passwordVisible)
+                            "Ocultar contraseña"
+                        else
+                            "Mostrar contraseña"
                     )
                 }
             },
-
-            visualTransformation =
-                if (passwordVisible)
-                    VisualTransformation.None
-                else
-                    PasswordVisualTransformation(),
-
+            visualTransformation = if (passwordVisible)
+                VisualTransformation.None
+            else
+                PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.Done
             ),
-
             keyboardActions = KeyboardActions(
                 onDone = {
                     focusManager.clearFocus()
-
-                    if (formularioValido) {
-                        viewModel.iniciarSesion(
-                            email = email,
-                            password = password
-                        )
+                    if (formularioValido && !uiState.cargando) {
+                        viewModel.iniciarSesion(email = email, password = password)
                     }
                 }
             ),
-
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(passwordFocusRequester),
             singleLine = true
         )
 
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
+        Spacer(modifier = Modifier.height(8.dp))
 
         // ================= ERROR =================
 
         uiState.error?.let { error ->
-
             Text(
                 text = error,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall
             )
-
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // ================= BOTON =================
+        // ================= BOTÓN =================
 
         Button(
             onClick = {
                 focusManager.clearFocus()
-
-                viewModel.iniciarSesion(
-                    email = email,
-                    password = password
-                )
+                viewModel.iniciarSesion(email = email, password = password)
             },
-
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
-
-            enabled =
-                formularioValido &&
-                        !uiState.cargando
+            enabled = formularioValido && !uiState.cargando
         ) {
             if (uiState.cargando) {
                 CircularProgressIndicator(
@@ -246,22 +203,14 @@ fun LoginScreen(
                     strokeWidth = 2.dp
                 )
             } else {
-                Text(
-                    text = "Iniciar sesion"
-                )
+                Text("Iniciar sesión")
             }
         }
 
-        Spacer(
-            modifier = Modifier.height(16.dp)
-        )
+        Spacer(modifier = Modifier.height(16.dp))
 
-        TextButton(
-            onClick = onNavigateToRegister
-        ) {
-            Text(
-                text = "¿No tienes cuenta? Crear cuenta"
-            )
+        TextButton(onClick = onNavigateToRegister) {
+            Text("¿No tienes cuenta? Crear cuenta")
         }
     }
 }

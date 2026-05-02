@@ -1,12 +1,46 @@
 package com.simutrade.screens.amigos
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PersonRemove
+import androidx.compose.material.icons.filled.PersonSearch
+import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -22,10 +56,11 @@ fun AmigosScreen(
     viewModel: AmigosViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var tabSeleccionado by remember { mutableStateOf(0) }
+    var tabSeleccionado by remember { mutableIntStateOf(0) }
     val tabs = listOf("Amigos", "Buscar")
 
     val snackbarHostState = remember { SnackbarHostState() }
+
     LaunchedEffect(uiState.mensaje) {
         uiState.mensaje?.let {
             snackbarHostState.showSnackbar(it)
@@ -41,10 +76,12 @@ fun AmigosScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
         ) {
             Text(
-                "Amigos",
+                text = "Amigos",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
@@ -54,7 +91,12 @@ fun AmigosScreen(
                 tabs.forEachIndexed { index, titulo ->
                     Tab(
                         selected = tabSeleccionado == index,
-                        onClick = { tabSeleccionado = index },
+                        onClick = {
+                            if (index != tabSeleccionado) {
+                                tabSeleccionado = index
+                                if (index == 0) viewModel.buscarPorCodigo("")
+                            }
+                        },
                         text = { Text(titulo) },
                         icon = {
                             when (index) {
@@ -70,14 +112,14 @@ fun AmigosScreen(
                 0 -> TabAmigos(
                     amigos = uiState.amigos,
                     solicitudes = uiState.solicitudes,
-                    isLoading = uiState.isLoading,
+                    cargando = uiState.cargando,
                     onAceptar = { viewModel.aceptarSolicitud(it) },
                     onRechazar = { viewModel.rechazarSolicitud(it) },
                     onEliminar = { viewModel.eliminarAmigo(it) }
                 )
                 1 -> TabBuscar(
                     resultado = uiState.resultadoBusqueda,
-                    isBuscando = uiState.isBuscando,
+                    buscando = uiState.buscando,
                     error = uiState.error,
                     onBuscar = { viewModel.buscarPorCodigo(it) },
                     onEnviarSolicitud = { viewModel.enviarSolicitud(it) }
@@ -87,16 +129,18 @@ fun AmigosScreen(
     }
 }
 
+// ================= TAB AMIGOS =================
+
 @Composable
 fun TabAmigos(
     amigos: List<Amigo>,
     solicitudes: List<SolicitudAmistad>,
-    isLoading: Boolean,
+    cargando: Boolean,
     onAceptar: (String) -> Unit,
     onRechazar: (String) -> Unit,
     onEliminar: (String) -> Unit
 ) {
-    if (isLoading) {
+    if (cargando) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
@@ -104,13 +148,15 @@ fun TabAmigos(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (solicitudes.isNotEmpty()) {
             item {
                 Text(
-                    "Solicitudes (${solicitudes.size})",
+                    text = "Solicitudes (${solicitudes.size})",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -126,7 +172,7 @@ fun TabAmigos(
 
         item {
             Text(
-                "Mis amigos (${amigos.size})",
+                text = "Mis amigos (${amigos.size})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -136,11 +182,13 @@ fun TabAmigos(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Box(
-                        modifier = Modifier.fillMaxWidth().padding(32.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "Aun no tienes amigos. Busca por codigo en la pestana Buscar",
+                            text = "Aún no tienes amigos. Búscalos por código en la pestaña Buscar",
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -157,10 +205,12 @@ fun TabAmigos(
     }
 }
 
+// ================= TAB BUSCAR =================
+
 @Composable
 fun TabBuscar(
     resultado: Amigo?,
-    isBuscando: Boolean,
+    buscando: Boolean,
     error: String?,
     onBuscar: (String) -> Unit,
     onEnviarSolicitud: (String) -> Unit
@@ -168,64 +218,70 @@ fun TabBuscar(
     var codigo by remember { mutableStateOf("") }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            "Buscar por codigo",
+            text = "Buscar por código",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
 
         OutlinedTextField(
             value = codigo,
-            onValueChange = { codigo = it },
+            onValueChange = {
+                codigo = it
+                onBuscar(it)
+            },
             placeholder = { Text("#XXXXXXXX") },
             leadingIcon = { Icon(Icons.Default.Tag, null) },
+            trailingIcon = {
+                if (buscando) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
 
-        Button(
-            onClick = { onBuscar(codigo) },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = codigo.isNotBlank() && !isBuscando
-        ) {
-            if (isBuscando) {
-                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                Spacer(Modifier.width(8.dp))
-            }
-            Text("Buscar")
+        if (error != null) {
+            Text(
+                text = error,
+                color = MaterialTheme.colorScheme.error
+            )
         }
 
-        error?.let {
-            Text(it, color = MaterialTheme.colorScheme.error)
-        }
-
-        resultado?.let { amigo ->
+        if (resultado != null) {
             Card(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Row(
-                        Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text(amigo.nombreUsuario, fontWeight = FontWeight.Bold)
                             Text(
-                                "#${amigo.codigoUsuario}",
+                                text = resultado.nombreUsuario,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "#${resultado.codigoUsuario}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
-                            Text(
-                                amigo.idRango.replaceFirstChar { it.uppercaseChar() },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
-                        Button(onClick = { onEnviarSolicitud(amigo.uid) }) {
-                            Icon(Icons.Default.PersonAdd, null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
+                        Button(onClick = { onEnviarSolicitud(resultado.uid) }) {
+                            Icon(
+                                imageVector = Icons.Default.PersonAdd,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text("Agregar")
                         }
                     }
@@ -234,6 +290,8 @@ fun TabBuscar(
         }
     }
 }
+
+// ================= CARD SOLICITUD =================
 
 @Composable
 fun CardSolicitud(
@@ -248,29 +306,41 @@ fun CardSolicitud(
         )
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text(solicitud.nombreUsuario, fontWeight = FontWeight.Bold)
+                Text(text = solicitud.nombreUsuario, fontWeight = FontWeight.Bold)
                 Text(
-                    "#${solicitud.codigoUsuario}",
+                    text = "#${solicitud.codigoUsuario}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 IconButton(onClick = onAceptar) {
-                    Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.positive)
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.positive
+                    )
                 }
                 IconButton(onClick = onRechazar) {
-                    Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error)
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
                 }
             }
         }
     }
 }
+
+// ================= CARD AMIGO =================
 
 @Composable
 fun CardAmigo(
@@ -279,25 +349,26 @@ fun CardAmigo(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text(amigo.nombreUsuario, fontWeight = FontWeight.Bold)
+                Text(text = amigo.nombreUsuario, fontWeight = FontWeight.Bold)
                 Text(
-                    "#${amigo.codigoUsuario}",
+                    text = "#${amigo.codigoUsuario}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Text(
-                    amigo.idRango.replaceFirstChar { it.uppercaseChar() },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
             IconButton(onClick = onEliminar) {
-                Icon(Icons.Default.PersonRemove, null, tint = MaterialTheme.colorScheme.error)
+                Icon(
+                    imageVector = Icons.Default.PersonRemove,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
         }
     }

@@ -9,14 +9,13 @@ import kotlinx.coroutines.flow.asStateFlow
 // ================= PANTALLAS =================
 
 sealed class Pantalla {
-
-    object Inicio : Pantalla()
-    object Mercado : Pantalla()
-    object Trading : Pantalla()
-    object Rankings : Pantalla()
-    object Retos : Pantalla()
-    object Amigos : Pantalla()
-    object Ligas : Pantalla()
+    data object Inicio : Pantalla()
+    data object Mercado : Pantalla()
+    data object Trading : Pantalla()
+    data object Rankings : Pantalla()
+    data object Retos : Pantalla()
+    data object Amigos : Pantalla()
+    data object Ligas : Pantalla()
 }
 
 // ================= ESTADO =================
@@ -42,9 +41,9 @@ class MainViewModel : ViewModel() {
 
         _uiState.value = estadoActual.copy(
             pantallaActual = pantalla,
-            activoSeleccionado =
-                if (pantalla == Pantalla.Trading) estadoActual.activoSeleccionado
-                else null
+            activoSeleccionado = estadoActual.activoSeleccionado.takeIf {
+                pantalla == Pantalla.Trading
+            }
         )
     }
 
@@ -55,9 +54,5 @@ class MainViewModel : ViewModel() {
             activoSeleccionado = activo,
             pantallaActual = Pantalla.Trading
         )
-    }
-
-    fun limpiarActivoSeleccionado() {
-        _uiState.value = _uiState.value.copy(activoSeleccionado = null)
     }
 }

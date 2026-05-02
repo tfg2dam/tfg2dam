@@ -20,10 +20,8 @@ data class EstadoUiMercado(
     val criptomonedas: List<Activo> = emptyList(),
     val acciones: List<Activo> = emptyList(),
     val resultadosBusqueda: List<Activo> = emptyList(),
-
     val cargandoInicial: Boolean = true,
     val actualizando: Boolean = false,
-
     val buscando: Boolean = false,
     val error: String? = null,
     val ultimaActualizacion: Long = 0L
@@ -31,31 +29,20 @@ data class EstadoUiMercado(
 
 class MarketViewModel : ViewModel() {
 
-    private val repositorio = RepositorioMercado()
+    private val repositorio = RepositorioMercado
 
-    private val _uiState = MutableStateFlow(
-        EstadoUiMercado()
-    )
-
-    val uiState: StateFlow<EstadoUiMercado> =
-        _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(EstadoUiMercado())
+    val uiState: StateFlow<EstadoUiMercado> = _uiState.asStateFlow()
 
     private var trabajoBusqueda: Job? = null
     private var trabajoRefresh: Job? = null
     private var trabajoCarga: Job? = null
 
-    private var ultimaCarga = 0L
     private var bloqueadoHasta = 0L
-
-    private var criptomonedasCache: List<Activo> = emptyList()
-    private var accionesCache: List<Activo> = emptyList()
 
     companion object {
         private const val INTERVALO_REFRESH_MS = 120_000L
-
-        // público para usar desde MarketScreen
         const val MINIMO_REFRESH_MS = 60_000L
-
         private const val TIMEOUT_MS = 10_000L
     }
 
@@ -74,11 +61,7 @@ class MarketViewModel : ViewModel() {
                 delay(INTERVALO_REFRESH_MS)
 
                 val estado = _uiState.value
-
-                if (
-                    !estado.actualizando &&
-                    estado.resultadosBusqueda.isEmpty()
-                ) {
+                if (!estado.actualizando && estado.resultadosBusqueda.isEmpty()) {
                     cargarDatosMercado(forzar = false)
                 }
             }
@@ -87,83 +70,51 @@ class MarketViewModel : ViewModel() {
 
     // ================= CARGAR =================
 
-    fun cargarDatosMercado(
-        forzar: Boolean = false
-    ) {
+    fun cargarDatosMercado(forzar: Boolean = false) {
         val ahora = System.currentTimeMillis()
 
-        // bloqueo temporal por rate limit
-        if (ahora < bloqueadoHasta) {
-            return
-        }
+        if (ahora < bloqueadoHasta) return
 
-        // cooldown normal
         if (
             !forzar &&
-            ahora - ultimaCarga < MINIMO_REFRESH_MS &&
-            criptomonedasCache.isNotEmpty()
-        ) {
-            return
-        }
+            _uiState.value.criptomonedas.isNotEmpty() &&
+            (ahora - _uiState.value.ultimaActualizacion) < MINIMO_REFRESH_MS
+        ) return
 
         trabajoCarga?.cancel()
 
         trabajoCarga = viewModelScope.launch {
 
-            val hayCache =
-                criptomonedasCache.isNotEmpty() ||
-                        accionesCache.isNotEmpty()
+            val hayDatosEnPantalla = _uiState.value.criptomonedas.isNotEmpty() ||
+                    _uiState.value.acciones.isNotEmpty()
 
-            if (hayCache) {
-                _uiState.value = _uiState.value.copy(
-                    criptomonedas = criptomonedasCache,
-                    acciones = accionesCache,
-                    cargandoInicial = false,
-                    actualizando = true,
-                    error = null
-                )
-            } else {
-                _uiState.value = _uiState.value.copy(
-                    cargandoInicial = true,
-                    actualizando = false,
-                    error = null
-                )
-            }
+            _uiState.value = _uiState.value.copy(
+                cargandoInicial = !hayDatosEnPantalla,
+                actualizando = hayDatosEnPantalla,
+                error = null
+            )
 
             try {
                 val (criptomonedas, acciones) = coroutineScope {
-
                     val criptomonedasDiferidas = async {
-                        reintentarIO {
-                            repositorio.obtenerTopCriptomonedas()
-                        }
+                        reintentarIO { repositorio.obtenerTopCriptomonedas() }
                     }
-
                     val accionesDiferidas = async {
-                        reintentarIO {
-                            repositorio.obtenerTopAcciones()
-                        }
+                        reintentarIO { repositorio.obtenerTopAcciones() }
                     }
-
                     Pair(
                         criptomonedasDiferidas.await(),
                         accionesDiferidas.await()
                     )
                 }
 
-                if (criptomonedas.isNotEmpty()) {
-                    criptomonedasCache = criptomonedas
-                }
-
-                if (acciones.isNotEmpty()) {
-                    accionesCache = acciones
-                }
-
-                ultimaCarga = System.currentTimeMillis()
-
                 _uiState.value = _uiState.value.copy(
-                    criptomonedas = criptomonedasCache,
-                    acciones = accionesCache,
+                    criptomonedas = criptomonedas.ifEmpty {
+                        _uiState.value.criptomonedas
+                    },
+                    acciones = acciones.ifEmpty {
+                        _uiState.value.acciones
+                    },
                     cargandoInicial = false,
                     actualizando = false,
                     ultimaActualizacion = System.currentTimeMillis(),
@@ -171,34 +122,22 @@ class MarketViewModel : ViewModel() {
                 )
 
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
 
-                if (e is CancellationException) {
-                    return@launch
-                }
-
-                val esRateLimit =
-                    e.message?.contains("429") == true ||
-                            e.toString().contains("429")
+                val esRateLimit = e.message?.contains("429") == true ||
+                        e.toString().contains("429")
 
                 if (esRateLimit) {
-                    bloqueadoHasta =
-                        System.currentTimeMillis() + MINIMO_REFRESH_MS
+                    bloqueadoHasta = System.currentTimeMillis() + MINIMO_REFRESH_MS
                 }
 
                 _uiState.value = _uiState.value.copy(
-                    criptomonedas = criptomonedasCache,
-                    acciones = accionesCache,
                     cargandoInicial = false,
                     actualizando = false,
-                    error = if (!hayCache) {
-                        if (esRateLimit) {
-                            "Demasiadas peticiones. Espera un momento."
-                        } else {
-                            "Error al cargar el mercado"
-                        }
-                    } else {
-                        null
-                    }
+                    error = if (!hayDatosEnPantalla) {
+                        if (esRateLimit) "Demasiadas peticiones. Espera un momento."
+                        else "Error al cargar el mercado"
+                    } else null
                 )
             }
         }
@@ -206,9 +145,7 @@ class MarketViewModel : ViewModel() {
 
     // ================= BÚSQUEDA =================
 
-    fun buscar(
-        textoBusqueda: String
-    ) {
+    fun buscar(textoBusqueda: String) {
         trabajoBusqueda?.cancel()
 
         if (textoBusqueda.isBlank()) {
@@ -220,9 +157,6 @@ class MarketViewModel : ViewModel() {
         }
 
         trabajoBusqueda = viewModelScope.launch {
-
-            val consultaActual = textoBusqueda
-
             delay(400)
 
             _uiState.value = _uiState.value.copy(
@@ -232,11 +166,12 @@ class MarketViewModel : ViewModel() {
 
             try {
                 val resultados = reintentarIO {
-                    repositorio.buscarActivos(consultaActual)
+                    repositorio.buscarActivos(textoBusqueda)
                 }
 
+                // ✅ Filtra activos sin precio — no se pueden operar
                 _uiState.value = _uiState.value.copy(
-                    resultadosBusqueda = resultados,
+                    resultadosBusqueda = resultados.filter { it.precioActual > 0 },
                     buscando = false
                 )
 
@@ -260,27 +195,14 @@ class MarketViewModel : ViewModel() {
 
         repeat(intentos - 1) {
             try {
-                return withTimeout(TIMEOUT_MS) {
-                    bloque()
-                }
-            } catch (_: Exception) {
+                return withTimeout(TIMEOUT_MS) { bloque() }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 delay(retrasoActual)
                 retrasoActual *= 2
             }
         }
 
-        return withTimeout(TIMEOUT_MS) {
-            bloque()
-        }
-    }
-
-    // ================= LIMPIEZA =================
-
-    override fun onCleared() {
-        super.onCleared()
-
-        trabajoCarga?.cancel()
-        trabajoRefresh?.cancel()
-        trabajoBusqueda?.cancel()
+        return withTimeout(TIMEOUT_MS) { bloque() }
     }
 }

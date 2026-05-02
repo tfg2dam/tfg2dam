@@ -24,43 +24,29 @@ object Rutas {
 fun GrafoNavegacion(
     controladorNavegacion: NavHostController
 ) {
-
     // ================= AUTENTICACIÓN =================
 
     val autenticacion = FirebaseAuth.getInstance()
 
     var sesionIniciada by remember {
-        mutableStateOf(
-            autenticacion.currentUser != null
-        )
+        mutableStateOf(autenticacion.currentUser != null)
     }
 
     // ================= LISTENER FIREBASE =================
 
     DisposableEffect(Unit) {
-        val listener =
-            FirebaseAuth.AuthStateListener {
-                sesionIniciada =
-                    it.currentUser != null
-            }
+        val listener = FirebaseAuth.AuthStateListener {
+            sesionIniciada = it.currentUser != null
+        }
 
-        autenticacion.addAuthStateListener(
-            listener
-        )
+        autenticacion.addAuthStateListener(listener)
 
         onDispose {
-            autenticacion.removeAuthStateListener(
-                listener
-            )
+            autenticacion.removeAuthStateListener(listener)
         }
     }
 
-    val destinoInicial =
-        if (sesionIniciada) {
-            Rutas.PRINCIPAL
-        } else {
-            Rutas.LOGIN
-        }
+    val destinoInicial = if (sesionIniciada) Rutas.PRINCIPAL else Rutas.LOGIN
 
     NavHost(
         navController = controladorNavegacion,
@@ -72,17 +58,14 @@ fun GrafoNavegacion(
         composable(Rutas.LOGIN) {
             LoginScreen(
                 onLoginSuccess = {
-                    controladorNavegacion.navigate(
-                        Rutas.PRINCIPAL
-                    ) {
-                        popUpTo(0)
+                    controladorNavegacion.navigate(Rutas.PRINCIPAL) {
+                        popUpTo(controladorNavegacion.graph.startDestinationId) {
+                            inclusive = true
+                        }
                     }
                 },
-
                 onNavigateToRegister = {
-                    controladorNavegacion.navigate(
-                        Rutas.REGISTRO
-                    )
+                    controladorNavegacion.navigate(Rutas.REGISTRO)
                 }
             )
         }
@@ -92,13 +75,12 @@ fun GrafoNavegacion(
         composable(Rutas.REGISTRO) {
             RegisterScreen(
                 onRegisterSuccess = {
-                    controladorNavegacion.navigate(
-                        Rutas.PRINCIPAL
-                    ) {
-                        popUpTo(0)
+                    controladorNavegacion.navigate(Rutas.PRINCIPAL) {
+                        popUpTo(controladorNavegacion.graph.startDestinationId) {
+                            inclusive = true
+                        }
                     }
                 },
-
                 onNavigateToLogin = {
                     controladorNavegacion.popBackStack()
                 }
@@ -110,12 +92,10 @@ fun GrafoNavegacion(
         composable(Rutas.PRINCIPAL) {
             MainScreen(
                 onLogout = {
-                    autenticacion.signOut()
-
-                    controladorNavegacion.navigate(
-                        Rutas.LOGIN
-                    ) {
-                        popUpTo(0)
+                    controladorNavegacion.navigate(Rutas.LOGIN) {
+                        popUpTo(controladorNavegacion.graph.startDestinationId) {
+                            inclusive = true
+                        }
                     }
                 }
             )

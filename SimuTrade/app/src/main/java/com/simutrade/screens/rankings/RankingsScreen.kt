@@ -23,7 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -39,59 +39,28 @@ fun RankingsScreen(
     userViewModel: UserViewModel = viewModel(),
     rankingsViewModel: RankingsViewModel = viewModel()
 ) {
-
-    val userUiState =
-        userViewModel.uiState
-            .collectAsStateWithLifecycle()
-            .value
-
-    val rankingsUiState =
-        rankingsViewModel.uiState
-            .collectAsStateWithLifecycle()
-            .value
+    val userUiState by userViewModel.uiState.collectAsStateWithLifecycle()
+    val rankingsUiState by rankingsViewModel.uiState.collectAsStateWithLifecycle()
 
     val usuario = userUiState.usuario
     val cartera = userUiState.cartera
-
     val ranking = rankingsUiState.ranking
     val cargando = rankingsUiState.cargando
     val error = rankingsUiState.error
 
-    val valorCartera = remember(cartera) {
-        cartera.sumOf {
-            it.cantidad * it.precioActual
-        }
-    }
+    val valorCartera = cartera.sumOf { it.valorActual }
+    val valorTotal = usuario.saldo + valorCartera
 
-    val valorTotal =
-        usuario.saldo + valorCartera
-
-    val beneficio =
-        valorTotal - usuario.saldoInicial
-
-    val beneficioRedondeado = remember(beneficio) {
-        round(beneficio * 100) / 100.0
-    }
+    val beneficio = (usuario.saldo - usuario.saldoBonus + valorCartera) - usuario.saldoInicial
+    val beneficioRedondeado = round(beneficio * 100) / 100.0
 
     val colorBeneficio = when {
-        beneficioRedondeado > 0 ->
-            MaterialTheme.colorScheme.positive
-
-        beneficioRedondeado < 0 ->
-            MaterialTheme.colorScheme.error
-
-        else ->
-            MaterialTheme.colorScheme.onSurface
+        beneficioRedondeado > 0 -> MaterialTheme.colorScheme.positive
+        beneficioRedondeado < 0 -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurface
     }
 
-    val posicion = remember(
-        ranking,
-        usuario.idUsuario
-    ) {
-        rankingsViewModel.obtenerPosicionUsuario(
-            usuario.idUsuario
-        )
-    }
+    val posicion = rankingsViewModel.obtenerPosicionUsuario(usuario.idUsuario)
 
     LaunchedEffect(Unit) {
         userViewModel.cargarDatos()
@@ -102,11 +71,10 @@ fun RankingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
 
-        // ================= TITULO =================
+        // ================= TÍTULO =================
 
         item {
             Text(
@@ -121,75 +89,45 @@ fun RankingsScreen(
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-
                 colors = CardDefaults.cardColors(
-                    containerColor =
-                        MaterialTheme.colorScheme.primaryContainer
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
+                Column(modifier = Modifier.padding(16.dp)) {
 
-                    Text(
-                        text = "Tu posicion"
-                    )
+                    Text(text = "Tu posición")
 
-                    Spacer(
-                        modifier = Modifier.height(8.dp)
-                    )
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-
-                        horizontalArrangement =
-                            Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text =
-                                if (posicion != -1) {
-                                    "#$posicion · ${usuario.nombreUsuario}"
-                                } else {
-                                    usuario.nombreUsuario
-                                },
-
+                            text = if (posicion != -1)
+                                "#$posicion · ${usuario.nombreUsuario}"
+                            else
+                                usuario.nombreUsuario,
                             fontWeight = FontWeight.Bold
                         )
 
                         Text(
-                            text =
-                                (if (beneficioRedondeado > 0) "+" else "") +
-                                        "€${"%.2f".format(beneficioRedondeado)}",
-
+                            text = (if (beneficioRedondeado > 0) "+" else "") +
+                                    "€${"%.2f".format(beneficioRedondeado)}",
                             fontWeight = FontWeight.Bold,
                             color = colorBeneficio
                         )
                     }
 
-                    Spacer(
-                        modifier = Modifier.height(6.dp)
-                    )
+                    Spacer(modifier = Modifier.height(6.dp))
 
-                    Text(
-                        text = "Total: €${"%.2f".format(valorTotal)}"
-                    )
-
-                    Text(
-                        text = "Cartera: €${"%.2f".format(valorCartera)}"
-                    )
-
-                    Text(
-                        text = "Efectivo: €${"%.2f".format(usuario.saldo)}"
-                    )
-
-                    Spacer(
-                        modifier = Modifier.height(4.dp)
-                    )
+                    Text(text = "Total: €${"%.2f".format(valorTotal)}")
+                    Text(text = "Cartera: €${"%.2f".format(valorCartera)}")
+                    Text(text = "Efectivo: €${"%.2f".format(usuario.saldo)}")
 
                     userUiState.rangoActual?.let { rango ->
-                        Text(
-                            text = "Rango: " + rango.nombre
-                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "Rango: ${rango.nombre}")
                     }
                 }
             }
@@ -200,23 +138,13 @@ fun RankingsScreen(
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.SpaceBetween,
-
-                verticalAlignment =
-                    Alignment.CenterVertically
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Top inversores",
-                    fontWeight = FontWeight.Bold
-                )
+                Text(text = "Top inversores", fontWeight = FontWeight.Bold)
 
                 IconButton(
-                    onClick = {
-                        rankingsViewModel.recargar()
-                    },
-
+                    onClick = { rankingsViewModel.cargarRanking() },
                     enabled = !cargando
                 ) {
                     Icon(
@@ -231,14 +159,11 @@ fun RankingsScreen(
 
         if (error != null) {
             item {
-                Text(
-                    text = error,
-                    color = MaterialTheme.colorScheme.error
-                )
+                Text(text = error, color = MaterialTheme.colorScheme.error)
             }
         }
 
-        // ================= LOADING =================
+        // ================= CARGANDO =================
 
         if (cargando) {
             item {
@@ -256,100 +181,74 @@ fun RankingsScreen(
         if (!cargando) {
             itemsIndexed(ranking) { index, entrada ->
 
-                val esMiUsuario =
-                    entrada.id == usuario.idUsuario
-
-                val beneficioEntrada =
-                    round(entrada.beneficio * 100) / 100.0
+                val esMiUsuario = entrada.id == usuario.idUsuario
 
                 val colorEntrada = when {
-                    beneficioEntrada > 0 ->
-                        MaterialTheme.colorScheme.positive
-
-                    beneficioEntrada < 0 ->
-                        MaterialTheme.colorScheme.error
-
-                    else ->
-                        MaterialTheme.colorScheme.onSurface
+                    entrada.beneficio > 0 -> MaterialTheme.colorScheme.positive
+                    entrada.beneficio < 0 -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.onSurface
                 }
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-
                     colors = CardDefaults.cardColors(
-                        containerColor =
-                            if (esMiUsuario) {
-                                MaterialTheme.colorScheme.secondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surface
-                            }
+                        containerColor = if (esMiUsuario)
+                            MaterialTheme.colorScheme.secondaryContainer
+                        else
+                            MaterialTheme.colorScheme.surfaceContainerHigh
                     )
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-
-                            horizontalArrangement =
-                                Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(
-                                verticalAlignment =
-                                    Alignment.CenterVertically
-                            ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = (index + 1).toString() + "."
+                                    text = "${index + 1}.",
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-
-                                Spacer(
-                                    modifier = Modifier.width(8.dp)
-                                )
-
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = entrada.nombreUsuario,
                                     fontWeight = FontWeight.Bold
                                 )
-
                                 if (esMiUsuario) {
-                                    Spacer(
-                                        modifier = Modifier.width(6.dp)
-                                    )
-
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "Tu",
-                                        style =
-                                            MaterialTheme.typography.labelSmall
+                                        text = "tú",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
 
                             Text(
-                                text =
-                                    (if (beneficioEntrada > 0) "+" else "") +
-                                            "€${"%.2f".format(beneficioEntrada)}",
-
+                                text = (if (entrada.beneficio > 0) "+" else "") +
+                                        "€${"%.2f".format(entrada.beneficio)}",
                                 color = colorEntrada,
                                 fontWeight = FontWeight.Bold
                             )
                         }
 
-                        Spacer(
-                            modifier = Modifier.height(6.dp)
-                        )
-
-                        Text(
-                            text = "Total: €${"%.2f".format(entrada.valorTotal)}"
-                        )
-
-                        Text(
-                            text = "Cartera: €${"%.2f".format(entrada.valorCartera)}"
-                        )
-
-                        Text(
-                            text = "Efectivo: €${"%.2f".format(entrada.saldo)}"
-                        )
+                        if (esMiUsuario) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Total: €${"%.2f".format(entrada.valorTotal)}",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Cartera: €${"%.2f".format(entrada.valorCartera)}",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Efectivo: €${"%.2f".format(entrada.saldo)}",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
