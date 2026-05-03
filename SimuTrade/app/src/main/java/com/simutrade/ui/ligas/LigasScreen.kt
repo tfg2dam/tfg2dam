@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -94,7 +95,11 @@ fun LigasScreen(
             onLimpiarMensaje = { ligasViewModel.limpiarMensaje() },
             onVolver = { ligasViewModel.deseleccionarLiga() },
             onInvitar = { amigoUid -> ligasViewModel.invitarAmigo(estadoUi.ligaSeleccionada!!.id, amigoUid) },
-            onSalir = { ligasViewModel.salirDeLiga(estadoUi.ligaSeleccionada!!.id) }
+            onSalir = { ligasViewModel.salirDeLiga(estadoUi.ligaSeleccionada!!.id) },
+            onRefrescar = {
+                ligasViewModel.seleccionarLiga(estadoUi.ligaSeleccionada!!)
+                usuarioViewModel.cargarDatos()
+            }
         )
         return
     }
@@ -115,7 +120,10 @@ fun LigasScreen(
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = padding.calculateBottomPadding())
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
@@ -181,14 +189,21 @@ fun DetalleLigaScreen(
     onLimpiarMensaje: () -> Unit,
     onVolver: () -> Unit,
     onInvitar: (String) -> Unit,
-    onSalir: () -> Unit
+    onSalir: () -> Unit,
+    onRefrescar: () -> Unit
 ) {
     var mostrarDialogoInvitar by remember { mutableStateOf(false) }
     var mostrarDialogoSalir by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Muestra mensajes como snackbar
     LaunchedEffect(mensaje) {
         mensaje?.let { snackbarHostState.showSnackbar(it); onLimpiarMensaje() }
+    }
+
+    // Carga el ranking automáticamente al entrar en la liga
+    LaunchedEffect(Unit) {
+        onRefrescar()
     }
 
     val usuario = estadoUiUsuario.usuario
@@ -230,8 +245,8 @@ fun DetalleLigaScreen(
         )
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { paddingValues ->
+        Column(modifier = Modifier.fillMaxSize().padding(bottom = paddingValues.calculateBottomPadding())) {
 
             // ================= HEADER =================
 
@@ -260,74 +275,88 @@ fun DetalleLigaScreen(
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider()
-            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
 
-            // ================= RANKING =================
+            // ================= CONTENIDO FIJO + LISTA =================
 
-            if (cargandoRanking) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+
+                // ================= TARJETA USUARIO (FIJA) =================
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                 ) {
-                    // Tarjeta con la posición del usuario actual
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(text = "Tu posición")
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text(
-                                        text = if (posicionEnLiga != -1) "#${posicionEnLiga + 1} · ${usuario.nombreUsuario}" else usuario.nombreUsuario,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = (if (beneficioRedondeado > 0) "+" else "") + "€${"%.2f".format(beneficioRedondeado)}",
-                                        fontWeight = FontWeight.Bold,
-                                        color = colorBeneficio
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(text = "Total: €${"%.2f".format(valorTotal)}")
-                                Text(text = "Cartera: €${"%.2f".format(valorCartera)}")
-                                Text(text = "Efectivo: €${"%.2f".format(usuario.saldo)}")
-                                estadoUiUsuario.rangoActual?.let { rango ->
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(text = "Rango: ${rango.nombre}")
-                                }
-                            }
-                        }
-                    }
-
-                    item {
-                        Text(text = "Top inversores", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    }
-
-                    itemsIndexed(ranking) { index, entrada ->
-                        val esMiUsuario = entrada.id == miUid
-                        val colorEntrada = when {
-                            entrada.beneficio > 0 -> MaterialTheme.colorScheme.positive
-                            entrada.beneficio < 0 -> MaterialTheme.colorScheme.error
-                            else -> MaterialTheme.colorScheme.onSurface
-                        }
-
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (esMiUsuario) MaterialTheme.colorScheme.secondaryContainer
-                                else MaterialTheme.colorScheme.surfaceContainerHigh
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(text = "Tu posición")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(
+                                text = if (posicionEnLiga != -1) "#${posicionEnLiga + 1} · ${usuario.nombreUsuario}" else usuario.nombreUsuario,
+                                fontWeight = FontWeight.Bold
                             )
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(
+                                text = (if (beneficioRedondeado > 0) "+" else "") + "€${"%.2f".format(beneficioRedondeado)}",
+                                fontWeight = FontWeight.Bold,
+                                color = colorBeneficio
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(text = "Total: €${"%.2f".format(valorTotal)}")
+                        Text(text = "Cartera: €${"%.2f".format(valorCartera)}")
+                        Text(text = "Efectivo: €${"%.2f".format(usuario.saldo)}")
+                        estadoUiUsuario.rangoActual?.let { rango ->
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(text = "Rango: ${rango.nombre}")
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // ================= CABECERA LISTA (FIJA) =================
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "Top inversores", fontWeight = FontWeight.Bold)
+                    IconButton(onClick = onRefrescar, enabled = !cargandoRanking) {
+                        Icon(imageVector = Icons.Default.Refresh, contentDescription = "Actualizar")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // ================= LISTA SCROLLEABLE =================
+
+                if (cargandoRanking) {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        itemsIndexed(ranking) { index, entrada ->
+                            val esMiUsuario = entrada.id == miUid
+                            val colorEntrada = when {
+                                entrada.beneficio > 0 -> MaterialTheme.colorScheme.positive
+                                entrada.beneficio < 0 -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.onSurface
+                            }
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (esMiUsuario) MaterialTheme.colorScheme.secondaryContainer
+                                    else MaterialTheme.colorScheme.surfaceContainerHigh
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(text = "${index + 1}.", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         Spacer(modifier = Modifier.width(8.dp))
@@ -342,13 +371,6 @@ fun DetalleLigaScreen(
                                         fontWeight = FontWeight.Bold,
                                         color = colorEntrada
                                     )
-                                }
-                                // Detalle extra solo para el usuario actual
-                                if (esMiUsuario) {
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(text = "Total: €${"%.2f".format(entrada.valorTotal)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(text = "Cartera: €${"%.2f".format(entrada.valorCartera)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(text = "Efectivo: €${"%.2f".format(entrada.saldo)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }

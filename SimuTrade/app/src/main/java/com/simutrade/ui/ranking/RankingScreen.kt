@@ -67,102 +67,104 @@ fun RankingScreen(
         rankingViewModel.cargarRanking()
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+    // Column principal que divide la pantalla en parte fija y lista scrolleable
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
 
         // ================= TÍTULO =================
 
-        item {
-            Text(text = "Ranking", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        }
+        Text(text = "Ranking", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
 
-        // ================= TARJETA USUARIO =================
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Muestra la posición y estadísticas del usuario actual
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Tu posición")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(
-                            text = if (posicion != -1) "#$posicion · ${usuario.nombreUsuario}" else usuario.nombreUsuario,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = (if (beneficioRedondeado > 0) "+" else "") + "€${"%.2f".format(beneficioRedondeado)}",
-                            fontWeight = FontWeight.Bold,
-                            color = colorBeneficio
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(text = "Total: €${"%.2f".format(valorTotal)}")
-                    Text(text = "Cartera: €${"%.2f".format(valorCartera)}")
-                    Text(text = "Efectivo: €${"%.2f".format(usuario.saldo)}")
-                    estadoUiUsuario.rangoActual?.let { rango ->
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(text = "Rango: ${rango.nombre}")
-                    }
+        // ================= TARJETA USUARIO (FIJA) =================
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(text = "Tu posición")
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        text = if (posicion != -1) "#$posicion · ${usuario.nombreUsuario}" else usuario.nombreUsuario,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = (if (beneficioRedondeado > 0) "+" else "") + "€${"%.2f".format(beneficioRedondeado)}",
+                        fontWeight = FontWeight.Bold,
+                        color = colorBeneficio
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(text = "Total: €${"%.2f".format(valorTotal)}")
+                Text(text = "Cartera: €${"%.2f".format(valorCartera)}")
+                Text(text = "Efectivo: €${"%.2f".format(usuario.saldo)}")
+                estadoUiUsuario.rangoActual?.let { rango ->
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = "Rango: ${rango.nombre}")
                 }
             }
         }
 
-        // ================= CABECERA LISTA =================
+        Spacer(modifier = Modifier.height(16.dp))
 
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        // ================= CABECERA LISTA (FIJA) =================
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "Top inversores", fontWeight = FontWeight.Bold)
+            IconButton(
+                onClick = {
+                    rankingViewModel.cargarRanking()
+                    usuarioViewModel.cargarDatos()
+                },
+                enabled = !cargando
             ) {
-                Text(text = "Top inversores", fontWeight = FontWeight.Bold)
-                IconButton(onClick = { rankingViewModel.cargarRanking() }, enabled = !cargando) {
-                    Icon(imageVector = Icons.Default.Refresh, contentDescription = "Actualizar")
-                }
+                Icon(imageVector = Icons.Default.Refresh, contentDescription = "Actualizar")
             }
         }
 
-        // ================= ERROR =================
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // ================= LISTA SCROLLEABLE =================
 
         if (error != null) {
-            item { Text(text = error, color = MaterialTheme.colorScheme.error) }
+            Text(text = error, color = MaterialTheme.colorScheme.error)
         }
 
-        // ================= CARGANDO =================
-
         if (cargando) {
-            item {
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
             }
         }
 
-        // ================= LISTA =================
-
         if (!cargando) {
-            itemsIndexed(ranking) { index, entrada ->
-                val esMiUsuario = entrada.id == usuario.idUsuario
-                val colorEntrada = when {
-                    entrada.beneficio > 0 -> MaterialTheme.colorScheme.positive
-                    entrada.beneficio < 0 -> MaterialTheme.colorScheme.error
-                    else -> MaterialTheme.colorScheme.onSurface
-                }
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                itemsIndexed(ranking) { index, entrada ->
+                    val esMiUsuario = entrada.id == usuario.idUsuario
+                    val colorEntrada = when {
+                        entrada.beneficio > 0 -> MaterialTheme.colorScheme.positive
+                        entrada.beneficio < 0 -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (esMiUsuario) MaterialTheme.colorScheme.secondaryContainer
-                        else MaterialTheme.colorScheme.surfaceContainerHigh
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    // Todos los usuarios muestran solo nombre y beneficio
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (esMiUsuario) MaterialTheme.colorScheme.secondaryContainer
+                            else MaterialTheme.colorScheme.surfaceContainerHigh
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(text = "${index + 1}.", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -177,14 +179,6 @@ fun RankingScreen(
                                 color = colorEntrada,
                                 fontWeight = FontWeight.Bold
                             )
-                        }
-
-                        // Detalle extra solo para el usuario actual
-                        if (esMiUsuario) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(text = "Total: €${"%.2f".format(entrada.valorTotal)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(text = "Cartera: €${"%.2f".format(entrada.valorCartera)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(text = "Efectivo: €${"%.2f".format(entrada.saldo)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
