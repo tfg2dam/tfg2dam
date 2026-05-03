@@ -5,8 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.navigation.compose.rememberNavController
-import com.simutrade.navigation.GrafoNavegacion
-import com.simutrade.screens.theme.SimuTradeTheme
+import com.simutrade.navegacion.NavGraph
+import com.simutrade.ui.tema.SimuTradeTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -17,7 +17,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             SimuTradeTheme {
                 val controladorNavegacion = rememberNavController()
-                GrafoNavegacion(controladorNavegacion = controladorNavegacion)
+                NavGraph(controladorNavegacion = controladorNavegacion)
             }
         }
     }

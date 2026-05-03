@@ -5,8 +5,8 @@
 
 # Gson
 -keepattributes *Annotation*
--keep class com.simutrade.data.remote.** { *; }
--keep class com.simutrade.data.model.** { *; }
+-keep class com.simutrade.datos.remoto.** { *; }
+-keep class com.simutrade.datos.modelo.** { *; }
 
 # Firebase
 -keep class com.google.firebase.** { *; }
