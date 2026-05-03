@@ -72,7 +72,7 @@ fun OperacionesScreen(
 
         if (activoSeleccionado == null) {
             SinActivoSeleccionado(
-                modifier = Modifier.padding(padding),
+                modifier = Modifier.padding(bottom = padding.calculateBottomPadding()),
                 onIrMercado = { mainViewModel.navegarA(Pantalla.Mercado) }
             )
         } else {
@@ -84,7 +84,7 @@ fun OperacionesScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    .padding(bottom = padding.calculateBottomPadding())
                     .padding(16.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -110,16 +110,40 @@ fun OperacionesScreen(
 
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(text = activo.simbolo, fontWeight = FontWeight.Bold)
-                        Text(text = activo.nombre)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(text = "€${"%.2f".format(activo.precioActual)}", style = MaterialTheme.typography.headlineMedium)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = activo.simbolo,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = activo.nombre,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = "€${"%.2f".format(activo.precioActual)}",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
 
+                        // Tienes y ganancia/pérdida en columna, uno debajo del otro
                         activoEnCartera?.let {
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(text = "Tienes: ${it.cantidad}")
                             Text(
-                                text = "P/L: €${"%.2f".format(it.beneficio)}",
+                                text = "Tienes: ${"%.6f".format(it.cantidad).trimEnd('0').trimEnd('.')}",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                text = "Ganancia/Pérdida: €${"%.2f".format(it.beneficio)}",
+                                style = MaterialTheme.typography.bodyLarge,
                                 color = if (it.beneficio >= 0) MaterialTheme.colorScheme.positive
                                 else MaterialTheme.colorScheme.error
                             )
@@ -251,12 +275,17 @@ fun FormularioCompra(
             singleLine = true,
             isError = cantidad.isNotEmpty() && cantidadDouble <= 0
         )
-        Text(text = "Disponible: €${"%.2f".format(saldo)}")
-        Text(
-            text = "Total: €${"%.2f".format(total)}",
-            fontWeight = FontWeight.Bold,
-            color = if (totalSuperaSaldo) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(text = "Disponible: €${"%.2f".format(saldo)}")
+            Text(
+                text = "Total: €${"%.2f".format(total)}",
+                fontWeight = FontWeight.Bold,
+                color = if (totalSuperaSaldo) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+            )
+        }
         if (totalSuperaSaldo) {
             Text(text = "Saldo insuficiente", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
@@ -291,15 +320,19 @@ fun FormularioVenta(
             singleLine = true,
             isError = cantidad.isNotEmpty() && cantidadDouble <= 0
         )
-        // Formato de 6 decimales para criptos con cantidades pequeñas
-        cantidadDisponible?.let {
-            Text(
-                text = "Disponible: ${"%.6f".format(it).trimEnd('0').trimEnd('.')} ${activo.simbolo}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            cantidadDisponible?.let {
+                Text(
+                    text = "Disponible: ${"%.6f".format(it).trimEnd('0').trimEnd('.')} ${activo.simbolo}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(text = "Recibirás: €${"%.2f".format(total)}", fontWeight = FontWeight.Bold)
         }
-        Text(text = "Recibirás: €${"%.2f".format(total)}", fontWeight = FontWeight.Bold)
         Button(onClick = onVender, modifier = Modifier.fillMaxWidth(), enabled = enabled && cantidad.isNotBlank()) {
             Text("Vender ${activo.simbolo}")
         }

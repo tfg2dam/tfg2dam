@@ -13,11 +13,12 @@ private val Green600  = Color(0xFF16A34A)
 private val Red600    = Color(0xFFDC2626)
 
 // Colores de los rangos de usuario
-val ColorBronce   = Color(0xFFCD7F32)
-val ColorPlata    = Color(0xFFC0C0C0)
-val ColorOro      = Color(0xFFFFD700)
-val ColorPlatino  = Color(0xFF9E9E9E)
-val ColorDiamante = Color(0xFF00E5FF)
+val ColorPrincipiante = Color(0xFF9E9E9E)
+val ColorBronce       = Color(0xFFCD7F32)
+val ColorPlata        = Color(0xFFC0C0C0)
+val ColorOro          = Color(0xFFFFD700)
+val ColorPlatino      = Color(0xFF8A2BE2)
+val ColorDiamante     = Color(0xFF00E5FF)
 
 // Color para valores positivos (ganancias)
 @Suppress("UnusedReceiverParameter")

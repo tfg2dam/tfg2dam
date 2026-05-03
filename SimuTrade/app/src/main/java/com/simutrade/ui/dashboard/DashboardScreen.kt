@@ -75,13 +75,13 @@ fun DashboardScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
 
-        item {
+        item(key = "titulo") {
             Text(text = "Resumen", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         }
 
         // ================= TARJETAS RESUMEN =================
 
-        item {
+        item(key = "tarjetas_1") {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TarjetaResumen(
                     titulo = "Total",
@@ -100,7 +100,7 @@ fun DashboardScreen(
             }
         }
 
-        item {
+        item(key = "tarjetas_2") {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TarjetaResumen(
                     titulo = "Cartera",
@@ -126,24 +126,31 @@ fun DashboardScreen(
         // ================= PROGRESO RANGO =================
 
         if (siguienteRango != null && rangoActual != null) {
-            item {
+            item(key = "progreso_rango") {
                 val progreso = ((beneficio - rangoActual.beneficioMinimo) /
                         (siguienteRango.beneficioMinimo - rangoActual.beneficioMinimo))
                     .toFloat().coerceIn(0f, 1f)
-                TarjetaProgresoRango(siguienteRango = siguienteRango, beneficioActual = beneficio, progreso = progreso)
+                TarjetaProgresoRango(
+                    siguienteRango = siguienteRango,
+                    beneficioActual = beneficio,
+                    progreso = progreso
+                )
             }
         }
 
         // ================= MI CARTERA =================
 
-        item {
+        item(key = "titulo_cartera") {
             Text(text = "Mi cartera", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
 
         if (cartera.isEmpty()) {
-            item { TarjetaVacia(texto = "Aún no tienes inversiones") }
+            item(key = "cartera_vacia") {
+                TarjetaVacia(texto = "Aún no tienes inversiones")
+            }
         } else {
-            items(cartera) { activo ->
+            // Key estable para evitar el crash de LayoutNode
+            items(items = cartera, key = { it.idActivo }) { activo ->
                 TarjetaActivoCartera(
                     activo = activo,
                     onClick = { mainViewModel.seleccionarActivo(activo.toActivo()) }
@@ -153,14 +160,17 @@ fun DashboardScreen(
 
         // ================= TRANSACCIONES =================
 
-        item {
+        item(key = "titulo_transacciones") {
             Text(text = "Últimas transacciones", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
 
         if (transacciones.isEmpty()) {
-            item { TarjetaVacia(texto = "Aún no hay movimientos") }
+            item(key = "transacciones_vacias") {
+                TarjetaVacia(texto = "Aún no hay movimientos")
+            }
         } else {
-            items(transacciones.take(10)) { transaccion ->
+            // Key estable para evitar el crash de LayoutNode
+            items(items = transacciones.take(10), key = { it.id }) { transaccion ->
                 TarjetaTransaccion(transaccion = transaccion)
             }
         }

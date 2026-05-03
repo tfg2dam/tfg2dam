@@ -48,6 +48,7 @@ import com.simutrade.ui.tema.ColorDiamante
 import com.simutrade.ui.tema.ColorOro
 import com.simutrade.ui.tema.ColorPlata
 import com.simutrade.ui.tema.ColorPlatino
+import com.simutrade.ui.tema.ColorPrincipiante
 
 @Composable
 fun PerfilScreen(
@@ -185,6 +186,7 @@ fun FilaPerfilConIcono(icono: ImageVector, etiqueta: String, valor: String, icon
 // Devuelve el icono correspondiente al rango
 fun obtenerIconoRango(nombreRango: String): ImageVector {
     return when (nombreRango.lowercase()) {
+        "principiante" -> Icons.Default.Star
         "bronce" -> Icons.Default.MilitaryTech
         "plata" -> Icons.Default.MilitaryTech
         "oro" -> Icons.Default.EmojiEvents
@@ -198,6 +200,7 @@ fun obtenerIconoRango(nombreRango: String): ImageVector {
 @Composable
 fun obtenerColorRango(nombreRango: String): Color {
     return when (nombreRango.lowercase()) {
+        "principiante" -> ColorPrincipiante
         "bronce" -> ColorBronce
         "plata" -> ColorPlata
         "oro" -> ColorOro

@@ -51,6 +51,8 @@ class UsuarioViewModel : ViewModel() {
 
     // Carga usuario, cartera y transacciones en paralelo
     fun cargarDatos() {
+        // Evita lanzar una nueva carga si ya hay una en curso
+        if (trabajoCarga?.isActive == true) return
         trabajoCarga?.cancel()
         trabajoCarga = viewModelScope.launch {
             _estadoUi.update { it.copy(cargando = true) }
