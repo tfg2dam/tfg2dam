@@ -176,13 +176,54 @@ class RepositorioLigas {
 
     // ================= SALIR =================
 
-    // Elimina al usuario de la liga y la quita de su lista
+    // Sale de la liga con lógica según si es el último miembro o el creador
     suspend fun salirDeLiga(ligaId: String): Boolean {
         val miUid = uid ?: return false
         return try {
-            firestore.collection(LIGAS).document(ligaId)
-                .collection(MIEMBROS).document(miUid).delete().await()
+            val ligaDoc = firestore.collection(LIGAS).document(ligaId).get().await()
+            val creadoPor = ligaDoc.getString("creado_por") ?: ""
+            val miembrosAceptados = obtenerMiembrosLiga(ligaId)
+                .filter { it.estado == EstadoMiembro.ACEPTADO }
 
+            val batch = firestore.batch()
+
+            when {
+                // Último miembro → eliminar la liga entera
+                miembrosAceptados.size <= 1 -> {
+                    miembrosAceptados.forEach { miembro ->
+                        batch.delete(
+                            firestore.collection(LIGAS).document(ligaId)
+                                .collection(MIEMBROS).document(miembro.uid)
+                        )
+                    }
+                    batch.delete(firestore.collection(LIGAS).document(ligaId))
+                }
+
+                // Es el creador pero hay más miembros → transferir al siguiente
+                creadoPor == miUid -> {
+                    val nuevoCreador = miembrosAceptados.first { it.uid != miUid }
+                    batch.update(
+                        firestore.collection(LIGAS).document(ligaId),
+                        "creado_por", nuevoCreador.uid
+                    )
+                    batch.delete(
+                        firestore.collection(LIGAS).document(ligaId)
+                            .collection(MIEMBROS).document(miUid)
+                    )
+                }
+
+                // Miembro normal → simplemente salir
+                else -> {
+                    batch.delete(
+                        firestore.collection(LIGAS).document(ligaId)
+                            .collection(MIEMBROS).document(miUid)
+                    )
+                }
+            }
+
+            batch.commit().await()
+
+            // Quitar la liga del array del usuario
             firestore.collection(USUARIOS).document(miUid)
                 .update("mis_ligas", FieldValue.arrayRemove(ligaId)).await()
 

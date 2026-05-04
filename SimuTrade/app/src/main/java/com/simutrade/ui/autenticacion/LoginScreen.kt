@@ -1,7 +1,11 @@
 package com.simutrade.ui.autenticacion
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -20,9 +25,11 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -44,6 +52,10 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.simutrade.R
 
 @Composable
 fun LoginScreen(
@@ -54,16 +66,41 @@ fun LoginScreen(
     val estadoUi by viewModel.estadoUi.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     val passwordFocusRequester = remember { FocusRequester() }
+    val context = LocalContext.current
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    // Validaciones en tiempo real
     val emailInvalido = email.isNotEmpty() && (!email.contains("@") || !email.contains("."))
     val formularioValido = email.isNotBlank() && !emailInvalido && password.isNotBlank()
 
-    // Navega al éxito cuando el login es correcto
+    // Launcher para el flujo de Google Sign-In
+    val googleLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val tarea = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val cuenta = tarea.getResult(ApiException::class.java)
+                cuenta.idToken?.let { token ->
+                    viewModel.iniciarSesionConGoogle(token)
+                }
+            } catch (_: ApiException) {
+                // Error silencioso — el usuario canceló o falló
+            }
+        }
+    }
+
+    // Configura el cliente de Google Sign-In
+    val clienteGoogle = remember {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(context.getString(R.string.default_web_client_id))
+            .requestEmail()
+            .build()
+        GoogleSignIn.getClient(context, gso)
+    }
+
     LaunchedEffect(estadoUi.exito) {
         if (estadoUi.exito) onLoginSuccess()
     }
@@ -144,7 +181,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // ================= BOTÓN =================
+        // ================= BOTÓN LOGIN =================
 
         Button(
             onClick = {
@@ -152,12 +189,56 @@ fun LoginScreen(
                 viewModel.iniciarSesion(email = email, password = password)
             },
             modifier = Modifier.fillMaxWidth().height(52.dp),
-            enabled = formularioValido && !estadoUi.cargando
+            enabled = formularioValido && !estadoUi.cargando && !estadoUi.cargandoGoogle
         ) {
             if (estadoUi.cargando) {
                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
             } else {
                 Text("Iniciar sesión")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ================= DIVISOR =================
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            HorizontalDivider(modifier = Modifier.weight(1f))
+            Text(
+                text = "  o  ",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            HorizontalDivider(modifier = Modifier.weight(1f))
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ================= BOTÓN GOOGLE =================
+
+        OutlinedButton(
+            onClick = {
+                focusManager.clearFocus()
+                googleLauncher.launch(clienteGoogle.signInIntent)
+            },
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            enabled = !estadoUi.cargando && !estadoUi.cargandoGoogle
+        ) {
+            if (estadoUi.cargandoGoogle) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Email, // placeholder — ver nota abajo
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Continuar con Google")
+                }
             }
         }
 

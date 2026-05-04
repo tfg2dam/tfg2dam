@@ -12,7 +12,20 @@
           "package_name": "com.simutrade"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "96487663187-15gl6emf41jpcbf5qcsa4oo3kkpr9jku.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.simutrade",
+            "certificate_hash": "c52fccee36c1ecae7b6594073e1cef0c9caef437"
+          }
+        },
+        {
+          "client_id": "96487663187-i45vnage0hoh0fe8gd4qjqd951h0mos9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAihcx8YOTrVxU0vnOr1VX7YnTEgwR0soI"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "96487663187-i45vnage0hoh0fe8gd4qjqd951h0mos9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

@@ -76,7 +76,11 @@ fun DashboardScreen(
     ) {
 
         item(key = "titulo") {
-            Text(text = "Resumen", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text(
+                text = "Hola, ${usuario.nombreUsuario}!",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
         }
 
         // ================= TARJETAS RESUMEN =================
@@ -149,7 +153,6 @@ fun DashboardScreen(
                 TarjetaVacia(texto = "Aún no tienes inversiones")
             }
         } else {
-            // Key estable para evitar el crash de LayoutNode
             items(items = cartera, key = { it.idActivo }) { activo ->
                 TarjetaActivoCartera(
                     activo = activo,
@@ -169,7 +172,6 @@ fun DashboardScreen(
                 TarjetaVacia(texto = "Aún no hay movimientos")
             }
         } else {
-            // Key estable para evitar el crash de LayoutNode
             items(items = transacciones.take(10), key = { it.id }) { transaccion ->
                 TarjetaTransaccion(transaccion = transaccion)
             }

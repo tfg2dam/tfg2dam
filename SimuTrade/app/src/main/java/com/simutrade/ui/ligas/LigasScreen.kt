@@ -70,7 +70,6 @@ fun LigasScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var mostrarDialogoCrear by remember { mutableStateOf(false) }
 
-    // Muestra mensajes como snackbar y los limpia después
     LaunchedEffect(estadoUi.mensaje) {
         estadoUi.mensaje?.let {
             snackbarHostState.showSnackbar(it)
@@ -80,7 +79,6 @@ fun LigasScreen(
 
     LaunchedEffect(Unit) { ligasViewModel.cargarDatos() }
 
-    // Si hay liga seleccionada muestra el detalle
     if (estadoUi.ligaSeleccionada != null) {
         DetalleLigaScreen(
             liga = estadoUi.ligaSeleccionada!!,
@@ -130,8 +128,6 @@ fun LigasScreen(
                 Text(text = "Ligas", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             }
 
-            // ================= INVITACIONES =================
-
             if (estadoUi.invitaciones.isNotEmpty()) {
                 item {
                     Text(text = "Invitaciones (${estadoUi.invitaciones.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -144,8 +140,6 @@ fun LigasScreen(
                     )
                 }
             }
-
-            // ================= MIS LIGAS =================
 
             item {
                 Text(text = "Mis ligas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -176,7 +170,6 @@ fun LigasScreen(
 
 // ================= DETALLE LIGA =================
 
-// Pantalla de detalle con ranking y opciones de la liga
 @Composable
 fun DetalleLigaScreen(
     liga: Liga,
@@ -196,15 +189,11 @@ fun DetalleLigaScreen(
     var mostrarDialogoSalir by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Muestra mensajes como snackbar
     LaunchedEffect(mensaje) {
         mensaje?.let { snackbarHostState.showSnackbar(it); onLimpiarMensaje() }
     }
 
-    // Carga el ranking automáticamente al entrar en la liga
-    LaunchedEffect(Unit) {
-        onRefrescar()
-    }
+    LaunchedEffect(Unit) { onRefrescar() }
 
     val usuario = estadoUiUsuario.usuario
     val cartera = estadoUiUsuario.cartera
@@ -221,6 +210,9 @@ fun DetalleLigaScreen(
 
     val posicionEnLiga = ranking.indexOfFirst { it.id == miUid }
 
+    // Comprueba si es el último miembro aceptado
+    val esUltimoMiembro = liga.miembros.count { it.estado == EstadoMiembro.ACEPTADO } <= 1
+
     if (mostrarDialogoInvitar) {
         DialogoInvitarAmigo(
             amigos = misAmigos,
@@ -229,17 +221,23 @@ fun DetalleLigaScreen(
         )
     }
 
-    // Diálogo de confirmación para salir de la liga
+    // Diálogo de confirmación para salir — mensaje distinto si es el último miembro
     if (mostrarDialogoSalir) {
         AlertDialog(
             onDismissRequest = { mostrarDialogoSalir = false },
             title = { Text("Salir de la liga") },
-            text = { Text("¿Seguro que quieres salir de ${liga.nombre}?") },
+            text = {
+                if (esUltimoMiembro) {
+                    Text("Eres el único miembro de ${liga.nombre}. Si sales, la liga se eliminará permanentemente.")
+                } else {
+                    Text("¿Seguro que quieres salir de ${liga.nombre}?")
+                }
+            },
             confirmButton = {
                 Button(
                     onClick = { mostrarDialogoSalir = false; onSalir() },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Salir") }
+                ) { Text(if (esUltimoMiembro) "Salir y eliminar" else "Salir") }
             },
             dismissButton = { TextButton(onClick = { mostrarDialogoSalir = false }) { Text("Cancelar") } }
         )
@@ -267,7 +265,6 @@ fun DetalleLigaScreen(
                 }
             }
 
-            // Solo cuenta miembros aceptados
             Text(
                 text = "${liga.miembros.count { it.estado == EstadoMiembro.ACEPTADO }} miembros",
                 style = MaterialTheme.typography.bodySmall,
@@ -276,8 +273,6 @@ fun DetalleLigaScreen(
             )
 
             HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
-
-            // ================= CONTENIDO FIJO + LISTA =================
 
             Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
 
@@ -383,7 +378,6 @@ fun DetalleLigaScreen(
 
 // ================= DIÁLOGO CREAR LIGA =================
 
-// Diálogo para introducir el nombre de la nueva liga
 @Composable
 fun DialogoCrearLiga(onConfirmar: (String) -> Unit, onCancelar: () -> Unit) {
     var nombre by remember { mutableStateOf("") }
@@ -412,7 +406,6 @@ fun DialogoCrearLiga(onConfirmar: (String) -> Unit, onCancelar: () -> Unit) {
 
 // ================= DIÁLOGO INVITAR AMIGO =================
 
-// Diálogo con lista de amigos que aún no están en la liga
 @Composable
 fun DialogoInvitarAmigo(amigos: List<Amigo>, onInvitar: (String) -> Unit, onCancelar: () -> Unit) {
     AlertDialog(
@@ -448,7 +441,6 @@ fun DialogoInvitarAmigo(amigos: List<Amigo>, onInvitar: (String) -> Unit, onCanc
 
 // ================= TARJETA LIGA =================
 
-// Tarjeta de liga con nombre y número de miembros aceptados
 @Composable
 fun TarjetaLiga(liga: Liga, onClick: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
@@ -472,7 +464,6 @@ fun TarjetaLiga(liga: Liga, onClick: () -> Unit) {
 
 // ================= TARJETA INVITACIÓN LIGA =================
 
-// Tarjeta de invitación pendiente con botones de aceptar y rechazar
 @Composable
 fun TarjetaInvitacionLiga(invitacion: InvitacionLiga, onAceptar: () -> Unit, onRechazar: () -> Unit) {
     Card(

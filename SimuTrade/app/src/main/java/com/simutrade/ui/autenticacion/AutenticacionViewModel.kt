@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 // Estado de la pantalla de autenticación
 data class EstadoUiAutenticacion(
     val cargando: Boolean = false,
+    val cargandoGoogle: Boolean = false,
     val error: String? = null,
     val exito: Boolean = false
 )
@@ -50,6 +51,22 @@ class AutenticacionViewModel : ViewModel() {
                     _estadoUi.value = EstadoUiAutenticacion(cargando = false, exito = true)
                 is ResultadoAutenticacion.Error ->
                     _estadoUi.value = EstadoUiAutenticacion(cargando = false, error = resultado.mensaje)
+            }
+        }
+    }
+
+    // ================= LOGIN CON GOOGLE =================
+
+    // Recibe el idToken de Google y autentica con Firebase
+    fun iniciarSesionConGoogle(idToken: String) {
+        if (_estadoUi.value.cargandoGoogle) return
+        viewModelScope.launch {
+            _estadoUi.update { it.copy(cargandoGoogle = true, error = null, exito = false) }
+            when (val resultado = repositorio.iniciarSesionConGoogle(idToken)) {
+                is ResultadoAutenticacion.Exito ->
+                    _estadoUi.value = EstadoUiAutenticacion(cargandoGoogle = false, exito = true)
+                is ResultadoAutenticacion.Error ->
+                    _estadoUi.value = EstadoUiAutenticacion(cargandoGoogle = false, error = resultado.mensaje)
             }
         }
     }

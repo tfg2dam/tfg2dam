@@ -66,6 +66,9 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
 
+    // Google Sign-In ← nuevo
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
+
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 

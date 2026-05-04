@@ -5,6 +5,7 @@ import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
 import com.simutrade.datos.modelo.ResultadoAutenticacion
 import kotlinx.coroutines.tasks.await
@@ -78,6 +79,63 @@ class RepositorioAutenticacion {
                 .document(usuario.uid)
                 .update("ultimo_login", System.currentTimeMillis())
                 .await()
+
+            ResultadoAutenticacion.Exito(usuario)
+
+        } catch (e: Exception) {
+            ResultadoAutenticacion.Error(traducirErrorAuth(e))
+        }
+    }
+
+    // ================= LOGIN CON GOOGLE =================
+
+    // Autentica con el token de Google y crea el usuario si es la primera vez
+    suspend fun iniciarSesionConGoogle(idToken: String): ResultadoAutenticacion {
+        return try {
+            val credencial = GoogleAuthProvider.getCredential(idToken, null)
+            val resultado = autenticacion.signInWithCredential(credencial).await()
+            val usuario = resultado.user
+                ?: return ResultadoAutenticacion.Error("Usuario no válido")
+
+            val ahora = System.currentTimeMillis()
+            val referenciaUsuario = firestore.collection(USUARIOS).document(usuario.uid)
+            val doc = referenciaUsuario.get().await()
+
+            if (!doc.exists()) {
+                // Primera vez con Google → crea el documento en Firestore
+                val nombreUsuario = usuario.displayName ?: "Usuario"
+                referenciaUsuario.set(
+                    mapOf(
+                        "nombre_usuario" to nombreUsuario,
+                        "email" to (usuario.email ?: ""),
+                        "codigo_usuario" to generarCodigoUsuario(),
+                        "saldo" to SALDO_INICIAL,
+                        "saldo_inicial" to SALDO_INICIAL,
+                        "saldo_bonus" to 0.0,
+                        "creado_en" to ahora,
+                        "ultimo_login" to ahora,
+                        "valor_cartera" to 0.0,
+                        "beneficio" to 0.0,
+                        "mis_ligas" to emptyList<String>()
+                    )
+                ).await()
+
+                // Inicializa los retos del usuario
+                referenciaUsuario.collection(RETOS).document(DOCUMENTO_RETOS)
+                    .set(
+                        mapOf(
+                            "racha_actual" to 0,
+                            "racha_maxima" to 0,
+                            "ultima_vez" to 0L,
+                            "retos_completados" to emptyList<String>(),
+                            "retos_del_dia" to emptyList<String>(),
+                            "dia_actual" to 0L
+                        )
+                    ).await()
+            } else {
+                // Ya existe → solo actualiza el último login
+                referenciaUsuario.update("ultimo_login", ahora).await()
+            }
 
             ResultadoAutenticacion.Exito(usuario)
 
