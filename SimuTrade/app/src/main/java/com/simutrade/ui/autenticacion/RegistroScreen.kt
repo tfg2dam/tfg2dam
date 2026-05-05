@@ -112,7 +112,7 @@ fun RegistroScreen(
         OutlinedTextField(
             value = nombreUsuario,
             onValueChange = {
-                if (it.length <= 20) {
+                if (it.length <= 30) {
                     nombreUsuario = it
                     viewModel.limpiarError()
                 }
@@ -121,7 +121,7 @@ fun RegistroScreen(
             leadingIcon = { Icon(imageVector = Icons.Default.Person, contentDescription = null) },
             supportingText = {
                 if (nombreInvalido) Text("Mínimo 3 caracteres")
-                else Text("${nombreUsuario.trim().length}/20")
+                else Text("${nombreUsuario.trim().length}/30")
             },
             isError = nombreInvalido,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
