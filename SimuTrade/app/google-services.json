@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "96487663187-cb3835c4ilgheucmkgka1t7cs4b4gs4k.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.simutrade",
+            "certificate_hash": "c7be5cd505d2d67a4b43a94dc694b6a3c9d999a1"
+          }
+        },
+        {
           "client_id": "96487663187-i45vnage0hoh0fe8gd4qjqd951h0mos9.apps.googleusercontent.com",
           "client_type": 3
         }

@@ -65,7 +65,7 @@ fun DashboardScreen(
 
     val valorCartera = cartera.sumOf { it.valorActual }
     val valorTotal = usuario.saldo + valorCartera
-    val beneficio = valorTotal - usuario.saldoInicial
+    val beneficio = (usuario.saldo - usuario.saldoBonus + valorCartera) - usuario.saldoInicial
     val porcentajeBeneficio = if (usuario.saldoInicial > 0) (beneficio / usuario.saldoInicial) * 100 else 0.0
     val porcentajeEfectivo = if (valorTotal > 0) (usuario.saldo / valorTotal) * 100 else 0.0
     val siguienteRango = RankingUtilidades.obtenerSiguienteRango(beneficio)
