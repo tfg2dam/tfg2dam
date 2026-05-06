@@ -193,7 +193,15 @@ fun TarjetaActivoCartera(activo: ActivoEnCartera, onClick: () -> Unit) {
                 Text(text = "€${"%.2f".format(activo.valorActual)}")
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text(text = "Invertido: €${"%.2f".format(activo.valorInvertido)}", style = MaterialTheme.typography.bodySmall)
+            Text(
+                text = "Invertido: €${"%.2f".format(activo.valorInvertido)}",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                text = "Cantidad: ${"%.6f".format(activo.cantidad)} ${activo.simbolo}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = (if (activo.beneficio >= 0) "+" else "-") + "€${"%.2f".format(abs(activo.beneficio))} (${"%.2f".format(activo.porcentajeBeneficio)}%)",

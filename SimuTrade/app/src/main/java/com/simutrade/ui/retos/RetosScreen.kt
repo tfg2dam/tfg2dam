@@ -63,7 +63,7 @@ fun RetosScreen(
     val todosCompletados = total > 0 && completados == total
 
     // Muestra racha + 1 visualmente cuando todos los retos están completados
-    val rachaVisual = if (todosCompletados) datosRetos.rachaActual + 1 else datosRetos.rachaActual
+    val rachaVisual = datosRetos.rachaActual
 
     var mensajeDialogo by remember { mutableStateOf<String?>(null) }
     var dialogoExito by remember { mutableStateOf(false) }

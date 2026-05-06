@@ -230,12 +230,9 @@ class RetosViewModel : ViewModel() {
         }
     }
 
-    // ================= COMPLETAR =================
-
     // Valida, otorga la recompensa y marca el reto como completado
     fun completarReto(id: String, recompensa: Double, onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {
-            // Comprueba localmente primero para evitar petición a Firestore
             if (id in _estadoUi.value.datosRetos.retosCompletados) {
                 onResult(false, "Ya has completado este reto")
                 return@launch
@@ -252,11 +249,29 @@ class RetosViewModel : ViewModel() {
             val nuevosDatos = _estadoUi.value.datosRetos.copy(
                 retosCompletados = _estadoUi.value.datosRetos.retosCompletados + id
             )
-            repositorio.guardarDatosRetos(nuevosDatos)
+
+            // Comprobar si con este reto se completan todos
+            val idsRetos = nuevosDatos.retosDelDia.mapIndexed { index, tipo ->
+                "reto_${tipo}_${nuevosDatos.diaActual}_${index + 1}"
+            }
+            val todosCompletados = idsRetos.all { it in nuevosDatos.retosCompletados }
+
+            // Si se completan todos, subir la racha inmediatamente
+            val datosFinales = if (todosCompletados) {
+                val nuevaRacha = nuevosDatos.rachaActual + 1
+                nuevosDatos.copy(
+                    rachaActual = nuevaRacha,
+                    rachaMaxima = maxOf(nuevaRacha, nuevosDatos.rachaMaxima)
+                )
+            } else {
+                nuevosDatos
+            }
+
+            repositorio.guardarDatosRetos(datosFinales)
 
             _estadoUi.update {
                 it.copy(
-                    datosRetos = nuevosDatos,
+                    datosRetos = datosFinales,
                     milisegundosHastaReset = calcularTiempoReset()
                 )
             }
