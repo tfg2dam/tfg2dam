@@ -61,7 +61,11 @@ fun OperacionesScreen(
 
     var modoCompra by remember { mutableStateOf(true) }
     var cantidad by remember { mutableStateOf("") }
+    var modoPorDinero by remember { mutableStateOf(false) } // Nuevo: modo alternativo
+    var dinero by remember { mutableStateOf("") } // Nuevo: campo para dinero
     var procesando by remember { mutableStateOf(false) }
+    var modoPorDineroVenta by remember { mutableStateOf(false) } // Nuevo: modo alternativo venta
+    var dineroVenta by remember { mutableStateOf("") } // Nuevo: campo para dinero venta
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -78,7 +82,17 @@ fun OperacionesScreen(
         } else {
             val activo = activoSeleccionado
             val activoEnCartera = estadoUi.cartera.find { it.idActivo == activo.id }
-            val cantidadDouble = parsearCantidad(cantidad)
+                    val cantidadDouble = if (modoCompra) {
+                if (!modoPorDinero) parsearCantidad(cantidad) else {
+                    val dineroDouble = parsearCantidad(dinero)
+                    if (activo.precioActual > 0) dineroDouble / activo.precioActual else 0.0
+                }
+            } else {
+                if (!modoPorDineroVenta) parsearCantidad(cantidad) else {
+                    val dineroDouble = parsearCantidad(dineroVenta)
+                    if (activo.precioActual > 0) dineroDouble / activo.precioActual else 0.0
+                }
+            }
             val total = activo.precioActual * cantidadDouble
 
             Column(
@@ -175,6 +189,15 @@ fun OperacionesScreen(
                         activo = activo,
                         cantidad = cantidad,
                         onCantidadChange = { cantidad = it },
+                        modoPorDinero = modoPorDinero,
+                        onModoPorDineroChange = { nuevo ->
+                            modoPorDinero = nuevo
+                            cantidad = ""
+                            dinero = ""
+                        },
+                        dinero = dinero,
+                        onDineroChange = { dinero = it },
+                        cantidadCalculada = cantidadDouble,
                         total = total,
                         saldo = estadoUi.usuario.saldo,
                         enabled = puedeComprar(cantidadDouble, activo.precioActual, estadoUi.usuario.saldo) && !procesando,
@@ -190,6 +213,7 @@ fun OperacionesScreen(
                                         }
                                     )
                                     cantidad = ""
+                                    dinero = ""
                                     procesando = false
                                 }
                             }
@@ -200,6 +224,15 @@ fun OperacionesScreen(
                         activo = activo,
                         cantidad = cantidad,
                         onCantidadChange = { cantidad = it },
+                        modoPorDinero = modoPorDineroVenta,
+                        onModoPorDineroChange = { nuevo ->
+                            modoPorDineroVenta = nuevo
+                            cantidad = ""
+                            dineroVenta = ""
+                        },
+                        dinero = dineroVenta,
+                        onDineroChange = { dineroVenta = it },
+                        cantidadCalculada = cantidadDouble,
                         total = total,
                         cantidadDisponible = activoEnCartera?.cantidad,
                         enabled = puedeVender(cantidadDouble, activoEnCartera?.cantidad) && !procesando,
@@ -215,6 +248,7 @@ fun OperacionesScreen(
                                         }
                                     )
                                     cantidad = ""
+                                    dineroVenta = ""
                                     procesando = false
                                 }
                             }
@@ -251,30 +285,64 @@ fun SinActivoSeleccionado(
 
 // ================= FORMULARIO COMPRA =================
 
-// Formulario para comprar un activo con validación de saldo
+// Formulario para comprar un activo con validación de saldo y modo alternativo por dinero
 @Composable
 fun FormularioCompra(
     activo: Activo,
     cantidad: String,
     onCantidadChange: (String) -> Unit,
+    modoPorDinero: Boolean,
+    onModoPorDineroChange: (Boolean) -> Unit,
+    dinero: String,
+    onDineroChange: (String) -> Unit,
+    cantidadCalculada: Double,
     total: Double,
     saldo: Double,
     enabled: Boolean,
     onComprar: () -> Unit
 ) {
     val cantidadDouble = parsearCantidad(cantidad)
+    val dineroDouble = parsearCantidad(dinero)
     val totalSuperaSaldo = total > saldo && total > 0
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
-            value = cantidad,
-            onValueChange = onCantidadChange,
-            label = { Text("Cantidad") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            isError = cantidad.isNotEmpty() && cantidadDouble <= 0
-        )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
+                selected = !modoPorDinero,
+                onClick = { onModoPorDineroChange(false) },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+            ) { Text("Por cantidad") }
+            SegmentedButton(
+                selected = modoPorDinero,
+                onClick = { onModoPorDineroChange(true) },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+            ) { Text("Por dinero") }
+        }
+        if (!modoPorDinero) {
+            OutlinedTextField(
+                value = cantidad,
+                onValueChange = onCantidadChange,
+                label = { Text("Cantidad") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                isError = cantidad.isNotEmpty() && cantidadDouble <= 0
+            )
+        } else {
+            OutlinedTextField(
+                value = dinero,
+                onValueChange = onDineroChange,
+                label = { Text("Dinero a invertir (€)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                isError = dinero.isNotEmpty() && dineroDouble <= 0
+            )
+            Text(
+                text = "Unidades que recibirás: ${"%.6f".format(cantidadCalculada).trimEnd('0').trimEnd('.')} ${activo.simbolo}",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -289,7 +357,11 @@ fun FormularioCompra(
         if (totalSuperaSaldo) {
             Text(text = "Saldo insuficiente", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
-        Button(onClick = onComprar, modifier = Modifier.fillMaxWidth(), enabled = enabled && cantidad.isNotBlank()) {
+        Button(
+            onClick = onComprar,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = enabled && (if (!modoPorDinero) cantidad.isNotBlank() else dinero.isNotBlank())
+        ) {
             Text("Comprar ${activo.simbolo}")
         }
     }
@@ -297,29 +369,63 @@ fun FormularioCompra(
 
 // ================= FORMULARIO VENTA =================
 
-// Formulario para vender un activo con validación de cantidad disponible
+// Formulario para vender un activo con validación de cantidad disponible y modo alternativo por dinero
 @Composable
 fun FormularioVenta(
     activo: Activo,
     cantidad: String,
     onCantidadChange: (String) -> Unit,
+    modoPorDinero: Boolean,
+    onModoPorDineroChange: (Boolean) -> Unit,
+    dinero: String,
+    onDineroChange: (String) -> Unit,
+    cantidadCalculada: Double,
     total: Double,
     cantidadDisponible: Double?,
     enabled: Boolean,
     onVender: () -> Unit
 ) {
     val cantidadDouble = parsearCantidad(cantidad)
+    val dineroDouble = parsearCantidad(dinero)
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
-            value = cantidad,
-            onValueChange = onCantidadChange,
-            label = { Text("Cantidad") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            isError = cantidad.isNotEmpty() && cantidadDouble <= 0
-        )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
+                selected = !modoPorDinero,
+                onClick = { onModoPorDineroChange(false) },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+            ) { Text("Por cantidad") }
+            SegmentedButton(
+                selected = modoPorDinero,
+                onClick = { onModoPorDineroChange(true) },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+            ) { Text("Por dinero") }
+        }
+        if (!modoPorDinero) {
+            OutlinedTextField(
+                value = cantidad,
+                onValueChange = onCantidadChange,
+                label = { Text("Cantidad") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                isError = cantidad.isNotEmpty() && cantidadDouble <= 0
+            )
+        } else {
+            OutlinedTextField(
+                value = dinero,
+                onValueChange = onDineroChange,
+                label = { Text("Dinero a recibir (€)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                isError = dinero.isNotEmpty() && dineroDouble <= 0
+            )
+            Text(
+                text = "Unidades a vender: ${"%.6f".format(cantidadCalculada).trimEnd('0').trimEnd('.')} ${activo.simbolo}",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -333,7 +439,11 @@ fun FormularioVenta(
             }
             Text(text = "Recibirás: €${"%.2f".format(total)}", fontWeight = FontWeight.Bold)
         }
-        Button(onClick = onVender, modifier = Modifier.fillMaxWidth(), enabled = enabled && cantidad.isNotBlank()) {
+        Button(
+            onClick = onVender,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = enabled && (if (!modoPorDinero) cantidad.isNotBlank() else dinero.isNotBlank())
+        ) {
             Text("Vender ${activo.simbolo}")
         }
     }
