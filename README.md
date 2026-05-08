@@ -19,7 +19,7 @@ competir en rankings, completar retos diarios y jugar con amigos en ligas privad
 ## Características principales
 
 - **Trading en tiempo real** — precios reales de acciones (Finnhub) y criptomonedas (CoinGecko)
-- **Sistema de rangos** — 6 rangos basados exclusivamente en beneficio de trading: Principiante → Bronce → Plata → Oro → Platino → Diamante
+- **Sistema de rangos** — 6 rangos basados exclusivamente en beneficio de trading: Principiante, Bronce, Plata, Oro, Platino y Diamante
 - **Ranking global** — leaderboard ordenado por beneficio de trading
 - **Retos diarios** — 3 retos aleatorios cada día con racha y recompensas en saldo bonus
 - **Sistema de amigos** — búsqueda por código único `#XXXXXXXX`, solicitudes de amistad
@@ -60,14 +60,19 @@ competir en rankings, completar retos diarios y jugar con amigos en ligas privad
 
 ### 1. Clonar el repositorio
 
+Abre **PowerShell** o **CMD**, navega a la carpeta donde quieras clonar el proyecto y ejecuta:
+
 ```bash
 git clone https://github.com/tfg2dam/tfg2dam.git
-cd tfg2dam/SimuTrade
 ```
 
-### 2. Compilar y ejecutar
+### 2. Abrir el proyecto
 
-Abre el proyecto en Android Studio, sincroniza Gradle y ejecuta la app en un emulador o dispositivo físico con cuenta de Google configurada.
+Abre Android Studio y selecciona **File → Open**, navega hasta la carpeta clonada y abre la subcarpeta **`SimuTrade/`** — no la carpeta raíz `tfg2dam/`.
+
+### 3. Compilar y ejecutar
+
+Sincroniza Gradle y ejecuta la app en un emulador o dispositivo físico con cuenta de Google configurada.
 
 ---
 
@@ -190,7 +195,7 @@ La racha sube al completar todos los retos del día y se rompe si no se completa
 
 ## Rate limiting de APIs
 
-La API gratuita de CoinGecko tiene un límite de ~30 peticiones/minuto. La app gestiona esto con:
+La API gratuita de CoinGecko tiene un límite de aproximadamente 30 peticiones por minuto. La app gestiona esto con:
 
 - **Cooldown manual**: 60 segundos entre actualizaciones manuales
 - **Autorefresh**: cada 2 minutos en segundo plano
