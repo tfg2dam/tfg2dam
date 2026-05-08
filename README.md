@@ -16,18 +16,6 @@ competir en rankings, completar retos diarios y jugar con amigos en ligas privad
 
 ---
 
-## Capturas de pantalla
-
-| Login | Dashboard | Mercado |
-|---|---|---|
-| ![Login](screenshots/login.png) | ![Dashboard](screenshots/dashboard.png) | ![Mercado](screenshots/mercado.png) |
-
-| Retos | Amigos | Ligas |
-|---|---|---|
-| ![Retos](screenshots/retos.png) | ![Amigos](screenshots/amigos.png) | ![Ligas](screenshots/ligas.png) |
-
----
-
 ## Características principales
 
 - **Trading en tiempo real** — precios reales de acciones (Finnhub) y criptomonedas (CoinGecko)
