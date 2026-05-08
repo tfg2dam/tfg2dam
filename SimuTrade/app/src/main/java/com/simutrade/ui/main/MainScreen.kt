@@ -57,7 +57,6 @@ fun MainScreen(
 
     var mostrarPerfilScreen by remember { mutableStateOf(false) }
 
-    // Items de la barra de navegación inferior
     val itemsNavegacion = listOf(
         ItemNavegacion(Pantalla.Inicio,   "Panel",   Icons.Default.Dashboard),
         ItemNavegacion(Pantalla.Mercado,  "Mercado", Icons.AutoMirrored.Filled.TrendingUp),
@@ -75,9 +74,9 @@ fun MainScreen(
             onDismiss = { mostrarPerfilScreen = false },
             onLogout = {
                 mostrarPerfilScreen = false
-                autenticacionViewModel.cerrarSesion()
                 onLogout()
-            }
+            },
+            autenticacionViewModel = autenticacionViewModel
         )
     }
 
@@ -87,7 +86,6 @@ fun MainScreen(
                 title = {
                     Column {
                         Text(text = "SimuTrade", style = MaterialTheme.typography.titleLarge)
-                        // Muestra saldo y rango o "Cargando..." mientras carga
                         Text(
                             text = if (estadoUiUsuario.cargando && rangoActual == null) "Cargando..."
                             else "€${"%.2f".format(usuario.saldo)} • ${rangoActual?.nombre ?: ""}",
@@ -148,7 +146,6 @@ fun MainScreen(
 
 // ================= ITEM NAVEGACIÓN =================
 
-// Modelo de cada ítem de la barra de navegación inferior
 data class ItemNavegacion(
     val pantalla: Pantalla,
     val etiqueta: String,

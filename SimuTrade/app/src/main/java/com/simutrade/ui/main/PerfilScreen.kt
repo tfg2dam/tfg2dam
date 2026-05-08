@@ -39,10 +39,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.simutrade.datos.modelo.DatosUsuario
 import com.simutrade.datos.modelo.Rango
+import com.simutrade.ui.autenticacion.AutenticacionViewModel
 import com.simutrade.ui.tema.ColorBronce
 import com.simutrade.ui.tema.ColorDiamante
 import com.simutrade.ui.tema.ColorOro
@@ -55,8 +57,10 @@ fun PerfilScreen(
     datosUsuario: DatosUsuario,
     rangoActual: Rango?,
     onDismiss: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    autenticacionViewModel: AutenticacionViewModel
 ) {
+    val context = LocalContext.current
     val nombreUsuario = datosUsuario.nombreUsuario
     val inicial = nombreUsuario.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
     val nombreRango = rangoActual?.nombre ?: ""
@@ -67,7 +71,6 @@ fun PerfilScreen(
 
     // ================= CONFIRMAR LOGOUT =================
 
-    // Diálogo de confirmación antes de cerrar sesión
     if (mostrarConfirmacionSalir) {
         AlertDialog(
             onDismissRequest = { mostrarConfirmacionSalir = false },
@@ -75,7 +78,11 @@ fun PerfilScreen(
             text = { Text("¿Seguro que quieres salir?") },
             confirmButton = {
                 Button(
-                    onClick = { mostrarConfirmacionSalir = false; onLogout() },
+                    onClick = {
+                        mostrarConfirmacionSalir = false
+                        autenticacionViewModel.cerrarSesion(context)
+                        onLogout()
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) { Text("Salir") }
             },
@@ -95,7 +102,6 @@ fun PerfilScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Avatar circular con la inicial del usuario
                     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp)) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(text = inicial, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
@@ -134,7 +140,6 @@ fun PerfilScreen(
 
                 HorizontalDivider()
 
-                // Botón de cerrar sesión
                 TextButton(
                     onClick = { mostrarConfirmacionSalir = true },
                     modifier = Modifier.fillMaxWidth(),
@@ -152,7 +157,6 @@ fun PerfilScreen(
 
 // ================= FILA NORMAL =================
 
-// Fila de información con icono y valor de texto
 @Composable
 fun FilaPerfil(icono: ImageVector, etiqueta: String, valor: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -166,7 +170,6 @@ fun FilaPerfil(icono: ImageVector, etiqueta: String, valor: String) {
 
 // ================= FILA CON ICONO DE VALOR =================
 
-// Fila con icono de color para mostrar el rango
 @Composable
 fun FilaPerfilConIcono(icono: ImageVector, etiqueta: String, valor: String, iconoValor: ImageVector, colorValor: Color) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -183,7 +186,6 @@ fun FilaPerfilConIcono(icono: ImageVector, etiqueta: String, valor: String, icon
 
 // ================= HELPERS =================
 
-// Devuelve el icono correspondiente al rango
 fun obtenerIconoRango(nombreRango: String): ImageVector {
     return when (nombreRango.lowercase()) {
         "principiante" -> Icons.Default.Star
@@ -196,7 +198,6 @@ fun obtenerIconoRango(nombreRango: String): ImageVector {
     }
 }
 
-// Devuelve el color correspondiente al rango
 @Composable
 fun obtenerColorRango(nombreRango: String): Color {
     return when (nombreRango.lowercase()) {

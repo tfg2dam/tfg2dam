@@ -1,5 +1,8 @@
 package com.simutrade.datos.repositorio
 
+import android.content.Context
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
@@ -102,7 +105,6 @@ class RepositorioAutenticacion {
             val doc = referenciaUsuario.get().await()
 
             if (!doc.exists()) {
-                // Primera vez con Google → crea el documento en Firestore
                 val nombreUsuario = usuario.displayName ?: "Usuario"
                 referenciaUsuario.set(
                     mapOf(
@@ -120,7 +122,6 @@ class RepositorioAutenticacion {
                     )
                 ).await()
 
-                // Inicializa los retos del usuario
                 referenciaUsuario.collection(RETOS).document(DOCUMENTO_RETOS)
                     .set(
                         mapOf(
@@ -133,7 +134,6 @@ class RepositorioAutenticacion {
                         )
                     ).await()
             } else {
-                // Ya existe → solo actualiza el último login
                 referenciaUsuario.update("ultimo_login", ahora).await()
             }
 
@@ -163,7 +163,6 @@ class RepositorioAutenticacion {
             val ahora = System.currentTimeMillis()
             val referenciaUsuario = firestore.collection(USUARIOS).document(usuario.uid)
 
-            // Datos principales del usuario
             referenciaUsuario.set(
                 mapOf(
                     "nombre_usuario" to nombreUsuario,
@@ -180,7 +179,6 @@ class RepositorioAutenticacion {
                 )
             ).await()
 
-            // Inicializa los retos del usuario
             referenciaUsuario.collection(RETOS).document(DOCUMENTO_RETOS)
                 .set(
                     mapOf(
@@ -202,8 +200,10 @@ class RepositorioAutenticacion {
 
     // ================= LOGOUT =================
 
-    // Cierra la sesión del usuario actual
-    fun cerrarSesion() {
+    // Cierra la sesión de Firebase y también del cliente de Google
+    fun cerrarSesion(context: Context) {
         autenticacion.signOut()
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+        GoogleSignIn.getClient(context, gso).signOut()
     }
 }

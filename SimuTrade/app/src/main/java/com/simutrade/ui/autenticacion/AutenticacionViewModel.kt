@@ -1,5 +1,6 @@
 package com.simutrade.ui.autenticacion
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.simutrade.datos.modelo.ResultadoAutenticacion
@@ -135,10 +136,10 @@ class AutenticacionViewModel : ViewModel() {
         _estadoUi.update { it.copy(error = null) }
     }
 
-    // Cierra la sesión y resetea el estado
-    fun cerrarSesion() {
+    // Cierra la sesión de Firebase y Google, y resetea el estado
+    fun cerrarSesion(context: Context) {
         if (_estadoUi.value.cargando) return
-        repositorio.cerrarSesion()
+        repositorio.cerrarSesion(context)
         _estadoUi.value = EstadoUiAutenticacion()
     }
 
