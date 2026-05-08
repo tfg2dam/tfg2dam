@@ -10,7 +10,7 @@ competir en rankings, completar retos diarios y jugar con amigos en ligas privad
 
 ## Descarga
 
-📱 [Descargar APK](https://github.com/tfg2dam/tfg2dam/releases/latest)
+[Descargar APK](https://github.com/tfg2dam/tfg2dam/releases/latest)
 
 > Requiere Android 7.0 o superior. Activa **"Instalar aplicaciones de fuentes desconocidas"** en los ajustes del móvil.
 
@@ -202,8 +202,8 @@ La API gratuita de CoinGecko tiene un límite de ~30 peticiones/minuto. La app g
 
 La memoria del proyecto y el diagrama de base de datos están disponibles en la carpeta [`sampledata/`](sampledata/):
 
-- 📄 [Memoria del proyecto](sampledata/Memoria_SimuTrade.docx)
-- 🗄️ [Diagrama de base de datos](sampledata/BD_SimuTrade.jpeg)
+- [Memoria del proyecto](sampledata/Memoria_SimuTrade.docx)
+- [Diagrama de base de datos](sampledata/BD_SimuTrade.jpeg)
 
 ---
 
