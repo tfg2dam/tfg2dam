@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.simutrade.datos.modelo.Amigo
 import com.simutrade.datos.modelo.EntradaRanking
+import com.simutrade.datos.modelo.EstadoMiembro
 import com.simutrade.datos.modelo.InvitacionLiga
 import com.simutrade.datos.modelo.Liga
+import com.simutrade.datos.modelo.MiembroLiga
 import com.simutrade.datos.repositorio.RepositorioAmigos
 import com.simutrade.datos.repositorio.RepositorioLigas
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,33 +40,57 @@ class LigasViewModel : ViewModel() {
     val estadoUi: StateFlow<EstadoUiLigas> = _estadoUi.asStateFlow()
 
     init {
-        // Guarda el UID del usuario actual al iniciar
         _estadoUi.update { it.copy(miUid = FirebaseAuth.getInstance().currentUser?.uid ?: "") }
-        cargarDatos()
+        observarDatos()
     }
 
-    // ================= CARGAR =================
+    // ================= OBSERVAR EN TIEMPO REAL =================
 
-    // Carga ligas, invitaciones y amigos en paralelo
-    fun cargarDatos() {
+    private fun observarDatos() {
         viewModelScope.launch {
             _estadoUi.update { it.copy(cargando = true, error = null) }
             try {
-                val ligas = repositorio.obtenerMisLigas()
-                val invitaciones = repositorio.obtenerInvitaciones()
-                val amigos = repositorioAmigos.obtenerAmigos()
-                _estadoUi.update {
-                    it.copy(misLigas = ligas, invitaciones = invitaciones, misAmigos = amigos, cargando = false)
+                repositorio.observarMisLigas().collect { ligas ->
+                    val ligaActualizada = _estadoUi.value.ligaSeleccionada?.let { seleccionada ->
+                        ligas.find { it.id == seleccionada.id }
+                    }
+                    _estadoUi.update {
+                        it.copy(
+                            misLigas = ligas,
+                            ligaSeleccionada = ligaActualizada ?: it.ligaSeleccionada,
+                            cargando = false
+                        )
+                    }
                 }
             } catch (_: Exception) {
                 _estadoUi.update { it.copy(cargando = false, error = "Error al cargar ligas") }
             }
         }
+
+        viewModelScope.launch {
+            try {
+                repositorio.observarInvitaciones().collect { invitaciones ->
+                    _estadoUi.update { it.copy(invitaciones = invitaciones) }
+                }
+            } catch (_: Exception) {
+                _estadoUi.update { it.copy(error = "Error al cargar invitaciones") }
+            }
+        }
+
+        viewModelScope.launch {
+            try {
+                val amigos = repositorioAmigos.obtenerAmigos()
+                _estadoUi.update { it.copy(misAmigos = amigos) }
+            } catch (_: Exception) { }
+        }
+    }
+
+    fun cargarDatos() {
+        observarDatos()
     }
 
     // ================= CREAR =================
 
-    // Crea una nueva liga y recarga los datos
     fun crearLiga(nombre: String) {
         if (nombre.isBlank()) {
             _estadoUi.update { it.copy(error = "El nombre no puede estar vacío") }
@@ -74,7 +100,6 @@ class LigasViewModel : ViewModel() {
             _estadoUi.update { it.copy(cargando = true) }
             val ligaId = repositorio.crearLiga(nombre)
             if (ligaId != null) {
-                cargarDatos()
                 _estadoUi.update { it.copy(mensaje = "Liga creada") }
             } else {
                 _estadoUi.update { it.copy(cargando = false, error = "Error al crear la liga") }
@@ -84,7 +109,7 @@ class LigasViewModel : ViewModel() {
 
     // ================= INVITAR =================
 
-    // Invita a un amigo comprobando que no sea ya miembro
+    // Invita a un amigo y actualiza localmente la liga al instante
     fun invitarAmigo(ligaId: String, amigoUid: String) {
         viewModelScope.launch {
             val yaEsMiembro = _estadoUi.value.ligaSeleccionada
@@ -96,44 +121,43 @@ class LigasViewModel : ViewModel() {
             }
 
             val exito = repositorio.invitarAmigo(ligaId, amigoUid)
-            _estadoUi.update {
-                it.copy(
-                    mensaje = if (exito) "Invitación enviada" else null,
-                    error = if (!exito) "Error al enviar la invitación" else null
-                )
+            if (exito) {
+                // Actualiza localmente para que desaparezca al instante de la lista
+                _estadoUi.update { estado ->
+                    val ligaActualizada = estado.ligaSeleccionada?.copy(
+                        miembros = estado.ligaSeleccionada.miembros + MiembroLiga(
+                            uid = amigoUid,
+                            estado = EstadoMiembro.PENDIENTE
+                        )
+                    )
+                    estado.copy(
+                        ligaSeleccionada = ligaActualizada,
+                        mensaje = "Invitación enviada"
+                    )
+                }
+            } else {
+                _estadoUi.update { it.copy(error = "Error al enviar la invitación") }
             }
         }
     }
 
     // ================= ACEPTAR / RECHAZAR =================
 
-    // Acepta la invitación y recarga los datos
     fun aceptarInvitacion(ligaId: String) {
         viewModelScope.launch {
             val exito = repositorio.aceptarInvitacion(ligaId)
             if (exito) {
-                _estadoUi.update { estado ->
-                    estado.copy(
-                        invitaciones = estado.invitaciones.filter { it.ligaId != ligaId },
-                        mensaje = "Te has unido a la liga"
-                    )
-                }
-                cargarDatos()
+                _estadoUi.update { it.copy(mensaje = "Te has unido a la liga") }
             } else {
                 _estadoUi.update { it.copy(error = "Error al aceptar la invitación") }
             }
         }
     }
 
-    // Rechaza y elimina la invitación de la lista
     fun rechazarInvitacion(ligaId: String) {
         viewModelScope.launch {
             val exito = repositorio.rechazarInvitacion(ligaId)
-            if (exito) {
-                _estadoUi.update { estado ->
-                    estado.copy(invitaciones = estado.invitaciones.filter { it.ligaId != ligaId })
-                }
-            } else {
+            if (!exito) {
                 _estadoUi.update { it.copy(error = "Error al rechazar la invitación") }
             }
         }
@@ -141,14 +165,12 @@ class LigasViewModel : ViewModel() {
 
     // ================= SALIR =================
 
-    // Sale de la liga y la elimina de la lista
     fun salirDeLiga(ligaId: String) {
         viewModelScope.launch {
             val exito = repositorio.salirDeLiga(ligaId)
             if (exito) {
                 _estadoUi.update { estado ->
                     estado.copy(
-                        misLigas = estado.misLigas.filter { it.id != ligaId },
                         ligaSeleccionada = null,
                         rankingLiga = emptyList(),
                         mensaje = "Has salido de la liga"
@@ -162,18 +184,15 @@ class LigasViewModel : ViewModel() {
 
     // ================= SELECCIÓN =================
 
-    // Selecciona una liga y carga su ranking
     fun seleccionarLiga(liga: Liga) {
         _estadoUi.update { it.copy(ligaSeleccionada = liga) }
         cargarRankingLiga(liga.id)
     }
 
-    // Deselecciona la liga actual
     fun deseleccionarLiga() {
         _estadoUi.update { it.copy(ligaSeleccionada = null, rankingLiga = emptyList()) }
     }
 
-    // Carga el ranking de una liga específica
     private fun cargarRankingLiga(ligaId: String) {
         viewModelScope.launch {
             _estadoUi.update { it.copy(cargandoRanking = true) }
@@ -188,7 +207,6 @@ class LigasViewModel : ViewModel() {
 
     // ================= HELPERS =================
 
-    // Limpia mensajes y errores de la UI
     fun limpiarMensaje() {
         _estadoUi.update { it.copy(mensaje = null, error = null) }
     }

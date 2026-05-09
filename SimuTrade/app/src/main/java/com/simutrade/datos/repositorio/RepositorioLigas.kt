@@ -11,7 +11,10 @@ import com.simutrade.datos.modelo.Liga
 import com.simutrade.datos.modelo.MiembroLiga
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 class RepositorioLigas {
@@ -19,7 +22,6 @@ class RepositorioLigas {
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
 
-    // UID del usuario autenticado actualmente
     private val uid get() = auth.currentUser?.uid
 
     companion object {
@@ -32,7 +34,6 @@ class RepositorioLigas {
 
     // ================= CREAR =================
 
-    // Crea una liga y añade al creador como miembro aceptado
     suspend fun crearLiga(nombre: String): String? {
         val miUid = uid ?: return null
         return try {
@@ -61,7 +62,6 @@ class RepositorioLigas {
             )
             batch.commit().await()
 
-            // Añade la liga al array del usuario
             firestore.collection(USUARIOS).document(miUid)
                 .update("mis_ligas", FieldValue.arrayUnion(ligaId)).await()
 
@@ -74,7 +74,6 @@ class RepositorioLigas {
 
     // ================= INVITAR =================
 
-    // Invita a un amigo a la liga y le crea la invitación pendiente
     suspend fun invitarAmigo(ligaId: String, amigoUid: String): Boolean {
         val miUid = uid ?: return false
         return try {
@@ -90,7 +89,6 @@ class RepositorioLigas {
 
             val batch = firestore.batch()
 
-            // Añade al amigo como miembro pendiente
             batch.set(
                 firestore.collection(LIGAS).document(ligaId)
                     .collection(MIEMBROS).document(amigoUid),
@@ -103,7 +101,6 @@ class RepositorioLigas {
                 )
             )
 
-            // Crea la invitación en el perfil del amigo
             batch.set(
                 firestore.collection(USUARIOS).document(amigoUid)
                     .collection(INVITACIONES).document(ligaId),
@@ -125,7 +122,6 @@ class RepositorioLigas {
 
     // ================= ACEPTAR / RECHAZAR =================
 
-    // Acepta la invitación y añade la liga al perfil del usuario
     suspend fun aceptarInvitacion(ligaId: String): Boolean {
         val miUid = uid ?: return false
         return try {
@@ -152,7 +148,6 @@ class RepositorioLigas {
         }
     }
 
-    // Rechaza la invitación y elimina al usuario de los miembros
     suspend fun rechazarInvitacion(ligaId: String): Boolean {
         val miUid = uid ?: return false
         return try {
@@ -176,7 +171,6 @@ class RepositorioLigas {
 
     // ================= SALIR =================
 
-    // Sale de la liga con lógica según si es el último miembro o el creador
     suspend fun salirDeLiga(ligaId: String): Boolean {
         val miUid = uid ?: return false
         return try {
@@ -188,7 +182,6 @@ class RepositorioLigas {
             val batch = firestore.batch()
 
             when {
-                // Último miembro → eliminar la liga entera
                 miembrosAceptados.size <= 1 -> {
                     miembrosAceptados.forEach { miembro ->
                         batch.delete(
@@ -199,7 +192,6 @@ class RepositorioLigas {
                     batch.delete(firestore.collection(LIGAS).document(ligaId))
                 }
 
-                // Es el creador pero hay más miembros → transferir al siguiente
                 creadoPor == miUid -> {
                     val nuevoCreador = miembrosAceptados.first { it.uid != miUid }
                     batch.update(
@@ -212,7 +204,6 @@ class RepositorioLigas {
                     )
                 }
 
-                // Miembro normal → simplemente salir
                 else -> {
                     batch.delete(
                         firestore.collection(LIGAS).document(ligaId)
@@ -223,7 +214,6 @@ class RepositorioLigas {
 
             batch.commit().await()
 
-            // Quitar la liga del array del usuario
             firestore.collection(USUARIOS).document(miUid)
                 .update("mis_ligas", FieldValue.arrayRemove(ligaId)).await()
 
@@ -234,9 +224,94 @@ class RepositorioLigas {
         }
     }
 
+    // ================= OBSERVAR EN TIEMPO REAL =================
+
+    // Escucha las ligas del usuario en tiempo real
+    fun observarMisLigas(): Flow<List<Liga>> = callbackFlow {
+        val miUid = uid ?: run { trySend(emptyList()); close(); return@callbackFlow }
+
+        val listener = firestore.collection(USUARIOS).document(miUid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "Error observarMisLigas", error)
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                val misLigaIds = (snapshot?.get("mis_ligas") as? List<*>)
+                    ?.filterIsInstance<String>() ?: emptyList()
+
+                if (misLigaIds.isEmpty()) {
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+
+                // Carga cada liga
+                val ligas = mutableListOf<Liga>()
+                var pendientes = misLigaIds.size
+                misLigaIds.forEach { ligaId ->
+                    firestore.collection(LIGAS).document(ligaId).get()
+                        .addOnSuccessListener { ligaDoc ->
+                            firestore.collection(LIGAS).document(ligaId)
+                                .collection(MIEMBROS).get()
+                                .addOnSuccessListener { miembrosSnap ->
+                                    val miembros = miembrosSnap.documents.map { doc ->
+                                        MiembroLiga(
+                                            uid = doc.getString("uid") ?: "",
+                                            nombreUsuario = doc.getString("nombre_usuario") ?: "",
+                                            codigoUsuario = doc.getString("codigo_usuario") ?: "",
+                                            estado = when (doc.getString("estado")) {
+                                                "aceptado" -> EstadoMiembro.ACEPTADO
+                                                else -> EstadoMiembro.PENDIENTE
+                                            },
+                                            invitadoPor = doc.getString("invitado_por") ?: ""
+                                        )
+                                    }
+                                    ligas.add(Liga(
+                                        id = ligaDoc.id,
+                                        nombre = ligaDoc.getString("nombre") ?: "",
+                                        creadoPor = ligaDoc.getString("creado_por") ?: "",
+                                        creadoEn = ligaDoc.getLong("creado_en") ?: 0L,
+                                        miembros = miembros
+                                    ))
+                                    pendientes--
+                                    if (pendientes == 0) trySend(ligas.toList())
+                                }
+                        }
+                        .addOnFailureListener { pendientes--; if (pendientes == 0) trySend(ligas.toList()) }
+                }
+            }
+
+        awaitClose { listener.remove() }
+    }
+
+    // Escucha las invitaciones del usuario en tiempo real
+    fun observarInvitaciones(): Flow<List<InvitacionLiga>> = callbackFlow {
+        val miUid = uid ?: run { trySend(emptyList()); close(); return@callbackFlow }
+
+        val listener = firestore.collection(USUARIOS).document(miUid)
+            .collection(INVITACIONES)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "Error observarInvitaciones", error)
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                val invitaciones = snapshot?.documents?.map { doc ->
+                    InvitacionLiga(
+                        ligaId = doc.getString("liga_id") ?: "",
+                        nombreLiga = doc.getString("nombre_liga") ?: "",
+                        invitadoPor = doc.getString("invitado_por") ?: "",
+                        creadoEn = doc.getLong("creado_en") ?: 0L
+                    )
+                } ?: emptyList()
+                trySend(invitaciones)
+            }
+
+        awaitClose { listener.remove() }
+    }
+
     // ================= OBTENER =================
 
-    // Obtiene todas las ligas en las que participa el usuario
     suspend fun obtenerMisLigas(): List<Liga> {
         val miUid = uid ?: return emptyList()
         return try {
@@ -262,7 +337,6 @@ class RepositorioLigas {
         }
     }
 
-    // Devuelve todos los miembros (aceptados y pendientes)
     suspend fun obtenerMiembrosLiga(ligaId: String): List<MiembroLiga> {
         return try {
             val snapshot = firestore.collection(LIGAS).document(ligaId)
@@ -286,7 +360,6 @@ class RepositorioLigas {
         }
     }
 
-    // Obtiene las invitaciones pendientes del usuario
     suspend fun obtenerInvitaciones(): List<InvitacionLiga> {
         val miUid = uid ?: return emptyList()
         return try {
@@ -309,7 +382,6 @@ class RepositorioLigas {
 
     // ================= RANKING =================
 
-    // Ranking de la liga, solo con miembros aceptados ordenados por beneficio
     suspend fun obtenerRankingLiga(ligaId: String): List<EntradaRanking> = coroutineScope {
         try {
             val miembros = obtenerMiembrosLiga(ligaId)
