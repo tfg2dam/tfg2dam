@@ -87,6 +87,7 @@ fun LigasScreen(
             misAmigos = estadoUi.misAmigos.filter { amigo ->
                 estadoUi.ligaSeleccionada?.miembros?.none { it.uid == amigo.uid } == true
             },
+            tieneAmigos = estadoUi.misAmigos.isNotEmpty(), // ← nuevo parámetro
             miUid = estadoUi.miUid,
             estadoUiUsuario = estadoUiUsuario,
             mensaje = estadoUi.mensaje,
@@ -176,6 +177,7 @@ fun DetalleLigaScreen(
     ranking: List<EntradaRanking>,
     cargandoRanking: Boolean,
     misAmigos: List<Amigo>,
+    tieneAmigos: Boolean, // ← nuevo parámetro
     miUid: String,
     estadoUiUsuario: UsuarioViewModel.EstadoUi,
     mensaje: String?,
@@ -209,19 +211,17 @@ fun DetalleLigaScreen(
     }
 
     val posicionEnLiga = ranking.indexOfFirst { it.id == miUid }
-
-    // Comprueba si es el último miembro aceptado
     val esUltimoMiembro = liga.miembros.count { it.estado == EstadoMiembro.ACEPTADO } <= 1
 
     if (mostrarDialogoInvitar) {
         DialogoInvitarAmigo(
             amigos = misAmigos,
+            tieneAmigos = tieneAmigos, // ← nuevo parámetro
             onInvitar = { amigoUid -> onInvitar(amigoUid); mostrarDialogoInvitar = false },
             onCancelar = { mostrarDialogoInvitar = false }
         )
     }
 
-    // Diálogo de confirmación para salir — mensaje distinto si es el último miembro
     if (mostrarDialogoSalir) {
         AlertDialog(
             onDismissRequest = { mostrarDialogoSalir = false },
@@ -245,8 +245,6 @@ fun DetalleLigaScreen(
 
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { paddingValues ->
         Column(modifier = Modifier.fillMaxSize().padding(bottom = paddingValues.calculateBottomPadding())) {
-
-            // ================= HEADER =================
 
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -275,8 +273,6 @@ fun DetalleLigaScreen(
             HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
 
             Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-
-                // ================= TARJETA USUARIO (FIJA) =================
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -309,8 +305,6 @@ fun DetalleLigaScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // ================= CABECERA LISTA (FIJA) =================
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -323,8 +317,6 @@ fun DetalleLigaScreen(
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
-
-                // ================= LISTA SCROLLEABLE =================
 
                 if (cargandoRanking) {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -407,13 +399,22 @@ fun DialogoCrearLiga(onConfirmar: (String) -> Unit, onCancelar: () -> Unit) {
 // ================= DIÁLOGO INVITAR AMIGO =================
 
 @Composable
-fun DialogoInvitarAmigo(amigos: List<Amigo>, onInvitar: (String) -> Unit, onCancelar: () -> Unit) {
+fun DialogoInvitarAmigo(
+    amigos: List<Amigo>,
+    tieneAmigos: Boolean, // ← distingue entre sin amigos y todos ya en liga
+    onInvitar: (String) -> Unit,
+    onCancelar: () -> Unit
+) {
     AlertDialog(
         onDismissRequest = onCancelar,
         title = { Text("Invitar amigo") },
         text = {
             if (amigos.isEmpty()) {
-                Text("Todos tus amigos ya están en la liga")
+                if (!tieneAmigos) {
+                    Text("No tienes amigos añadidos. Ve a la sección Amigos para agregar a alguien.")
+                } else {
+                    Text("Todos tus amigos ya están en la liga.")
+                }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(amigos) { amigo ->

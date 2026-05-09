@@ -5,6 +5,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.simutrade.datos.modelo.Amigo
 import com.simutrade.datos.modelo.SolicitudAmistad
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 class RepositorioAmigos {
@@ -12,7 +15,6 @@ class RepositorioAmigos {
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
 
-    // UID del usuario autenticado actualmente
     private val uid get() = auth.currentUser?.uid
 
     companion object {
@@ -24,7 +26,6 @@ class RepositorioAmigos {
 
     // ================= BUSCAR =================
 
-    // Busca un usuario por su código único
     suspend fun buscarPorCodigo(codigo: String): Amigo? {
         return try {
             val codigoLimpio = codigo.removePrefix("#").uppercase().trim()
@@ -48,7 +49,6 @@ class RepositorioAmigos {
 
     // ================= SOLICITUDES =================
 
-    // Envía una solicitud de amistad al usuario indicado
     suspend fun enviarSolicitud(amigoUid: String): Boolean {
         val miUid = uid ?: return false
         return try {
@@ -72,7 +72,6 @@ class RepositorioAmigos {
         }
     }
 
-    // Acepta una solicitud: añade amigo a ambos usuarios y borra la solicitud
     suspend fun aceptarSolicitud(solicitanteUid: String): Boolean {
         val miUid = uid ?: return false
         return try {
@@ -84,7 +83,6 @@ class RepositorioAmigos {
             val amigoNombre = amigoDoc.getString("nombre_usuario") ?: ""
             val amigoCodigo = amigoDoc.getString("codigo_usuario") ?: ""
 
-            // Batch para hacer las 3 operaciones de golpe
             val batch = firestore.batch()
 
             batch.set(
@@ -110,7 +108,6 @@ class RepositorioAmigos {
         }
     }
 
-    // Rechaza y elimina la solicitud de amistad
     suspend fun rechazarSolicitud(solicitanteUid: String): Boolean {
         val miUid = uid ?: return false
         return try {
@@ -126,7 +123,6 @@ class RepositorioAmigos {
 
     // ================= AMIGOS =================
 
-    // Elimina la amistad en ambos usuarios a la vez
     suspend fun eliminarAmigo(amigoUid: String): Boolean {
         val miUid = uid ?: return false
         return try {
@@ -147,7 +143,57 @@ class RepositorioAmigos {
         }
     }
 
-    // Obtiene la lista de amigos del usuario
+    // Escucha amigos en tiempo real con Flow
+    fun observarAmigos(): Flow<List<Amigo>> = callbackFlow {
+        val miUid = uid ?: run { trySend(emptyList()); close(); return@callbackFlow }
+
+        val listener = firestore.collection(USUARIOS).document(miUid)
+            .collection(AMIGOS)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "Error observarAmigos", error)
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                val amigos = snapshot?.documents?.map { doc ->
+                    Amigo(
+                        uid = doc.getString("uid") ?: "",
+                        nombreUsuario = doc.getString("nombre_usuario") ?: "",
+                        codigoUsuario = doc.getString("codigo_usuario") ?: ""
+                    )
+                } ?: emptyList()
+                trySend(amigos)
+            }
+
+        awaitClose { listener.remove() }
+    }
+
+    // Escucha solicitudes en tiempo real con Flow
+    fun observarSolicitudes(): Flow<List<SolicitudAmistad>> = callbackFlow {
+        val miUid = uid ?: run { trySend(emptyList()); close(); return@callbackFlow }
+
+        val listener = firestore.collection(USUARIOS).document(miUid)
+            .collection(SOLICITUDES)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "Error observarSolicitudes", error)
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                val solicitudes = snapshot?.documents?.map { doc ->
+                    SolicitudAmistad(
+                        uid = doc.getString("uid") ?: "",
+                        nombreUsuario = doc.getString("nombre_usuario") ?: "",
+                        codigoUsuario = doc.getString("codigo_usuario") ?: ""
+                    )
+                } ?: emptyList()
+                trySend(solicitudes)
+            }
+
+        awaitClose { listener.remove() }
+    }
+
+    // Mantiene el método original para compatibilidad con LigasViewModel
     suspend fun obtenerAmigos(): List<Amigo> {
         val miUid = uid ?: return emptyList()
         return try {
@@ -166,7 +212,6 @@ class RepositorioAmigos {
         }
     }
 
-    // Obtiene las solicitudes de amistad pendientes
     suspend fun obtenerSolicitudes(): List<SolicitudAmistad> {
         val miUid = uid ?: return emptyList()
         return try {
@@ -187,7 +232,6 @@ class RepositorioAmigos {
 
     // ================= COMPROBACIONES =================
 
-    // Comprueba si un usuario ya es amigo
     suspend fun esAmigo(amigoUid: String): Boolean {
         val miUid = uid ?: return false
         return try {
@@ -197,7 +241,6 @@ class RepositorioAmigos {
         } catch (_: Exception) { false }
     }
 
-    // Comprueba si ya se le ha enviado una solicitud
     suspend fun tieneSolicitudPendiente(amigoUid: String): Boolean {
         return try {
             val doc = firestore.collection(USUARIOS).document(amigoUid)

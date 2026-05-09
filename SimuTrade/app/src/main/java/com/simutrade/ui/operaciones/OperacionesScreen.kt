@@ -61,11 +61,11 @@ fun OperacionesScreen(
 
     var modoCompra by remember { mutableStateOf(true) }
     var cantidad by remember { mutableStateOf("") }
-    var modoPorDinero by remember { mutableStateOf(false) } // Nuevo: modo alternativo
-    var dinero by remember { mutableStateOf("") } // Nuevo: campo para dinero
+    var modoPorDinero by remember { mutableStateOf(false) }
+    var dinero by remember { mutableStateOf("") }
     var procesando by remember { mutableStateOf(false) }
-    var modoPorDineroVenta by remember { mutableStateOf(false) } // Nuevo: modo alternativo venta
-    var dineroVenta by remember { mutableStateOf("") } // Nuevo: campo para dinero venta
+    var modoPorDineroVenta by remember { mutableStateOf(false) }
+    var dineroVenta by remember { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -82,7 +82,7 @@ fun OperacionesScreen(
         } else {
             val activo = activoSeleccionado
             val activoEnCartera = estadoUi.cartera.find { it.idActivo == activo.id }
-                    val cantidadDouble = if (modoCompra) {
+            val cantidadDouble = if (modoCompra) {
                 if (!modoPorDinero) parsearCantidad(cantidad) else {
                     val dineroDouble = parsearCantidad(dinero)
                     if (activo.precioActual > 0) dineroDouble / activo.precioActual else 0.0
@@ -148,7 +148,6 @@ fun OperacionesScreen(
                             )
                         }
 
-                        // Tienes y ganancia/pérdida en columna, uno debajo del otro
                         activoEnCartera?.let {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
@@ -204,6 +203,9 @@ fun OperacionesScreen(
                         onComprar = {
                             if (procesando) return@FormularioCompra
                             procesando = true
+                            // ← limpia los campos inmediatamente al pulsar
+                            cantidad = ""
+                            dinero = ""
                             usuarioViewModel.comprarActivo(activo, cantidadDouble) { resultado ->
                                 scope.launch {
                                     snackbarHostState.showSnackbar(
@@ -212,9 +214,9 @@ fun OperacionesScreen(
                                             is ResultadoOperacion.Error -> resultado.mensaje
                                         }
                                     )
-                                    cantidad = ""
-                                    dinero = ""
+                                    // ← el snackbar ya desapareció, desbloquea el botón
                                     procesando = false
+                                    usuarioViewModel.cargarDatos()
                                 }
                             }
                         }
@@ -239,6 +241,9 @@ fun OperacionesScreen(
                         onVender = {
                             if (procesando) return@FormularioVenta
                             procesando = true
+                            // ← limpia los campos inmediatamente al pulsar
+                            cantidad = ""
+                            dineroVenta = ""
                             usuarioViewModel.venderActivo(activo.id, cantidadDouble, activo.precioActual) { resultado ->
                                 scope.launch {
                                     snackbarHostState.showSnackbar(
@@ -247,9 +252,9 @@ fun OperacionesScreen(
                                             is ResultadoOperacion.Error -> resultado.mensaje
                                         }
                                     )
-                                    cantidad = ""
-                                    dineroVenta = ""
+                                    // ← el snackbar ya desapareció, desbloquea el botón
                                     procesando = false
+                                    usuarioViewModel.cargarDatos()
                                 }
                             }
                         }
@@ -262,7 +267,6 @@ fun OperacionesScreen(
 
 // ================= SIN ACTIVO =================
 
-// Pantalla de fallback cuando no hay activo seleccionado
 @Composable
 fun SinActivoSeleccionado(
     modifier: Modifier = Modifier,
@@ -285,7 +289,6 @@ fun SinActivoSeleccionado(
 
 // ================= FORMULARIO COMPRA =================
 
-// Formulario para comprar un activo con validación de saldo y modo alternativo por dinero
 @Composable
 fun FormularioCompra(
     activo: Activo,
@@ -369,7 +372,6 @@ fun FormularioCompra(
 
 // ================= FORMULARIO VENTA =================
 
-// Formulario para vender un activo con validación de cantidad disponible y modo alternativo por dinero
 @Composable
 fun FormularioVenta(
     activo: Activo,
@@ -451,7 +453,6 @@ fun FormularioVenta(
 
 // ================= HELPERS =================
 
-// Parsea el input del usuario a Double aceptando coma y punto
 private fun parsearCantidad(input: String): Double {
     val limpio = input.replace(",", ".")
     val primerPunto = limpio.indexOf('.')
@@ -464,10 +465,8 @@ private fun parsearCantidad(input: String): Double {
     return sinPuntosExtra.toDoubleOrNull() ?: 0.0
 }
 
-// Comprueba si se puede comprar con el saldo disponible
 private fun puedeComprar(cantidad: Double, precio: Double, saldo: Double): Boolean =
     cantidad > 0 && precio > 0 && (cantidad * precio) <= saldo
 
-// Comprueba si se puede vender con la cantidad disponible en cartera
 private fun puedeVender(cantidad: Double, cantidadDisponible: Double?): Boolean =
     cantidadDisponible != null && cantidad > 0 && cantidad <= cantidadDisponible

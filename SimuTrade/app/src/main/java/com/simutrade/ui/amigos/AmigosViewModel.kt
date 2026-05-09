@@ -2,6 +2,7 @@ package com.simutrade.ui.amigos
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import com.simutrade.datos.modelo.Amigo
 import com.simutrade.datos.modelo.SolicitudAmistad
 import com.simutrade.datos.repositorio.RepositorioAmigos
@@ -33,27 +34,41 @@ class AmigosViewModel : ViewModel() {
 
     private var trabajoBusqueda: Job? = null
 
-    init { cargarDatos() }
+    init { observarDatos() }
 
-    // ================= CARGAR =================
+    // ================= OBSERVAR EN TIEMPO REAL =================
 
-    // Carga la lista de amigos y solicitudes pendientes
-    fun cargarDatos() {
+    private fun observarDatos() {
         viewModelScope.launch {
             _estadoUi.update { it.copy(cargando = true, error = null) }
             try {
-                val amigos = repositorio.obtenerAmigos()
-                val solicitudes = repositorio.obtenerSolicitudes()
-                _estadoUi.update { it.copy(amigos = amigos, solicitudes = solicitudes, cargando = false) }
+                repositorio.observarAmigos().collect { amigos ->
+                    _estadoUi.update { it.copy(amigos = amigos, cargando = false) }
+                }
             } catch (_: Exception) {
-                _estadoUi.update { it.copy(cargando = false, error = "Error al cargar datos") }
+                _estadoUi.update { it.copy(cargando = false, error = "Error al cargar amigos") }
             }
         }
+
+        viewModelScope.launch {
+            try {
+                repositorio.observarSolicitudes().collect { solicitudes ->
+                    _estadoUi.update { it.copy(solicitudes = solicitudes) }
+                }
+            } catch (_: Exception) {
+                _estadoUi.update { it.copy(error = "Error al cargar solicitudes") }
+            }
+        }
+    }
+
+    fun cargarDatos() {
+        observarDatos()
     }
 
     // ================= BUSCAR =================
 
     // Busca un usuario por código con debounce de 400ms
+    // Comprueba si es uno mismo, ya amigo o solicitud pendiente
     fun buscarPorCodigo(codigo: String) {
         trabajoBusqueda?.cancel()
 
@@ -67,6 +82,48 @@ class AmigosViewModel : ViewModel() {
             _estadoUi.update { it.copy(buscando = true, resultadoBusqueda = null, error = null) }
             try {
                 val resultado = repositorio.buscarPorCodigo(codigo)
+                val miUid = FirebaseAuth.getInstance().currentUser?.uid
+
+                // Es uno mismo
+                if (resultado != null && resultado.uid == miUid) {
+                    _estadoUi.update {
+                        it.copy(
+                            buscando = false,
+                            resultadoBusqueda = null,
+                            error = "No puedes añadirte a ti mismo"
+                        )
+                    }
+                    return@launch
+                }
+
+                if (resultado != null) {
+                    // Ya es amigo
+                    val yaEsAmigo = repositorio.esAmigo(resultado.uid)
+                    if (yaEsAmigo) {
+                        _estadoUi.update {
+                            it.copy(
+                                buscando = false,
+                                resultadoBusqueda = null,
+                                error = "Ya sois amigos"
+                            )
+                        }
+                        return@launch
+                    }
+
+                    // Ya tiene solicitud pendiente — no mostrar botón agregar
+                    val solicitudPendiente = repositorio.tieneSolicitudPendiente(resultado.uid)
+                    if (solicitudPendiente) {
+                        _estadoUi.update {
+                            it.copy(
+                                buscando = false,
+                                resultadoBusqueda = null,
+                                error = "Ya tienes una solicitud pendiente con este usuario"
+                            )
+                        }
+                        return@launch
+                    }
+                }
+
                 _estadoUi.update {
                     it.copy(
                         buscando = false,
@@ -86,6 +143,12 @@ class AmigosViewModel : ViewModel() {
     fun enviarSolicitud(amigoUid: String) {
         viewModelScope.launch {
             try {
+                val miUid = FirebaseAuth.getInstance().currentUser?.uid
+                if (amigoUid == miUid) {
+                    _estadoUi.update { it.copy(mensaje = "No puedes añadirte a ti mismo", resultadoBusqueda = null) }
+                    return@launch
+                }
+
                 val yaEsAmigo = repositorio.esAmigo(amigoUid)
                 if (yaEsAmigo) {
                     _estadoUi.update { it.copy(mensaje = "Ya sois amigos", resultadoBusqueda = null) }
@@ -111,33 +174,23 @@ class AmigosViewModel : ViewModel() {
         }
     }
 
-    // Acepta una solicitud y recarga los datos
+    // Acepta una solicitud — el listener actualizará la lista automáticamente
     fun aceptarSolicitud(solicitanteUid: String) {
         viewModelScope.launch {
             val exito = repositorio.aceptarSolicitud(solicitanteUid)
             if (exito) {
-                _estadoUi.update { estado ->
-                    estado.copy(
-                        solicitudes = estado.solicitudes.filter { it.uid != solicitanteUid },
-                        mensaje = "Solicitud aceptada"
-                    )
-                }
-                cargarDatos()
+                _estadoUi.update { it.copy(mensaje = "Solicitud aceptada") }
             } else {
                 _estadoUi.update { it.copy(error = "Error al aceptar la solicitud") }
             }
         }
     }
 
-    // Rechaza y elimina la solicitud de la lista
+    // Rechaza la solicitud — el listener actualizará la lista automáticamente
     fun rechazarSolicitud(solicitanteUid: String) {
         viewModelScope.launch {
             val exito = repositorio.rechazarSolicitud(solicitanteUid)
-            if (exito) {
-                _estadoUi.update { estado ->
-                    estado.copy(solicitudes = estado.solicitudes.filter { it.uid != solicitanteUid })
-                }
-            } else {
+            if (!exito) {
                 _estadoUi.update { it.copy(error = "Error al rechazar la solicitud") }
             }
         }
@@ -145,15 +198,11 @@ class AmigosViewModel : ViewModel() {
 
     // ================= AMIGOS =================
 
-    // Elimina un amigo de la lista
+    // Elimina un amigo — el listener actualizará la lista automáticamente
     fun eliminarAmigo(amigoUid: String) {
         viewModelScope.launch {
             val exito = repositorio.eliminarAmigo(amigoUid)
-            if (exito) {
-                _estadoUi.update { estado ->
-                    estado.copy(amigos = estado.amigos.filter { it.uid != amigoUid })
-                }
-            } else {
+            if (!exito) {
                 _estadoUi.update { it.copy(error = "Error al eliminar el amigo") }
             }
         }
@@ -161,7 +210,6 @@ class AmigosViewModel : ViewModel() {
 
     // ================= HELPERS =================
 
-    // Limpia mensajes y errores de la UI
     fun limpiarMensaje() {
         _estadoUi.update { it.copy(mensaje = null, error = null) }
     }
