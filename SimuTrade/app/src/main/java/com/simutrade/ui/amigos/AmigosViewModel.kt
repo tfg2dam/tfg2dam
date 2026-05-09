@@ -68,7 +68,7 @@ class AmigosViewModel : ViewModel() {
     // ================= BUSCAR =================
 
     // Busca un usuario por código con debounce de 400ms
-    // Comprueba si es uno mismo, ya amigo o solicitud pendiente
+    // Comprueba si es uno mismo, ya amigo, solicitud pendiente o el otro ya te envió solicitud
     fun buscarPorCodigo(codigo: String) {
         trabajoBusqueda?.cancel()
 
@@ -110,7 +110,7 @@ class AmigosViewModel : ViewModel() {
                         return@launch
                     }
 
-                    // Ya tiene solicitud pendiente — no mostrar botón agregar
+                    // Ya le envié una solicitud
                     val solicitudPendiente = repositorio.tieneSolicitudPendiente(resultado.uid)
                     if (solicitudPendiente) {
                         _estadoUi.update {
@@ -118,6 +118,19 @@ class AmigosViewModel : ViewModel() {
                                 buscando = false,
                                 resultadoBusqueda = null,
                                 error = "Ya tienes una solicitud pendiente con este usuario"
+                            )
+                        }
+                        return@launch
+                    }
+
+                    // El otro ya me envió una solicitud a mí
+                    val meEnvioSolicitud = repositorio.meTieneSolicitudPendiente(resultado.uid)
+                    if (meEnvioSolicitud) {
+                        _estadoUi.update {
+                            it.copy(
+                                buscando = false,
+                                resultadoBusqueda = null,
+                                error = "Este usuario ya te envió una solicitud. Acéptala en tu lista de solicitudes"
                             )
                         }
                         return@launch
@@ -158,6 +171,12 @@ class AmigosViewModel : ViewModel() {
                 val solicitudPendiente = repositorio.tieneSolicitudPendiente(amigoUid)
                 if (solicitudPendiente) {
                     _estadoUi.update { it.copy(mensaje = "Ya tienes una solicitud pendiente", resultadoBusqueda = null) }
+                    return@launch
+                }
+
+                val meEnvioSolicitud = repositorio.meTieneSolicitudPendiente(amigoUid)
+                if (meEnvioSolicitud) {
+                    _estadoUi.update { it.copy(mensaje = "Este usuario ya te envió una solicitud. Acéptala en tu lista de solicitudes", resultadoBusqueda = null) }
                     return@launch
                 }
 

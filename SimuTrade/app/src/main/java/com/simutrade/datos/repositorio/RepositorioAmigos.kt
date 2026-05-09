@@ -241,11 +241,22 @@ class RepositorioAmigos {
         } catch (_: Exception) { false }
     }
 
+    // Comprueba si yo ya le envié una solicitud al otro
     suspend fun tieneSolicitudPendiente(amigoUid: String): Boolean {
         return try {
             val doc = firestore.collection(USUARIOS).document(amigoUid)
                 .collection(SOLICITUDES)
                 .document(uid ?: return false).get().await()
+            doc.exists()
+        } catch (_: Exception) { false }
+    }
+
+    // Comprueba si el otro ya me envió una solicitud a mí
+    suspend fun meTieneSolicitudPendiente(amigoUid: String): Boolean {
+        val miUid = uid ?: return false
+        return try {
+            val doc = firestore.collection(USUARIOS).document(miUid)
+                .collection(SOLICITUDES).document(amigoUid).get().await()
             doc.exists()
         } catch (_: Exception) { false }
     }
