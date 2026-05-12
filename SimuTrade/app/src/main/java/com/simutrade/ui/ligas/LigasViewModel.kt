@@ -8,6 +8,7 @@ import com.simutrade.datos.modelo.EntradaRanking
 import com.simutrade.datos.modelo.EstadoMiembro
 import com.simutrade.datos.modelo.InvitacionLiga
 import com.simutrade.datos.modelo.Liga
+import com.simutrade.datos.modelo.MensajeChat
 import com.simutrade.datos.modelo.MiembroLiga
 import com.simutrade.datos.repositorio.RepositorioAmigos
 import com.simutrade.datos.repositorio.RepositorioLigas
@@ -17,12 +18,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-// Estado de la pantalla de ligas
 data class EstadoUiLigas(
     val misLigas: List<Liga> = emptyList(),
     val invitaciones: List<InvitacionLiga> = emptyList(),
     val ligaSeleccionada: Liga? = null,
     val rankingLiga: List<EntradaRanking> = emptyList(),
+    val mensajesChat: List<MensajeChat> = emptyList(),
     val misAmigos: List<Amigo> = emptyList(),
     val miUid: String = "",
     val cargando: Boolean = false,
@@ -35,6 +36,8 @@ class LigasViewModel : ViewModel() {
 
     private val repositorio = RepositorioLigas()
     private val repositorioAmigos = RepositorioAmigos()
+
+    private var cancelarListenerChat: (() -> Unit)? = null
 
     private val _estadoUi = MutableStateFlow(EstadoUiLigas())
     val estadoUi: StateFlow<EstadoUiLigas> = _estadoUi.asStateFlow()
@@ -109,7 +112,6 @@ class LigasViewModel : ViewModel() {
 
     // ================= INVITAR =================
 
-    // Invita a un amigo y actualiza localmente la liga al instante
     fun invitarAmigo(ligaId: String, amigoUid: String) {
         viewModelScope.launch {
             val yaEsMiembro = _estadoUi.value.ligaSeleccionada
@@ -122,7 +124,6 @@ class LigasViewModel : ViewModel() {
 
             val exito = repositorio.invitarAmigo(ligaId, amigoUid)
             if (exito) {
-                // Actualiza localmente para que desaparezca al instante de la lista
                 _estadoUi.update { estado ->
                     val ligaActualizada = estado.ligaSeleccionada?.copy(
                         miembros = estado.ligaSeleccionada.miembros + MiembroLiga(
@@ -169,10 +170,13 @@ class LigasViewModel : ViewModel() {
         viewModelScope.launch {
             val exito = repositorio.salirDeLiga(ligaId)
             if (exito) {
+                cancelarListenerChat?.invoke()
+                cancelarListenerChat = null
                 _estadoUi.update { estado ->
                     estado.copy(
                         ligaSeleccionada = null,
                         rankingLiga = emptyList(),
+                        mensajesChat = emptyList(),
                         mensaje = "Has salido de la liga"
                     )
                 }
@@ -187,10 +191,19 @@ class LigasViewModel : ViewModel() {
     fun seleccionarLiga(liga: Liga) {
         _estadoUi.update { it.copy(ligaSeleccionada = liga) }
         cargarRankingLiga(liga.id)
+        iniciarChatEnTiempoReal(liga.id)
     }
 
     fun deseleccionarLiga() {
-        _estadoUi.update { it.copy(ligaSeleccionada = null, rankingLiga = emptyList()) }
+        cancelarListenerChat?.invoke()
+        cancelarListenerChat = null
+        _estadoUi.update {
+            it.copy(
+                ligaSeleccionada = null,
+                rankingLiga = emptyList(),
+                mensajesChat = emptyList()
+            )
+        }
     }
 
     private fun cargarRankingLiga(ligaId: String) {
@@ -205,9 +218,30 @@ class LigasViewModel : ViewModel() {
         }
     }
 
+    // ================= CHAT =================
+
+    private fun iniciarChatEnTiempoReal(ligaId: String) {
+        cancelarListenerChat?.invoke()
+        cancelarListenerChat = repositorio.escucharMensajes(ligaId) { mensajes ->
+            _estadoUi.update { it.copy(mensajesChat = mensajes) }
+        }
+    }
+
+    fun enviarMensaje(ligaId: String, texto: String) {
+        if (texto.isBlank()) return
+        viewModelScope.launch {
+            repositorio.enviarMensaje(ligaId, texto)
+        }
+    }
+
     // ================= HELPERS =================
 
     fun limpiarMensaje() {
         _estadoUi.update { it.copy(mensaje = null, error = null) }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        cancelarListenerChat?.invoke()
     }
 }

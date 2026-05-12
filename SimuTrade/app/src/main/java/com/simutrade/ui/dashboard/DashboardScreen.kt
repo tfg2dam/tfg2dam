@@ -131,9 +131,12 @@ fun DashboardScreen(
 
         if (siguienteRango != null && rangoActual != null) {
             item(key = "progreso_rango") {
-                val progreso = ((beneficio - rangoActual.beneficioMinimo) /
-                        (siguienteRango.beneficioMinimo - rangoActual.beneficioMinimo))
-                    .toFloat().coerceIn(0f, 1f)
+                val minActual = if (rangoActual.beneficioMinimo.isInfinite()) 0.0
+                                else rangoActual.beneficioMinimo
+                val rango = siguienteRango.beneficioMinimo - minActual
+                val progreso = if (rango <= 0.0) 0f
+                                else ((beneficio - minActual) / rango)
+                                    .toFloat().coerceIn(0f, 1f)
                 TarjetaProgresoRango(
                     siguienteRango = siguienteRango,
                     beneficioActual = beneficio,

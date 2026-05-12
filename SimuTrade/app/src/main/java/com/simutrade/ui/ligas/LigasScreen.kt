@@ -3,6 +3,7 @@ package com.simutrade.ui.ligas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,16 +11,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
@@ -37,11 +44,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,8 +67,12 @@ import com.simutrade.datos.modelo.EntradaRanking
 import com.simutrade.datos.modelo.EstadoMiembro
 import com.simutrade.datos.modelo.InvitacionLiga
 import com.simutrade.datos.modelo.Liga
+import com.simutrade.datos.modelo.MensajeChat
 import com.simutrade.ui.tema.positive
 import com.simutrade.ui.usuario.UsuarioViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.round
 
 @Composable
@@ -84,10 +99,11 @@ fun LigasScreen(
             liga = estadoUi.ligaSeleccionada!!,
             ranking = estadoUi.rankingLiga,
             cargandoRanking = estadoUi.cargandoRanking,
+            mensajesChat = estadoUi.mensajesChat,
             misAmigos = estadoUi.misAmigos.filter { amigo ->
                 estadoUi.ligaSeleccionada?.miembros?.none { it.uid == amigo.uid } == true
             },
-            tieneAmigos = estadoUi.misAmigos.isNotEmpty(), // ← nuevo parámetro
+            tieneAmigos = estadoUi.misAmigos.isNotEmpty(),
             miUid = estadoUi.miUid,
             estadoUiUsuario = estadoUiUsuario,
             mensaje = estadoUi.mensaje,
@@ -98,6 +114,9 @@ fun LigasScreen(
             onRefrescar = {
                 ligasViewModel.seleccionarLiga(estadoUi.ligaSeleccionada!!)
                 usuarioViewModel.cargarDatos()
+            },
+            onEnviarMensaje = { texto ->
+                ligasViewModel.enviarMensaje(estadoUi.ligaSeleccionada!!.id, texto)
             }
         )
         return
@@ -176,8 +195,9 @@ fun DetalleLigaScreen(
     liga: Liga,
     ranking: List<EntradaRanking>,
     cargandoRanking: Boolean,
+    mensajesChat: List<MensajeChat>,
     misAmigos: List<Amigo>,
-    tieneAmigos: Boolean, // ← nuevo parámetro
+    tieneAmigos: Boolean,
     miUid: String,
     estadoUiUsuario: UsuarioViewModel.EstadoUi,
     mensaje: String?,
@@ -185,10 +205,12 @@ fun DetalleLigaScreen(
     onVolver: () -> Unit,
     onInvitar: (String) -> Unit,
     onSalir: () -> Unit,
-    onRefrescar: () -> Unit
+    onRefrescar: () -> Unit,
+    onEnviarMensaje: (String) -> Unit
 ) {
     var mostrarDialogoInvitar by remember { mutableStateOf(false) }
     var mostrarDialogoSalir by remember { mutableStateOf(false) }
+    var tabSeleccionado by remember { mutableIntStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(mensaje) {
@@ -216,7 +238,7 @@ fun DetalleLigaScreen(
     if (mostrarDialogoInvitar) {
         DialogoInvitarAmigo(
             amigos = misAmigos,
-            tieneAmigos = tieneAmigos, // ← nuevo parámetro
+            tieneAmigos = tieneAmigos,
             onInvitar = { amigoUid -> onInvitar(amigoUid); mostrarDialogoInvitar = false },
             onCancelar = { mostrarDialogoInvitar = false }
         )
@@ -246,6 +268,7 @@ fun DetalleLigaScreen(
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { paddingValues ->
         Column(modifier = Modifier.fillMaxSize().padding(bottom = paddingValues.calculateBottomPadding())) {
 
+            // Header
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -272,97 +295,287 @@ fun DetalleLigaScreen(
 
             HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
 
-            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            // Tabs
+            TabRow(selectedTabIndex = tabSeleccionado) {
+                Tab(
+                    selected = tabSeleccionado == 0,
+                    onClick = { tabSeleccionado = 0 },
+                    text = { Text("Ranking") },
+                    icon = { Icon(Icons.Default.EmojiEvents, null) }
+                )
+                Tab(
+                    selected = tabSeleccionado == 1,
+                    onClick = { tabSeleccionado = 1 },
+                    text = { Text("Chat") },
+                    icon = { Icon(Icons.Default.Forum, null) }
+                )
+            }
 
+            when (tabSeleccionado) {
+                0 -> TabRankingLiga(
+                    liga = liga,
+                    ranking = ranking,
+                    cargandoRanking = cargandoRanking,
+                    miUid = miUid,
+                    posicionEnLiga = posicionEnLiga,
+                    usuario = usuario,
+                    valorTotal = valorTotal,
+                    valorCartera = valorCartera,
+                    beneficioRedondeado = beneficioRedondeado,
+                    colorBeneficio = colorBeneficio,
+                    rangoActual = estadoUiUsuario.rangoActual,
+                    onRefrescar = onRefrescar
+                )
+                1 -> TabChatLiga(
+                    mensajes = mensajesChat,
+                    miUid = miUid,
+                    onEnviar = onEnviarMensaje
+                )
+            }
+        }
+    }
+}
+
+// ================= TAB RANKING =================
+
+@Composable
+fun TabRankingLiga(
+    liga: Liga,
+    ranking: List<EntradaRanking>,
+    cargandoRanking: Boolean,
+    miUid: String,
+    posicionEnLiga: Int,
+    usuario: com.simutrade.datos.modelo.DatosUsuario,
+    valorTotal: Double,
+    valorCartera: Double,
+    beneficioRedondeado: Double,
+    colorBeneficio: androidx.compose.ui.graphics.Color,
+    rangoActual: com.simutrade.datos.modelo.Rango?,
+    onRefrescar: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(text = "Tu posicion")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            text = if (posicionEnLiga != -1) "#${posicionEnLiga + 1} · ${usuario.nombreUsuario}" else usuario.nombreUsuario,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = (if (beneficioRedondeado > 0) "+" else "") + "€${"%.2f".format(beneficioRedondeado)}",
+                            fontWeight = FontWeight.Bold,
+                            color = colorBeneficio
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(text = "Total: €${"%.2f".format(valorTotal)}")
+                    Text(text = "Cartera: €${"%.2f".format(valorCartera)}")
+                    Text(text = "Efectivo: €${"%.2f".format(usuario.saldo)}")
+                    rangoActual?.let { rango ->
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "Rango: ${rango.nombre}")
+                    }
+                }
+            }
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "Top inversores", fontWeight = FontWeight.Bold)
+                IconButton(onClick = onRefrescar, enabled = !cargandoRanking) {
+                    Icon(imageVector = Icons.Default.Refresh, contentDescription = "Actualizar")
+                }
+            }
+        }
+
+        if (cargandoRanking) {
+            item {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+        } else {
+            itemsIndexed(ranking) { index, entrada ->
+                val esMiUsuario = entrada.id == miUid
+                val colorEntrada = when {
+                    entrada.beneficio > 0 -> MaterialTheme.colorScheme.positive
+                    entrada.beneficio < 0 -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.onSurface
+                }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (esMiUsuario) MaterialTheme.colorScheme.secondaryContainer
+                        else MaterialTheme.colorScheme.surfaceContainerHigh
+                    )
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(text = "Tu posición")
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(
-                                text = if (posicionEnLiga != -1) "#${posicionEnLiga + 1} · ${usuario.nombreUsuario}" else usuario.nombreUsuario,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = (if (beneficioRedondeado > 0) "+" else "") + "€${"%.2f".format(beneficioRedondeado)}",
-                                fontWeight = FontWeight.Bold,
-                                color = colorBeneficio
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(text = "Total: €${"%.2f".format(valorTotal)}")
-                        Text(text = "Cartera: €${"%.2f".format(valorCartera)}")
-                        Text(text = "Efectivo: €${"%.2f".format(usuario.saldo)}")
-                        estadoUiUsuario.rangoActual?.let { rango ->
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = "Rango: ${rango.nombre}")
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = "Top inversores", fontWeight = FontWeight.Bold)
-                    IconButton(onClick = onRefrescar, enabled = !cargandoRanking) {
-                        Icon(imageVector = Icons.Default.Refresh, contentDescription = "Actualizar")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (cargandoRanking) {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        itemsIndexed(ranking) { index, entrada ->
-                            val esMiUsuario = entrada.id == miUid
-                            val colorEntrada = when {
-                                entrada.beneficio > 0 -> MaterialTheme.colorScheme.positive
-                                entrada.beneficio < 0 -> MaterialTheme.colorScheme.error
-                                else -> MaterialTheme.colorScheme.onSurface
-                            }
-
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (esMiUsuario) MaterialTheme.colorScheme.secondaryContainer
-                                    else MaterialTheme.colorScheme.surfaceContainerHigh
-                                )
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(text = "${index + 1}.", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(text = entrada.nombreUsuario, fontWeight = FontWeight.Bold)
-                                        if (esMiUsuario) {
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(text = "tú", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                    Text(
-                                        text = (if (entrada.beneficio > 0) "+" else "") + "€${"%.2f".format(entrada.beneficio)}",
-                                        fontWeight = FontWeight.Bold,
-                                        color = colorEntrada
-                                    )
-                                }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "${index + 1}.", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = entrada.nombreUsuario, fontWeight = FontWeight.Bold)
+                            if (esMiUsuario) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(text = "tu", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                             }
                         }
+                        Text(
+                            text = (if (entrada.beneficio > 0) "+" else "") + "€${"%.2f".format(entrada.beneficio)}",
+                            fontWeight = FontWeight.Bold,
+                            color = colorEntrada
+                        )
                     }
                 }
+            }
+        }
+    }
+}
+
+// ================= TAB CHAT =================
+
+@Composable
+fun TabChatLiga(
+    mensajes: List<MensajeChat>,
+    miUid: String,
+    onEnviar: (String) -> Unit
+) {
+    var texto by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(mensajes.size) {
+        if (mensajes.isNotEmpty()) {
+            listState.animateScrollToItem(mensajes.size - 1)
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(vertical = 12.dp)
+        ) {
+            if (mensajes.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No hay mensajes todavia. Se el primero en escribir.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+            items(mensajes, key = { it.id }) { mensaje ->
+                BurbujaMensaje(mensaje = mensaje, esMio = mensaje.uid == miUid)
+            }
+        }
+
+        HorizontalDivider()
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = texto,
+                onValueChange = { texto = it },
+                placeholder = { Text("Escribe un mensaje...") },
+                modifier = Modifier.weight(1f),
+                maxLines = 3,
+                shape = MaterialTheme.shapes.large
+            )
+            IconButton(
+                onClick = {
+                    if (texto.isNotBlank()) {
+                        onEnviar(texto.trim())
+                        texto = ""
+                    }
+                },
+                enabled = texto.isNotBlank()
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Send,
+                    contentDescription = "Enviar",
+                    tint = if (texto.isNotBlank())
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                )
+            }
+        }
+    }
+}
+
+// ================= BURBUJA MENSAJE =================
+
+@Composable
+fun BurbujaMensaje(mensaje: MensajeChat, esMio: Boolean) {
+    val formatoHora = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = if (esMio) Alignment.End else Alignment.Start
+    ) {
+        if (!esMio) {
+            Text(
+                mensaje.nombreUsuario,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+            )
+        }
+
+        Surface(
+            shape = if (esMio)
+                MaterialTheme.shapes.large.copy(bottomEnd = CornerSize(4.dp))
+            else
+                MaterialTheme.shapes.large.copy(bottomStart = CornerSize(4.dp)),
+            color = if (esMio)
+                MaterialTheme.colorScheme.primary
+            else
+                MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.widthIn(max = 280.dp)
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Text(
+                    mensaje.texto,
+                    color = if (esMio)
+                        MaterialTheme.colorScheme.onPrimary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    formatoHora.format(Date(mensaje.enviadoEn)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (esMio)
+                        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.align(Alignment.End)
+                )
             }
         }
     }
@@ -401,7 +614,7 @@ fun DialogoCrearLiga(onConfirmar: (String) -> Unit, onCancelar: () -> Unit) {
 @Composable
 fun DialogoInvitarAmigo(
     amigos: List<Amigo>,
-    tieneAmigos: Boolean, // ← distingue entre sin amigos y todos ya en liga
+    tieneAmigos: Boolean,
     onInvitar: (String) -> Unit,
     onCancelar: () -> Unit
 ) {
@@ -411,9 +624,9 @@ fun DialogoInvitarAmigo(
         text = {
             if (amigos.isEmpty()) {
                 if (!tieneAmigos) {
-                    Text("No tienes amigos añadidos. Ve a la sección Amigos para agregar a alguien.")
+                    Text("No tienes amigos añadidos. Ve a la seccion Amigos para agregar a alguien.")
                 } else {
-                    Text("Todos tus amigos ya están en la liga.")
+                    Text("Todos tus amigos ya estan en la liga.")
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {

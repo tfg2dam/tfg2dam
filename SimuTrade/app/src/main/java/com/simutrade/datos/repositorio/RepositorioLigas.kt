@@ -4,6 +4,8 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import com.simutrade.datos.modelo.MensajeChat
 import com.simutrade.datos.modelo.EntradaRanking
 import com.simutrade.datos.modelo.EstadoMiembro
 import com.simutrade.datos.modelo.InvitacionLiga
@@ -405,5 +407,51 @@ class RepositorioLigas {
             Log.e(TAG, "Error obtenerRankingLiga", e)
             emptyList()
         }
+    }
+
+    // Enviar mensaje al chat de la liga
+    suspend fun enviarMensaje(ligaId: String, texto: String): Boolean {
+        val miUid = uid ?: return false
+        return try {
+            val miDoc = firestore.collection(USUARIOS).document(miUid).get().await()
+            val miNombre = miDoc.getString("nombre_usuario") ?: ""
+
+            firestore.collection(LIGAS).document(ligaId)
+                .collection("mensajes")
+                .add(mapOf(
+                    "uid"            to miUid,
+                    "nombre_usuario" to miNombre,
+                    "texto"          to texto,
+                    "enviado_en"     to System.currentTimeMillis()
+                )).await()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error enviarMensaje", e)
+            false
+        }
+    }
+
+    // Escuchar mensajes en tiempo real (devuelve la función para cancelar el listener)
+    fun escucharMensajes(
+        ligaId: String,
+        onMensajes: (List<MensajeChat>) -> Unit
+    ): () -> Unit {
+        val listener = firestore.collection(LIGAS).document(ligaId)
+            .collection("mensajes")
+            .orderBy("enviado_en", Query.Direction.ASCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null || snapshot == null) return@addSnapshotListener
+                val mensajes = snapshot.documents.map { doc ->
+                    MensajeChat(
+                        id            = doc.id,
+                        uid           = doc.getString("uid") ?: "",
+                        nombreUsuario = doc.getString("nombre_usuario") ?: "",
+                        texto         = doc.getString("texto") ?: "",
+                        enviadoEn     = doc.getLong("enviado_en") ?: 0L
+                    )
+                }
+                onMensajes(mensajes)
+            }
+        return { listener.remove() }
     }
 }

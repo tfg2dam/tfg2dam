@@ -156,6 +156,14 @@ data class InvitacionLiga(
     val creadoEn: Long = 0L
 )
 
+data class MensajeChat(
+    val id: String = "",
+    val uid: String = "",
+    val nombreUsuario: String = "",
+    val texto: String = "",
+    val enviadoEn: Long = 0L
+)
+
 // ================= RESULTADOS =================
 
 // Resultado genérico de una operación
