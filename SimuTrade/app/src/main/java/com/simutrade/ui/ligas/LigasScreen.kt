@@ -480,7 +480,7 @@ fun TabChatLiga(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "No hay mensajes todavia. Se el primero en escribir.",
+                            "No hay mensajes todavía. Sé el primero en escribir.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium
                         )

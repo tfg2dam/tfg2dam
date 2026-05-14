@@ -7,6 +7,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
+import com.simutrade.BuildConfig
 
 // ================= DTO =================
 
@@ -54,7 +55,7 @@ object ClienteFinnhub {
     private const val TIMEOUT_SEGUNDOS = 10L
 
     // API key de Finnhub — no compartir públicamente
-    const val API_KEY = "d7dsf8pr01qmm59ebt6gd7dsf8pr01qmm59ebt70"
+    const val API_KEY = BuildConfig.FINNHUB_API_KEY
 
     // Añade la API key en cada petición automáticamente
     private val clienteHttp = OkHttpClient.Builder()

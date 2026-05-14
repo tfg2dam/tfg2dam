@@ -210,7 +210,7 @@ class RetosViewModel : ViewModel() {
             "beneficio" -> {
                 val cartera = repositorio.obtenerCartera()
                 val usuario = repositorio.obtenerDatosUsuario()
-                val beneficio = (usuario.saldo + cartera.sumOf { it.valorActual }) - usuario.saldoInicial
+                val beneficio = (usuario.saldo - usuario.saldoBonus + cartera.sumOf { it.valorActual }) - usuario.saldoInicial
                 if (beneficio > 0) ValidacionReto(true, "Vas ganando €${"%.2f".format(beneficio)}")
                 else ValidacionReto(false, "Tu cartera aún no está en positivo")
             }

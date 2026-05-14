@@ -27,10 +27,19 @@ class RepositorioAutenticacion {
 
     // ================= UTILIDADES =================
 
-    // Genera un código único de 8 caracteres para el usuario
-    private fun generarCodigoUsuario(): String {
+    // Genera un código identificativo de 8 caracteres verificando que no exista ya en Firestore
+    private suspend fun generarCodigoUnico(): String {
         val caracteres = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        return (1..8).map { caracteres.random() }.joinToString("")
+        var codigo: String
+        do {
+            codigo = (1..8).map { caracteres.random() }.joinToString("")
+            val existe = firestore.collection(USUARIOS)
+                .whereEqualTo("codigo_usuario", codigo)
+                .limit(1)
+                .get().await()
+                .isEmpty
+        } while (!existe)
+        return codigo
     }
 
     // Traduce los errores de Firebase a mensajes legibles
@@ -68,7 +77,6 @@ class RepositorioAutenticacion {
 
     // ================= LOGIN =================
 
-    // Inicia sesión y actualiza el último login en Firestore
     suspend fun iniciarSesion(email: String, password: String): ResultadoAutenticacion {
         return try {
             val resultado = autenticacion
@@ -92,7 +100,6 @@ class RepositorioAutenticacion {
 
     // ================= LOGIN CON GOOGLE =================
 
-    // Autentica con el token de Google y crea el usuario si es la primera vez
     suspend fun iniciarSesionConGoogle(idToken: String): ResultadoAutenticacion {
         return try {
             val credencial = GoogleAuthProvider.getCredential(idToken, null)
@@ -110,7 +117,7 @@ class RepositorioAutenticacion {
                     mapOf(
                         "nombre_usuario" to nombreUsuario,
                         "email" to (usuario.email ?: ""),
-                        "codigo_usuario" to generarCodigoUsuario(),
+                        "codigo_usuario" to generarCodigoUnico(),
                         "saldo" to SALDO_INICIAL,
                         "saldo_inicial" to SALDO_INICIAL,
                         "saldo_bonus" to 0.0,
@@ -146,7 +153,6 @@ class RepositorioAutenticacion {
 
     // ================= REGISTRO =================
 
-    // Crea el usuario en Firebase Auth y su documento en Firestore
     suspend fun registrarUsuario(
         email: String,
         password: String,
@@ -167,7 +173,7 @@ class RepositorioAutenticacion {
                 mapOf(
                     "nombre_usuario" to nombreUsuario,
                     "email" to email,
-                    "codigo_usuario" to generarCodigoUsuario(),
+                    "codigo_usuario" to generarCodigoUnico(),
                     "saldo" to SALDO_INICIAL,
                     "saldo_inicial" to SALDO_INICIAL,
                     "saldo_bonus" to 0.0,
@@ -200,7 +206,6 @@ class RepositorioAutenticacion {
 
     // ================= LOGOUT =================
 
-    // Cierra la sesión de Firebase y también del cliente de Google
     fun cerrarSesion(context: Context) {
         autenticacion.signOut()
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
